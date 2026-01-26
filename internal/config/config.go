@@ -1,0 +1,143 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/pelletier/go-toml/v2"
+)
+
+// AppConfig 应用配置
+type AppConfig struct {
+	Server   ServerConfig   `toml:"server"`
+	Data     DataConfig     `toml:"data"`
+	Business BusinessConfig `toml:"business"`
+}
+
+// ServerConfig 服务器配置
+type ServerConfig struct {
+	Port    int  `toml:"port"`
+	DevMode bool `toml:"dev_mode"`
+}
+
+// DataConfig 数据配置
+type DataConfig struct {
+	DataDir    string `toml:"data_dir"`
+	AutoBackup bool   `toml:"auto_backup"`
+}
+
+// BusinessConfig 业务配置
+type BusinessConfig struct {
+	DefaultMonth int     `toml:"default_month"`
+	MaxGrowth    float64 `toml:"max_growth"`
+	MinGrowth    float64 `toml:"min_growth"`
+}
+
+// DefaultConfig 默认配置
+func DefaultConfig() *AppConfig {
+	return &AppConfig{
+		Server: ServerConfig{
+			Port:    8080,
+			DevMode: false,
+		},
+		Data: DataConfig{
+			DataDir:    "data",
+			AutoBackup: true,
+		},
+		Business: BusinessConfig{
+			DefaultMonth: 1,
+			MaxGrowth:    0.5,
+			MinGrowth:    -0.3,
+		},
+	}
+}
+
+// GetExeDir 获取可执行文件所在目录
+func GetExeDir() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Dir(exe), nil
+}
+
+// LoadConfig 从 config.toml 加载配置
+// 配置文件位于可执行文件同目录下
+func LoadConfig() (*AppConfig, error) {
+	config := DefaultConfig()
+
+	exeDir, err := GetExeDir()
+	if err != nil {
+		// 无法获取可执行文件目录，使用当前目录
+		exeDir = "."
+	}
+
+	configPath := filepath.Join(exeDir, "config.toml")
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// 配置文件不存在，使用默认配置
+			return config, nil
+		}
+		return nil, err
+	}
+
+	if err := toml.Unmarshal(data, config); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+// SaveConfig 保存配置到 config.toml
+func SaveConfig(config *AppConfig) error {
+	exeDir, err := GetExeDir()
+	if err != nil {
+		exeDir = "."
+	}
+
+	configPath := filepath.Join(exeDir, "config.toml")
+
+	data, err := toml.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// EnsureDataDir 确保数据目录存在
+// 数据目录位于可执行文件同目录下
+func EnsureDataDir(config *AppConfig) (string, error) {
+	exeDir, err := GetExeDir()
+	if err != nil {
+		exeDir = "."
+	}
+
+	dataDir := filepath.Join(exeDir, config.Data.DataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return "", err
+	}
+
+	// 创建子目录
+	subdirs := []string{"uploads", "exports", "backups"}
+	for _, subdir := range subdirs {
+		path := filepath.Join(dataDir, subdir)
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return "", err
+		}
+	}
+
+	return dataDir, nil
+}
+
+// GetDataPath 获取数据文件路径
+func GetDataPath(config *AppConfig, subdir, filename string) string {
+	exeDir, _ := GetExeDir()
+	if exeDir == "" {
+		exeDir = "."
+	}
+	return filepath.Join(exeDir, config.Data.DataDir, subdir, filename)
+}

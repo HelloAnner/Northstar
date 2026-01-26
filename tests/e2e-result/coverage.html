@@ -1,0 +1,2399 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>northstar: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">northstar/cmd/northstar/main.go (0.0%)</option>
+				
+				<option value="file1">northstar/internal/config/config.go (0.0%)</option>
+				
+				<option value="file2">northstar/internal/model/company.go (0.0%)</option>
+				
+				<option value="file3">northstar/internal/model/config.go (0.0%)</option>
+				
+				<option value="file4">northstar/internal/model/indicator.go (0.0%)</option>
+				
+				<option value="file5">northstar/internal/server/handlers/handlers.go (0.0%)</option>
+				
+				<option value="file6">northstar/internal/server/server.go (0.0%)</option>
+				
+				<option value="file7">northstar/internal/service/calculator/engine.go (100.0%)</option>
+				
+				<option value="file8">northstar/internal/service/calculator/optimizer.go (0.0%)</option>
+				
+				<option value="file9">northstar/internal/service/excel/exporter.go (0.0%)</option>
+				
+				<option value="file10">northstar/internal/service/excel/generator.go (0.0%)</option>
+				
+				<option value="file11">northstar/internal/service/excel/parser.go (0.0%)</option>
+				
+				<option value="file12">northstar/internal/service/store/memory.go (79.2%)</option>
+				
+				<option value="file13">northstar/internal/util/browser.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "flag"
+        "fmt"
+        "log"
+        "os"
+        "os/signal"
+        "syscall"
+
+        "northstar/internal/config"
+        "northstar/internal/server"
+        "northstar/internal/util"
+)
+
+var (
+        port    = flag.Int("port", 0, "服务端口 (覆盖配置文件)")
+        devMode = flag.Bool("dev", false, "开发模式")
+)
+
+func main() <span class="cov0" title="0">{
+        flag.Parse()
+
+        fmt.Println("==========================================")
+        fmt.Println("  Northstar - 经济数据统计分析工具")
+        fmt.Println("==========================================")
+
+        // 加载配置
+        cfg, err := config.LoadConfig()
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("加载配置失败，使用默认配置: %v", err)
+                cfg = config.DefaultConfig()
+        }</span>
+
+        // 命令行参数覆盖配置
+        <span class="cov0" title="0">if *port &gt; 0 </span><span class="cov0" title="0">{
+                cfg.Server.Port = *port
+        }</span>
+        <span class="cov0" title="0">if *devMode </span><span class="cov0" title="0">{
+                cfg.Server.DevMode = true
+        }</span>
+
+        // 确保数据目录存在
+        <span class="cov0" title="0">dataDir, err := config.EnsureDataDir(cfg)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("创建数据目录失败: %v", err)
+        }</span> else<span class="cov0" title="0"> {
+                fmt.Printf("数据目录: %s\n", dataDir)
+        }</span>
+
+        // 创建服务器
+        <span class="cov0" title="0">srv := server.NewServer(cfg.Server.DevMode)
+
+        // 构建地址
+        addr := fmt.Sprintf(":%d", cfg.Server.Port)
+        url := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+
+        // 启动服务器
+        go func() </span><span class="cov0" title="0">{
+                fmt.Printf("服务启动中，监听端口 %d ...\n", cfg.Server.Port)
+                if err := srv.Run(addr); err != nil </span><span class="cov0" title="0">{
+                        log.Fatalf("服务启动失败: %v", err)
+                }</span>
+        }()
+
+        // 打开浏览器
+        <span class="cov0" title="0">if !cfg.Server.DevMode </span><span class="cov0" title="0">{
+                fmt.Printf("正在打开浏览器: %s\n", url)
+                if err := util.OpenBrowserWithFallback(url); err != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("无法自动打开浏览器，请手动访问: %s\n", url)
+                }</span>
+        } else<span class="cov0" title="0"> {
+                fmt.Printf("开发模式: 请访问 %s\n", url)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Println("\n按 Ctrl+C 停止服务...")
+
+        // 等待信号
+        quit := make(chan os.Signal, 1)
+        signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+        &lt;-quit
+
+        fmt.Println("\n正在关闭服务...")</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package config
+
+import (
+        "os"
+        "path/filepath"
+
+        "github.com/pelletier/go-toml/v2"
+)
+
+// AppConfig 应用配置
+type AppConfig struct {
+        Server   ServerConfig   `toml:"server"`
+        Data     DataConfig     `toml:"data"`
+        Business BusinessConfig `toml:"business"`
+}
+
+// ServerConfig 服务器配置
+type ServerConfig struct {
+        Port    int  `toml:"port"`
+        DevMode bool `toml:"dev_mode"`
+}
+
+// DataConfig 数据配置
+type DataConfig struct {
+        DataDir    string `toml:"data_dir"`
+        AutoBackup bool   `toml:"auto_backup"`
+}
+
+// BusinessConfig 业务配置
+type BusinessConfig struct {
+        DefaultMonth int     `toml:"default_month"`
+        MaxGrowth    float64 `toml:"max_growth"`
+        MinGrowth    float64 `toml:"min_growth"`
+}
+
+// DefaultConfig 默认配置
+func DefaultConfig() *AppConfig <span class="cov0" title="0">{
+        return &amp;AppConfig{
+                Server: ServerConfig{
+                        Port:    8080,
+                        DevMode: false,
+                },
+                Data: DataConfig{
+                        DataDir:    "data",
+                        AutoBackup: true,
+                },
+                Business: BusinessConfig{
+                        DefaultMonth: 1,
+                        MaxGrowth:    0.5,
+                        MinGrowth:    -0.3,
+                },
+        }
+}</span>
+
+// GetExeDir 获取可执行文件所在目录
+func GetExeDir() (string, error) <span class="cov0" title="0">{
+        exe, err := os.Executable()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+        <span class="cov0" title="0">return filepath.Dir(exe), nil</span>
+}
+
+// LoadConfig 从 config.toml 加载配置
+// 配置文件位于可执行文件同目录下
+func LoadConfig() (*AppConfig, error) <span class="cov0" title="0">{
+        config := DefaultConfig()
+
+        exeDir, err := GetExeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                // 无法获取可执行文件目录，使用当前目录
+                exeDir = "."
+        }</span>
+
+        <span class="cov0" title="0">configPath := filepath.Join(exeDir, "config.toml")
+
+        data, err := os.ReadFile(configPath)
+        if err != nil </span><span class="cov0" title="0">{
+                if os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        // 配置文件不存在，使用默认配置
+                        return config, nil
+                }</span>
+                <span class="cov0" title="0">return nil, err</span>
+        }
+
+        <span class="cov0" title="0">if err := toml.Unmarshal(data, config); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return config, nil</span>
+}
+
+// SaveConfig 保存配置到 config.toml
+func SaveConfig(config *AppConfig) error <span class="cov0" title="0">{
+        exeDir, err := GetExeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                exeDir = "."
+        }</span>
+
+        <span class="cov0" title="0">configPath := filepath.Join(exeDir, "config.toml")
+
+        data, err := toml.Marshal(config)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return os.WriteFile(configPath, data, 0644)</span>
+}
+
+// EnsureDataDir 确保数据目录存在
+// 数据目录位于可执行文件同目录下
+func EnsureDataDir(config *AppConfig) (string, error) <span class="cov0" title="0">{
+        exeDir, err := GetExeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                exeDir = "."
+        }</span>
+
+        <span class="cov0" title="0">dataDir := filepath.Join(exeDir, config.Data.DataDir)
+
+        if err := os.MkdirAll(dataDir, 0755); err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+
+        // 创建子目录
+        <span class="cov0" title="0">subdirs := []string{"uploads", "exports", "backups"}
+        for _, subdir := range subdirs </span><span class="cov0" title="0">{
+                path := filepath.Join(dataDir, subdir)
+                if err := os.MkdirAll(path, 0755); err != nil </span><span class="cov0" title="0">{
+                        return "", err
+                }</span>
+        }
+
+        <span class="cov0" title="0">return dataDir, nil</span>
+}
+
+// GetDataPath 获取数据文件路径
+func GetDataPath(config *AppConfig, subdir, filename string) string <span class="cov0" title="0">{
+        exeDir, _ := GetExeDir()
+        if exeDir == "" </span><span class="cov0" title="0">{
+                exeDir = "."
+        }</span>
+        <span class="cov0" title="0">return filepath.Join(exeDir, config.Data.DataDir, subdir, filename)</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package model
+
+// IndustryType 行业类型
+type IndustryType string
+
+const (
+        IndustryWholesale     IndustryType = "wholesale"     // 批发
+        IndustryRetail        IndustryType = "retail"        // 零售
+        IndustryAccommodation IndustryType = "accommodation" // 住宿
+        IndustryCatering      IndustryType = "catering"      // 餐饮
+)
+
+// Company 企业数据模型
+type Company struct {
+        ID           string       `json:"id"`
+        Name         string       `json:"name"`
+        CreditCode   string       `json:"creditCode"`
+        IndustryCode string       `json:"industryCode"`
+        IndustryType IndustryType `json:"industryType"`
+        CompanyScale int          `json:"companyScale"` // 1/2/3/4，3/4为小微
+        IsEatWearUse bool         `json:"isEatWearUse"` // 是否属于吃穿用类
+
+        // 零售额相关
+        RetailLastYearMonth      float64 `json:"retailLastYearMonth"`      // 上年同期零售额
+        RetailCurrentMonth       float64 `json:"retailCurrentMonth"`       // 本期零售额
+        RetailLastYearCumulative float64 `json:"retailLastYearCumulative"` // 上年累计零售额
+        RetailCurrentCumulative  float64 `json:"retailCurrentCumulative"`  // 本年累计零售额
+
+        // 销售额/营业额相关
+        SalesLastYearMonth      float64 `json:"salesLastYearMonth"`      // 上年同期销售额
+        SalesCurrentMonth       float64 `json:"salesCurrentMonth"`       // 本期销售额
+        SalesLastYearCumulative float64 `json:"salesLastYearCumulative"` // 上年累计销售额
+        SalesCurrentCumulative  float64 `json:"salesCurrentCumulative"`  // 本年累计销售额
+
+        // 原始值（用于重置）
+        OriginalRetailCurrentMonth float64 `json:"-"`
+}
+
+// IsMicroSmall 判断是否为小微企业
+func (c *Company) IsMicroSmall() bool <span class="cov0" title="0">{
+        return c.CompanyScale == 3 || c.CompanyScale == 4
+}</span>
+
+// MonthGrowthRate 计算当月增速
+func (c *Company) MonthGrowthRate() float64 <span class="cov0" title="0">{
+        if c.RetailLastYearMonth == 0 </span><span class="cov0" title="0">{
+                return 0
+        }</span>
+        <span class="cov0" title="0">return (c.RetailCurrentMonth - c.RetailLastYearMonth) / c.RetailLastYearMonth</span>
+}
+
+// CumulativeGrowthRate 计算累计增速
+func (c *Company) CumulativeGrowthRate() float64 <span class="cov0" title="0">{
+        if c.RetailLastYearCumulative == 0 </span><span class="cov0" title="0">{
+                return 0
+        }</span>
+        <span class="cov0" title="0">return (c.RetailCurrentCumulative - c.RetailLastYearCumulative) / c.RetailLastYearCumulative</span>
+}
+
+// ValidationError 校验错误
+type ValidationError struct {
+        Field    string `json:"field"`
+        Message  string `json:"message"`
+        Severity string `json:"severity"` // error or warning
+}
+
+// Validate 校验企业数据
+func (c *Company) Validate() []ValidationError <span class="cov0" title="0">{
+        var errors []ValidationError
+
+        // 零售额不能超过销售额
+        if c.RetailCurrentMonth &gt; c.SalesCurrentMonth &amp;&amp; c.SalesCurrentMonth &gt; 0 </span><span class="cov0" title="0">{
+                errors = append(errors, ValidationError{
+                        Field:    "retailCurrentMonth",
+                        Message:  "零售额不能超过总销售额",
+                        Severity: "error",
+                })
+        }</span>
+
+        // 数值不能为负
+        <span class="cov0" title="0">if c.RetailCurrentMonth &lt; 0 </span><span class="cov0" title="0">{
+                errors = append(errors, ValidationError{
+                        Field:    "retailCurrentMonth",
+                        Message:  "零售额不能为负数",
+                        Severity: "error",
+                })
+        }</span>
+
+        // 增速异常警告
+        <span class="cov0" title="0">rate := c.MonthGrowthRate()
+        if rate &gt; 1.0 || rate &lt; -0.5 </span><span class="cov0" title="0">{
+                errors = append(errors, ValidationError{
+                        Field:    "retailCurrentMonth",
+                        Message:  "增速超出合理范围(-50% ~ 100%)",
+                        Severity: "warning",
+                })
+        }</span>
+
+        <span class="cov0" title="0">return errors</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package model
+
+// Config 系统配置
+type Config struct {
+        CurrentMonth                 int     `json:"currentMonth"`                 // 当前操作月份 (1-12)
+        LastYearLimitBelowCumulative float64 `json:"lastYearLimitBelowCumulative"` // 上年累计限下社零额
+}
+
+// OptimizeConstraints 智能调整约束条件
+type OptimizeConstraints struct {
+        TargetGrowthRate   float64  `json:"targetGrowthRate"`   // 目标增速
+        MaxIndividualRate  float64  `json:"maxIndividualRate"`  // 单个企业最大增速
+        MinIndividualRate  float64  `json:"minIndividualRate"`  // 单个企业最小增速
+        PriorityIndustries []string `json:"priorityIndustries"` // 优先调整的行业
+}
+
+// DefaultOptimizeConstraints 默认约束条件
+func DefaultOptimizeConstraints() *OptimizeConstraints <span class="cov0" title="0">{
+        return &amp;OptimizeConstraints{
+                MaxIndividualRate:  0.5,
+                MinIndividualRate:  0,
+                PriorityIndustries: []string{"catering", "retail"},
+        }
+}</span>
+
+// OptimizeResult 优化结果
+type OptimizeResult struct {
+        Success       bool                  `json:"success"`
+        AchievedValue float64               `json:"achievedValue"`
+        Adjustments   []CompanyAdjustment   `json:"adjustments"`
+        Summary       OptimizeSummary       `json:"summary"`
+        Indicators    *Indicators           `json:"indicators"`
+}
+
+// CompanyAdjustment 企业调整记录
+type CompanyAdjustment struct {
+        CompanyID     string  `json:"companyId"`
+        CompanyName   string  `json:"companyName"`
+        OriginalValue float64 `json:"originalValue"`
+        AdjustedValue float64 `json:"adjustedValue"`
+        ChangePercent float64 `json:"changePercent"`
+}
+
+// OptimizeSummary 优化汇总
+type OptimizeSummary struct {
+        AdjustedCount        int     `json:"adjustedCount"`
+        TotalAdjustment      float64 `json:"totalAdjustment"`
+        AverageChangePercent float64 `json:"averageChangePercent"`
+}
+
+// FieldMapping Excel字段映射
+type FieldMapping struct {
+        CompanyName              string `json:"companyName"`
+        CreditCode               string `json:"creditCode"`
+        IndustryCode             string `json:"industryCode"`
+        CompanyScale             string `json:"companyScale"`
+        RetailCurrentMonth       string `json:"retailCurrentMonth"`
+        RetailLastYearMonth      string `json:"retailLastYearMonth"`
+        RetailCurrentCumulative  string `json:"retailCurrentCumulative"`
+        RetailLastYearCumulative string `json:"retailLastYearCumulative"`
+        SalesCurrentMonth        string `json:"salesCurrentMonth"`
+        SalesLastYearMonth       string `json:"salesLastYearMonth"`
+        SalesCurrentCumulative   string `json:"salesCurrentCumulative"`
+        SalesLastYearCumulative  string `json:"salesLastYearCumulative"`
+}
+
+// GenerationRule 历史数据生成规则
+type GenerationRule struct {
+        IndustryType    IndustryType `json:"industryType"`
+        MinThreshold    float64      `json:"minThreshold"`
+        MaxThreshold    float64      `json:"maxThreshold"`
+        MonthlyVariance float64      `json:"monthlyVariance"`
+}
+
+// SheetInfo 工作表信息
+type SheetInfo struct {
+        Name     string `json:"name"`
+        RowCount int    `json:"rowCount"`
+}
+
+// ImportResult 导入结果
+type ImportResult struct {
+        ImportedCount         int         `json:"importedCount"`
+        GeneratedHistoryCount int         `json:"generatedHistoryCount"`
+        Indicators            *Indicators `json:"indicators"`
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package model
+
+// IndustryRate 行业增速
+type IndustryRate struct {
+        MonthRate      float64 `json:"monthRate"`
+        CumulativeRate float64 `json:"cumulativeRate"`
+}
+
+// Indicators 16项指标数据
+type Indicators struct {
+        // 指标组一：限上社零额 (4个指标)
+        LimitAboveMonthValue      float64 `json:"limitAboveMonthValue"`      // 1. 限上社零额(当月值)
+        LimitAboveMonthRate       float64 `json:"limitAboveMonthRate"`       // 2. 限上社零额增速(当月)
+        LimitAboveCumulativeValue float64 `json:"limitAboveCumulativeValue"` // 3. 限上社零额(累计值)
+        LimitAboveCumulativeRate  float64 `json:"limitAboveCumulativeRate"`  // 4. 限上社零额增速(累计)
+
+        // 指标组二：专项增速 (2个指标)
+        EatWearUseMonthRate float64 `json:"eatWearUseMonthRate"` // 5. 吃穿用增速(当月)
+        MicroSmallMonthRate float64 `json:"microSmallMonthRate"` // 6. 小微企业增速(当月)
+
+        // 指标组三：四大行业增速 (8个指标)
+        IndustryRates map[IndustryType]IndustryRate `json:"industryRates"` // 7-14
+
+        // 指标组四：社零总额 (2个指标)
+        TotalSocialCumulativeValue float64 `json:"totalSocialCumulativeValue"` // 15. 社零总额(累计值)
+        TotalSocialCumulativeRate  float64 `json:"totalSocialCumulativeRate"`  // 16. 社零总额增速(累计)
+}
+
+// NewIndicators 创建默认指标
+func NewIndicators() *Indicators <span class="cov0" title="0">{
+        return &amp;Indicators{
+                IndustryRates: make(map[IndustryType]IndustryRate),
+        }
+}</span>
+
+// IndicatorSums 预聚合的汇总值
+type IndicatorSums struct {
+        // 全部企业
+        AllRetailCurrent           float64
+        AllRetailLastYear          float64
+        AllRetailCurrentCumulative float64
+        AllRetailLastYearCumulative float64
+
+        // 吃穿用企业
+        EatWearUseRetailCurrent  float64
+        EatWearUseRetailLastYear float64
+
+        // 小微企业
+        MicroSmallRetailCurrent  float64
+        MicroSmallRetailLastYear float64
+
+        // 四大行业
+        Industries map[IndustryType]*IndustrySums
+}
+
+// IndustrySums 行业汇总
+type IndustrySums struct {
+        SalesCurrent           float64
+        SalesLastYear          float64
+        SalesCurrentCumulative float64
+        SalesLastYearCumulative float64
+}
+
+// NewIndicatorSums 创建汇总结构
+func NewIndicatorSums() *IndicatorSums <span class="cov0" title="0">{
+        return &amp;IndicatorSums{
+                Industries: map[IndustryType]*IndustrySums{
+                        IndustryWholesale:     {},
+                        IndustryRetail:        {},
+                        IndustryAccommodation: {},
+                        IndustryCatering:      {},
+                },
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package handlers
+
+import (
+        "fmt"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strconv"
+        "strings"
+        "sync"
+        "time"
+
+        "github.com/gin-gonic/gin"
+        "github.com/google/uuid"
+
+        "northstar/internal/model"
+        "northstar/internal/service/calculator"
+        "northstar/internal/service/excel"
+        "northstar/internal/service/store"
+)
+
+// Handlers API处理器
+type Handlers struct {
+        store     *store.MemoryStore
+        engine    *calculator.Engine
+        optimizer *calculator.Optimizer
+
+        // 文件缓存
+        parsers   map[string]*excel.Parser
+        parsersMu sync.RWMutex
+
+        // 导出文件缓存
+        exports   map[string]string
+        exportsMu sync.RWMutex
+}
+
+// NewHandlers 创建处理器
+func NewHandlers(store *store.MemoryStore, engine *calculator.Engine, optimizer *calculator.Optimizer) *Handlers <span class="cov0" title="0">{
+        return &amp;Handlers{
+                store:     store,
+                engine:    engine,
+                optimizer: optimizer,
+                parsers:   make(map[string]*excel.Parser),
+                exports:   make(map[string]string),
+        }
+}</span>
+
+// Response 通用响应
+type Response struct {
+        Code    int         `json:"code"`
+        Message string      `json:"message"`
+        Data    interface{} `json:"data,omitempty"`
+}
+
+func success(c *gin.Context, data interface{}) <span class="cov0" title="0">{
+        c.JSON(http.StatusOK, Response{
+                Code:    0,
+                Message: "success",
+                Data:    data,
+        })
+}</span>
+
+func errorResponse(c *gin.Context, code int, message string) <span class="cov0" title="0">{
+        c.JSON(http.StatusOK, Response{
+                Code:    code,
+                Message: message,
+        })
+}</span>
+
+// UploadFile 上传Excel文件
+func (h *Handlers) UploadFile(c *gin.Context) <span class="cov0" title="0">{
+        file, header, err := c.Request.FormFile("file")
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "请上传文件")
+                return
+        }</span>
+        <span class="cov0" title="0">defer file.Close()
+
+        // 检查文件大小 (10MB)
+        if header.Size &gt; 10*1024*1024 </span><span class="cov0" title="0">{
+                errorResponse(c, 1003, "文件过大，最大支持10MB")
+                return
+        }</span>
+
+        // 检查文件格式
+        <span class="cov0" title="0">ext := strings.ToLower(filepath.Ext(header.Filename))
+        if ext != ".xlsx" &amp;&amp; ext != ".xls" </span><span class="cov0" title="0">{
+                errorResponse(c, 1002, "仅支持 .xlsx 和 .xls 格式")
+                return
+        }</span>
+
+        <span class="cov0" title="0">parser := excel.NewParser()
+        if err := parser.LoadFile(file); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1002, "文件解析失败: "+err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">sheets, err := parser.GetSheets()
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1002, "获取工作表失败")
+                return
+        }</span>
+
+        <span class="cov0" title="0">fileID := parser.GetFileID()
+
+        // 缓存parser
+        h.parsersMu.Lock()
+        h.parsers[fileID] = parser
+        h.parsersMu.Unlock()
+
+        success(c, gin.H{
+                "fileId":   fileID,
+                "fileName": header.Filename,
+                "fileSize": header.Size,
+                "sheets":   sheets,
+        })</span>
+}
+
+// GetColumns 获取列信息
+func (h *Handlers) GetColumns(c *gin.Context) <span class="cov0" title="0">{
+        fileID := c.Param("fileId")
+        sheet := c.Query("sheet")
+
+        h.parsersMu.RLock()
+        parser, ok := h.parsers[fileID]
+        h.parsersMu.RUnlock()
+
+        if !ok </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "文件不存在或已过期")
+                return
+        }</span>
+
+        <span class="cov0" title="0">columns, err := parser.GetColumns(sheet)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "获取列信息失败")
+                return
+        }</span>
+
+        <span class="cov0" title="0">previewRows, _ := parser.GetPreviewRows(sheet, 5)
+
+        success(c, gin.H{
+                "columns":     columns,
+                "previewRows": previewRows,
+        })</span>
+}
+
+// SetMapping 设置字段映射
+func (h *Handlers) SetMapping(c *gin.Context) <span class="cov0" title="0">{
+        fileID := c.Param("fileId")
+
+        var req struct {
+                Sheet   string              `json:"sheet"`
+                Mapping *model.FieldMapping `json:"mapping"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.parsersMu.RLock()
+        parser, ok := h.parsers[fileID]
+        h.parsersMu.RUnlock()
+
+        if !ok </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "文件不存在或已过期")
+                return
+        }</span>
+
+        <span class="cov0" title="0">parser.SetMapping(req.Mapping)
+
+        success(c, gin.H{
+                "validRows":   0,
+                "invalidRows": 0,
+                "warnings":    []string{},
+        })</span>
+}
+
+// ExecuteImport 执行导入
+func (h *Handlers) ExecuteImport(c *gin.Context) <span class="cov0" title="0">{
+        fileID := c.Param("fileId")
+
+        var req struct {
+                Sheet           string `json:"sheet"`
+                GenerateHistory bool   `json:"generateHistory"`
+                CurrentMonth    int    `json:"currentMonth"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.parsersMu.RLock()
+        parser, ok := h.parsers[fileID]
+        h.parsersMu.RUnlock()
+
+        if !ok </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "文件不存在或已过期")
+                return
+        }</span>
+
+        <span class="cov0" title="0">companies, err := parser.Parse(req.Sheet)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 3001, "解析失败: "+err.Error())
+                return
+        }</span>
+
+        // 生成历史数据
+        <span class="cov0" title="0">generatedCount := 0
+        if req.GenerateHistory </span><span class="cov0" title="0">{
+                generator := excel.NewGenerator()
+                generatedCount = generator.BatchGenerateHistory(companies, nil)
+        }</span>
+
+        // 保存到存储
+        <span class="cov0" title="0">h.store.SetCompanies(companies)
+
+        // 更新配置
+        if req.CurrentMonth &gt; 0 </span><span class="cov0" title="0">{
+                h.store.UpdateConfig(map[string]interface{}{
+                        "currentMonth": req.CurrentMonth,
+                })
+        }</span>
+
+        // 计算指标
+        <span class="cov0" title="0">indicators := h.engine.Calculate()
+
+        success(c, gin.H{
+                "importedCount":         len(companies),
+                "generatedHistoryCount": generatedCount,
+                "indicators":            indicators,
+        })</span>
+}
+
+// ListCompanies 获取企业列表
+func (h *Handlers) ListCompanies(c *gin.Context) <span class="cov0" title="0">{
+        page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+        pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+        search := c.Query("search")
+        industry := c.Query("industry")
+        scale := c.Query("scale")
+
+        companies := h.store.GetAllCompanies()
+
+        // 筛选
+        filtered := make([]*model.Company, 0, len(companies))
+        for _, c := range companies </span><span class="cov0" title="0">{
+                // 搜索
+                if search != "" &amp;&amp; !strings.Contains(strings.ToLower(c.Name), strings.ToLower(search)) </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                // 行业筛选
+                <span class="cov0" title="0">if industry != "" &amp;&amp; string(c.IndustryType) != industry </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                // 规模筛选
+                <span class="cov0" title="0">if scale != "" </span><span class="cov0" title="0">{
+                        scales := strings.Split(scale, ",")
+                        match := false
+                        for _, s := range scales </span><span class="cov0" title="0">{
+                                if si, err := strconv.Atoi(s); err == nil &amp;&amp; c.CompanyScale == si </span><span class="cov0" title="0">{
+                                        match = true
+                                        break</span>
+                                }
+                        }
+                        <span class="cov0" title="0">if !match </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                }
+                <span class="cov0" title="0">filtered = append(filtered, c)</span>
+        }
+
+        // 分页
+        <span class="cov0" title="0">total := len(filtered)
+        start := (page - 1) * pageSize
+        end := start + pageSize
+        if start &gt; total </span><span class="cov0" title="0">{
+                start = total
+        }</span>
+        <span class="cov0" title="0">if end &gt; total </span><span class="cov0" title="0">{
+                end = total
+        }</span>
+
+        <span class="cov0" title="0">items := filtered[start:end]
+
+        // 添加校验信息
+        type CompanyWithValidation struct {
+                *model.Company
+                MonthGrowthRate      float64                   `json:"monthGrowthRate"`
+                CumulativeGrowthRate float64                   `json:"cumulativeGrowthRate"`
+                Validation           map[string]interface{}    `json:"validation"`
+        }
+
+        result := make([]CompanyWithValidation, 0, len(items))
+        for _, item := range items </span><span class="cov0" title="0">{
+                errors := item.Validate()
+                hasError := false
+                for _, e := range errors </span><span class="cov0" title="0">{
+                        if e.Severity == "error" </span><span class="cov0" title="0">{
+                                hasError = true
+                                break</span>
+                        }
+                }
+
+                <span class="cov0" title="0">result = append(result, CompanyWithValidation{
+                        Company:              item,
+                        MonthGrowthRate:      item.MonthGrowthRate(),
+                        CumulativeGrowthRate: item.CumulativeGrowthRate(),
+                        Validation: map[string]interface{}{
+                                "hasError": hasError,
+                                "errors":   errors,
+                        },
+                })</span>
+        }
+
+        <span class="cov0" title="0">success(c, gin.H{
+                "total":    total,
+                "page":     page,
+                "pageSize": pageSize,
+                "items":    result,
+        })</span>
+}
+
+// GetCompany 获取单个企业
+func (h *Handlers) GetCompany(c *gin.Context) <span class="cov0" title="0">{
+        id := c.Param("id")
+
+        company, err := h.store.GetCompany(id)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "企业不存在")
+                return
+        }</span>
+
+        <span class="cov0" title="0">success(c, company)</span>
+}
+
+// UpdateCompany 更新企业数据
+func (h *Handlers) UpdateCompany(c *gin.Context) <span class="cov0" title="0">{
+        id := c.Param("id")
+
+        var req struct {
+                RetailCurrentMonth float64 `json:"retailCurrentMonth"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">company, err := h.store.UpdateCompanyRetail(id, req.RetailCurrentMonth)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 2001, "企业不存在")
+                return
+        }</span>
+
+        // 校验
+        <span class="cov0" title="0">errors := company.Validate()
+        hasError := false
+        for _, e := range errors </span><span class="cov0" title="0">{
+                if e.Severity == "error" </span><span class="cov0" title="0">{
+                        hasError = true
+                        break</span>
+                }
+        }
+
+        // 重新计算指标
+        <span class="cov0" title="0">indicators := h.engine.Calculate()
+
+        success(c, gin.H{
+                "company": gin.H{
+                        "id":                      company.ID,
+                        "retailCurrentMonth":      company.RetailCurrentMonth,
+                        "retailCurrentCumulative": company.RetailCurrentCumulative,
+                        "monthGrowthRate":         company.MonthGrowthRate(),
+                        "validation": gin.H{
+                                "hasError": hasError,
+                                "errors":   errors,
+                        },
+                },
+                "indicators": indicators,
+        })</span>
+}
+
+// BatchUpdateCompanies 批量更新企业
+func (h *Handlers) BatchUpdateCompanies(c *gin.Context) <span class="cov0" title="0">{
+        var req struct {
+                Updates []struct {
+                        ID                 string  `json:"id"`
+                        RetailCurrentMonth float64 `json:"retailCurrentMonth"`
+                } `json:"updates"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">updates := make(map[string]float64)
+        for _, u := range req.Updates </span><span class="cov0" title="0">{
+                updates[u.ID] = u.RetailCurrentMonth
+        }</span>
+
+        <span class="cov0" title="0">h.store.BatchUpdateCompanyRetail(updates)
+
+        indicators := h.engine.Calculate()
+
+        success(c, gin.H{
+                "updatedCount": len(updates),
+                "indicators":   indicators,
+        })</span>
+}
+
+// ResetCompanies 重置企业数据
+func (h *Handlers) ResetCompanies(c *gin.Context) <span class="cov0" title="0">{
+        var req struct {
+                CompanyIds []string `json:"companyIds"`
+        }
+        c.ShouldBindJSON(&amp;req)
+
+        h.store.ResetCompanies(req.CompanyIds)
+
+        indicators := h.engine.Calculate()
+
+        success(c, gin.H{
+                "indicators": indicators,
+        })
+}</span>
+
+// GetIndicators 获取指标
+func (h *Handlers) GetIndicators(c *gin.Context) <span class="cov0" title="0">{
+        indicators := h.engine.Calculate()
+        success(c, indicators)
+}</span>
+
+// Optimize 执行智能调整
+func (h *Handlers) Optimize(c *gin.Context) <span class="cov0" title="0">{
+        var req struct {
+                TargetIndicator string                     `json:"targetIndicator"`
+                TargetValue     float64                    `json:"targetValue"`
+                Constraints     *model.OptimizeConstraints `json:"constraints"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">result, err := h.optimizer.Optimize(req.TargetValue, req.Constraints)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 3002, err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">success(c, result)</span>
+}
+
+// PreviewOptimize 预览智能调整
+func (h *Handlers) PreviewOptimize(c *gin.Context) <span class="cov0" title="0">{
+        var req struct {
+                TargetIndicator string                     `json:"targetIndicator"`
+                TargetValue     float64                    `json:"targetValue"`
+                Constraints     *model.OptimizeConstraints `json:"constraints"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">result, err := h.optimizer.Preview(req.TargetValue, req.Constraints)
+        if err != nil &amp;&amp; result == nil </span><span class="cov0" title="0">{
+                errorResponse(c, 3002, err.Error())
+                return
+        }</span>
+
+        <span class="cov0" title="0">success(c, result)</span>
+}
+
+// GetConfig 获取配置
+func (h *Handlers) GetConfig(c *gin.Context) <span class="cov0" title="0">{
+        config := h.store.GetConfig()
+        success(c, config)
+}</span>
+
+// UpdateConfig 更新配置
+func (h *Handlers) UpdateConfig(c *gin.Context) <span class="cov0" title="0">{
+        var req map[string]interface{}
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 1001, "参数错误")
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.store.UpdateConfig(req)
+
+        // 重新计算指标
+        indicators := h.engine.Calculate()
+
+        success(c, gin.H{
+                "config":     h.store.GetConfig(),
+                "indicators": indicators,
+        })</span>
+}
+
+// Export 导出数据
+func (h *Handlers) Export(c *gin.Context) <span class="cov0" title="0">{
+        var req struct {
+                Format            string `json:"format"`
+                IncludeIndicators bool   `json:"includeIndicators"`
+                IncludeChanges    bool   `json:"includeChanges"`
+        }
+        c.ShouldBindJSON(&amp;req)
+
+        companies := h.store.GetAllCompanies()
+        var indicators *model.Indicators
+        if req.IncludeIndicators </span><span class="cov0" title="0">{
+                indicators = h.engine.Calculate()
+        }</span>
+
+        <span class="cov0" title="0">exporter := excel.NewExporter()
+        file, err := exporter.Export(companies, indicators, req.IncludeChanges)
+        if err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 3001, "导出失败")
+                return
+        }</span>
+
+        // 保存临时文件
+        <span class="cov0" title="0">exportID := uuid.New().String()
+        tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("northstar_export_%s.xlsx", exportID))
+        if err := file.SaveAs(tmpPath); err != nil </span><span class="cov0" title="0">{
+                errorResponse(c, 3001, "保存失败")
+                return
+        }</span>
+
+        // 缓存路径
+        <span class="cov0" title="0">h.exportsMu.Lock()
+        h.exports[exportID] = tmpPath
+        h.exportsMu.Unlock()
+
+        success(c, gin.H{
+                "downloadUrl": fmt.Sprintf("/api/v1/export/download/%s", exportID),
+                "expiresAt":   time.Now().Add(time.Hour).Format(time.RFC3339),
+        })</span>
+}
+
+// Download 下载导出文件
+func (h *Handlers) Download(c *gin.Context) <span class="cov0" title="0">{
+        exportID := c.Param("exportId")
+
+        h.exportsMu.RLock()
+        path, ok := h.exports[exportID]
+        h.exportsMu.RUnlock()
+
+        if !ok </span><span class="cov0" title="0">{
+                c.String(http.StatusNotFound, "文件不存在或已过期")
+                return
+        }</span>
+
+        <span class="cov0" title="0">c.Header("Content-Disposition", "attachment; filename=northstar_export.xlsx")
+        c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        c.File(path)</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package server
+
+import (
+        "embed"
+        "io/fs"
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+
+        "northstar/internal/server/handlers"
+        "northstar/internal/service/calculator"
+        "northstar/internal/service/store"
+)
+
+//go:embed all:dist
+var staticFiles embed.FS
+
+// Server HTTP服务器
+type Server struct {
+        router    *gin.Engine
+        store     *store.MemoryStore
+        engine    *calculator.Engine
+        optimizer *calculator.Optimizer
+        handlers  *handlers.Handlers
+}
+
+// NewServer 创建服务器
+func NewServer(devMode bool) *Server <span class="cov0" title="0">{
+        if !devMode </span><span class="cov0" title="0">{
+                gin.SetMode(gin.ReleaseMode)
+        }</span>
+
+        <span class="cov0" title="0">memStore := store.NewMemoryStore()
+        calcEngine := calculator.NewEngine(memStore)
+        opt := calculator.NewOptimizer(memStore, calcEngine)
+        h := handlers.NewHandlers(memStore, calcEngine, opt)
+
+        s := &amp;Server{
+                router:    gin.Default(),
+                store:     memStore,
+                engine:    calcEngine,
+                optimizer: opt,
+                handlers:  h,
+        }
+
+        s.setupRoutes(devMode)
+
+        return s</span>
+}
+
+// setupRoutes 设置路由
+func (s *Server) setupRoutes(devMode bool) <span class="cov0" title="0">{
+        // CORS
+        s.router.Use(func(c *gin.Context) </span><span class="cov0" title="0">{
+                c.Header("Access-Control-Allow-Origin", "*")
+                c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+                c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                if c.Request.Method == "OPTIONS" </span><span class="cov0" title="0">{
+                        c.AbortWithStatus(204)
+                        return
+                }</span>
+                <span class="cov0" title="0">c.Next()</span>
+        })
+
+        // API路由
+        <span class="cov0" title="0">api := s.router.Group("/api/v1")
+        </span><span class="cov0" title="0">{
+                // 导入相关
+                api.POST("/import/upload", s.handlers.UploadFile)
+                api.GET("/import/:fileId/columns", s.handlers.GetColumns)
+                api.POST("/import/:fileId/mapping", s.handlers.SetMapping)
+                api.POST("/import/:fileId/execute", s.handlers.ExecuteImport)
+
+                // 企业数据
+                api.GET("/companies", s.handlers.ListCompanies)
+                api.GET("/companies/:id", s.handlers.GetCompany)
+                api.PATCH("/companies/:id", s.handlers.UpdateCompany)
+                api.PATCH("/companies/batch", s.handlers.BatchUpdateCompanies)
+                api.POST("/companies/reset", s.handlers.ResetCompanies)
+
+                // 指标
+                api.GET("/indicators", s.handlers.GetIndicators)
+
+                // 智能调整
+                api.POST("/optimize", s.handlers.Optimize)
+                api.POST("/optimize/preview", s.handlers.PreviewOptimize)
+
+                // 配置
+                api.GET("/config", s.handlers.GetConfig)
+                api.PATCH("/config", s.handlers.UpdateConfig)
+
+                // 导出
+                api.POST("/export", s.handlers.Export)
+                api.GET("/export/download/:exportId", s.handlers.Download)
+        }</span>
+
+        // 静态资源
+        <span class="cov0" title="0">if devMode </span><span class="cov0" title="0">{
+                // 开发模式：代理到前端开发服务器
+                s.router.NoRoute(func(c *gin.Context) </span><span class="cov0" title="0">{
+                        c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173"+c.Request.URL.Path)
+                }</span>)
+        } else<span class="cov0" title="0"> {
+                // 生产模式：使用embed的静态资源
+                sub, _ := fs.Sub(staticFiles, "dist")
+
+                // 静态资源 - assets 目录
+                assetsSub, _ := fs.Sub(sub, "assets")
+                s.router.StaticFS("/assets", http.FS(assetsSub))
+
+                // favicon
+                s.router.GET("/favicon.svg", func(c *gin.Context) </span><span class="cov0" title="0">{
+                        data, err := fs.ReadFile(sub, "favicon.svg")
+                        if err != nil </span><span class="cov0" title="0">{
+                                c.Status(http.StatusNotFound)
+                                return
+                        }</span>
+                        <span class="cov0" title="0">c.Data(http.StatusOK, "image/svg+xml", data)</span>
+                })
+
+                // 首页
+                <span class="cov0" title="0">s.router.GET("/", func(c *gin.Context) </span><span class="cov0" title="0">{
+                        data, _ := fs.ReadFile(sub, "index.html")
+                        c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+                }</span>)
+
+                // SPA 路由 fallback
+                <span class="cov0" title="0">s.router.NoRoute(func(c *gin.Context) </span><span class="cov0" title="0">{
+                        data, _ := fs.ReadFile(sub, "index.html")
+                        c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+                }</span>)
+        }
+}
+
+// Run 启动服务器
+func (s *Server) Run(addr string) error <span class="cov0" title="0">{
+        return s.router.Run(addr)
+}</span>
+
+// GetStore 获取存储（用于测试）
+func (s *Server) GetStore() *store.MemoryStore <span class="cov0" title="0">{
+        return s.store
+}</span>
+
+// GetEngine 获取计算引擎（用于测试）
+func (s *Server) GetEngine() *calculator.Engine <span class="cov0" title="0">{
+        return s.engine
+}</span>
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package calculator
+
+import (
+        "northstar/internal/model"
+        "northstar/internal/service/store"
+)
+
+// Engine 指标计算引擎
+type Engine struct {
+        store *store.MemoryStore
+}
+
+// NewEngine 创建计算引擎
+func NewEngine(store *store.MemoryStore) *Engine <span class="cov8" title="1">{
+        return &amp;Engine{store: store}
+}</span>
+
+// Calculate 计算所有指标
+func (e *Engine) Calculate() *model.Indicators <span class="cov8" title="1">{
+        companies := e.store.GetAllCompanies()
+        config := e.store.GetConfig()
+
+        // 预聚合各分组数据
+        sums := e.aggregateSums(companies)
+
+        // 计算各指标
+        indicators := model.NewIndicators()
+
+        // 指标组一：限上社零额
+        indicators.LimitAboveMonthValue = sums.AllRetailCurrent
+        indicators.LimitAboveMonthRate = calcRate(sums.AllRetailCurrent, sums.AllRetailLastYear)
+        indicators.LimitAboveCumulativeValue = sums.AllRetailCurrentCumulative
+        indicators.LimitAboveCumulativeRate = calcRate(sums.AllRetailCurrentCumulative, sums.AllRetailLastYearCumulative)
+
+        // 指标组二：专项增速
+        indicators.EatWearUseMonthRate = calcRate(sums.EatWearUseRetailCurrent, sums.EatWearUseRetailLastYear)
+        indicators.MicroSmallMonthRate = calcRate(sums.MicroSmallRetailCurrent, sums.MicroSmallRetailLastYear)
+
+        // 指标组三：四大行业增速
+        for industryType, industrySums := range sums.Industries </span><span class="cov8" title="1">{
+                indicators.IndustryRates[industryType] = model.IndustryRate{
+                        MonthRate:      calcRate(industrySums.SalesCurrent, industrySums.SalesLastYear),
+                        CumulativeRate: calcRate(industrySums.SalesCurrentCumulative, industrySums.SalesLastYearCumulative),
+                }
+        }</span>
+
+        // 指标组四：社零总额
+        // 估算本年累计限下社零额 = 上年累计限下社零额 × (1 + 小微企业增速)
+        <span class="cov8" title="1">estimatedLimitBelow := config.LastYearLimitBelowCumulative * (1 + indicators.MicroSmallMonthRate)
+        indicators.TotalSocialCumulativeValue = indicators.LimitAboveCumulativeValue + estimatedLimitBelow
+
+        // 上年社零总额(累计) = 上年累计限上 + 上年累计限下
+        lastYearTotal := sums.AllRetailLastYearCumulative + config.LastYearLimitBelowCumulative
+        indicators.TotalSocialCumulativeRate = calcRate(indicators.TotalSocialCumulativeValue, lastYearTotal)
+
+        return indicators</span>
+}
+
+// aggregateSums 预聚合各分组数据
+func (e *Engine) aggregateSums(companies []*model.Company) *model.IndicatorSums <span class="cov8" title="1">{
+        sums := model.NewIndicatorSums()
+
+        for _, c := range companies </span><span class="cov8" title="1">{
+                // 全部企业汇总
+                sums.AllRetailCurrent += c.RetailCurrentMonth
+                sums.AllRetailLastYear += c.RetailLastYearMonth
+                sums.AllRetailCurrentCumulative += c.RetailCurrentCumulative
+                sums.AllRetailLastYearCumulative += c.RetailLastYearCumulative
+
+                // 吃穿用企业
+                if c.IsEatWearUse </span><span class="cov8" title="1">{
+                        sums.EatWearUseRetailCurrent += c.RetailCurrentMonth
+                        sums.EatWearUseRetailLastYear += c.RetailLastYearMonth
+                }</span>
+
+                // 小微企业
+                <span class="cov8" title="1">if c.IsMicroSmall() </span><span class="cov8" title="1">{
+                        sums.MicroSmallRetailCurrent += c.RetailCurrentMonth
+                        sums.MicroSmallRetailLastYear += c.RetailLastYearMonth
+                }</span>
+
+                // 四大行业
+                <span class="cov8" title="1">if industrySums, ok := sums.Industries[c.IndustryType]; ok </span><span class="cov8" title="1">{
+                        industrySums.SalesCurrent += c.SalesCurrentMonth
+                        industrySums.SalesLastYear += c.SalesLastYearMonth
+                        industrySums.SalesCurrentCumulative += c.SalesCurrentCumulative
+                        industrySums.SalesLastYearCumulative += c.SalesLastYearCumulative
+                }</span>
+        }
+
+        <span class="cov8" title="1">return sums</span>
+}
+
+// calcRate 计算增速
+func calcRate(current, lastYear float64) float64 <span class="cov8" title="1">{
+        if lastYear == 0 </span><span class="cov8" title="1">{
+                return 0
+        }</span>
+        <span class="cov8" title="1">return (current - lastYear) / lastYear</span>
+}
+
+// GetSums 获取汇总数据（用于测试）
+func (e *Engine) GetSums() *model.IndicatorSums <span class="cov8" title="1">{
+        companies := e.store.GetAllCompanies()
+        return e.aggregateSums(companies)
+}</span>
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package calculator
+
+import (
+        "errors"
+        "sort"
+
+        "northstar/internal/model"
+        "northstar/internal/service/store"
+)
+
+// Optimizer 智能调整优化器
+type Optimizer struct {
+        store  *store.MemoryStore
+        engine *Engine
+}
+
+// NewOptimizer 创建优化器
+func NewOptimizer(store *store.MemoryStore, engine *Engine) *Optimizer <span class="cov0" title="0">{
+        return &amp;Optimizer{
+                store:  store,
+                engine: engine,
+        }
+}</span>
+
+// Optimize 执行智能调整
+func (o *Optimizer) Optimize(targetRate float64, constraints *model.OptimizeConstraints) (*model.OptimizeResult, error) <span class="cov0" title="0">{
+        if constraints == nil </span><span class="cov0" title="0">{
+                constraints = model.DefaultOptimizeConstraints()
+        }</span>
+        <span class="cov0" title="0">constraints.TargetGrowthRate = targetRate
+
+        companies := o.store.GetAllCompanies()
+        _ = o.store.GetConfig() // 预留配置使用
+
+        // 当前累计增速
+        currentSums := o.engine.GetSums()
+        currentRate := calcRate(currentSums.AllRetailCurrentCumulative, currentSums.AllRetailLastYearCumulative)
+
+        // 目标增速已达成
+        if currentRate &gt;= targetRate-0.0001 &amp;&amp; currentRate &lt;= targetRate+0.0001 </span><span class="cov0" title="0">{
+                return &amp;model.OptimizeResult{
+                        Success:       true,
+                        AchievedValue: currentRate,
+                        Adjustments:   []model.CompanyAdjustment{},
+                        Summary:       model.OptimizeSummary{},
+                        Indicators:    o.engine.Calculate(),
+                }, nil
+        }</span>
+
+        // 计算需要的总增量
+        // target = (current_cumulative + delta - last_year_cumulative) / last_year_cumulative
+        // delta = target * last_year_cumulative + last_year_cumulative - current_cumulative
+        <span class="cov0" title="0">requiredDelta := targetRate*currentSums.AllRetailLastYearCumulative + currentSums.AllRetailLastYearCumulative - currentSums.AllRetailCurrentCumulative
+
+        if requiredDelta &lt; 0 </span><span class="cov0" title="0">{
+                return nil, errors.New("目标增速低于当前值，不支持向下调整")
+        }</span>
+
+        // 按优先级排序企业
+        <span class="cov0" title="0">sortedCompanies := o.sortByPriority(companies, constraints.PriorityIndustries)
+
+        // 贪心分配增量
+        adjustments := []model.CompanyAdjustment{}
+        updates := make(map[string]float64)
+        remainingDelta := requiredDelta
+
+        for _, c := range sortedCompanies </span><span class="cov0" title="0">{
+                if remainingDelta &lt;= 0 </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                // 计算该企业的最大可调整量
+                <span class="cov0" title="0">maxRetail := c.SalesCurrentMonth // 零售额不能超过销售额
+                if maxRetail &lt;= 0 </span><span class="cov0" title="0">{
+                        maxRetail = c.RetailCurrentMonth * (1 + constraints.MaxIndividualRate)
+                }</span>
+
+                // 约束: 增速不超过最大值
+                <span class="cov0" title="0">maxByRate := c.RetailLastYearMonth * (1 + constraints.MaxIndividualRate)
+                if maxByRate &gt; 0 &amp;&amp; maxByRate &lt; maxRetail </span><span class="cov0" title="0">{
+                        maxRetail = maxByRate
+                }</span>
+
+                // 可调整空间
+                <span class="cov0" title="0">adjustable := maxRetail - c.RetailCurrentMonth
+                if adjustable &lt;= 0 </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                // 实际调整量
+                <span class="cov0" title="0">actualDelta := adjustable
+                if actualDelta &gt; remainingDelta </span><span class="cov0" title="0">{
+                        actualDelta = remainingDelta
+                }</span>
+
+                <span class="cov0" title="0">newValue := c.RetailCurrentMonth + actualDelta
+                updates[c.ID] = newValue
+
+                adjustments = append(adjustments, model.CompanyAdjustment{
+                        CompanyID:     c.ID,
+                        CompanyName:   c.Name,
+                        OriginalValue: c.RetailCurrentMonth,
+                        AdjustedValue: newValue,
+                        ChangePercent: actualDelta / c.RetailCurrentMonth,
+                })
+
+                remainingDelta -= actualDelta</span>
+        }
+
+        // 检查是否达成目标
+        <span class="cov0" title="0">if remainingDelta &gt; 0.01 </span><span class="cov0" title="0">{
+                return &amp;model.OptimizeResult{
+                        Success:       false,
+                        AchievedValue: targetRate - remainingDelta/currentSums.AllRetailLastYearCumulative,
+                        Adjustments:   adjustments,
+                        Summary: model.OptimizeSummary{
+                                AdjustedCount:   len(adjustments),
+                                TotalAdjustment: requiredDelta - remainingDelta,
+                        },
+                        Indicators: o.engine.Calculate(),
+                }, errors.New("在当前约束条件下无法完全达成目标增速")
+        }</span>
+
+        // 应用调整
+        <span class="cov0" title="0">o.store.BatchUpdateCompanyRetail(updates)
+
+        // 计算汇总
+        totalAdjustment := 0.0
+        totalChangePercent := 0.0
+        for _, adj := range adjustments </span><span class="cov0" title="0">{
+                totalAdjustment += adj.AdjustedValue - adj.OriginalValue
+                totalChangePercent += adj.ChangePercent
+        }</span>
+
+        <span class="cov0" title="0">indicators := o.engine.Calculate()
+
+        return &amp;model.OptimizeResult{
+                Success:       true,
+                AchievedValue: indicators.LimitAboveCumulativeRate,
+                Adjustments:   adjustments,
+                Summary: model.OptimizeSummary{
+                        AdjustedCount:        len(adjustments),
+                        TotalAdjustment:      totalAdjustment,
+                        AverageChangePercent: totalChangePercent / float64(len(adjustments)),
+                },
+                Indicators: indicators,
+        }, nil</span>
+}
+
+// Preview 预览智能调整结果（不实际修改数据）
+func (o *Optimizer) Preview(targetRate float64, constraints *model.OptimizeConstraints) (*model.OptimizeResult, error) <span class="cov0" title="0">{
+        // 保存当前状态
+        companies := o.store.GetAllCompanies()
+        originalValues := make(map[string]float64)
+        for _, c := range companies </span><span class="cov0" title="0">{
+                originalValues[c.ID] = c.RetailCurrentMonth
+        }</span>
+
+        // 执行优化
+        <span class="cov0" title="0">result, err := o.Optimize(targetRate, constraints)
+
+        // 恢复原始状态
+        o.store.BatchUpdateCompanyRetail(originalValues)
+
+        return result, err</span>
+}
+
+// sortByPriority 按优先级排序企业
+func (o *Optimizer) sortByPriority(companies []*model.Company, priorityIndustries []string) []*model.Company <span class="cov0" title="0">{
+        // 创建优先级映射
+        priorityMap := make(map[string]int)
+        for i, ind := range priorityIndustries </span><span class="cov0" title="0">{
+                priorityMap[ind] = len(priorityIndustries) - i
+        }</span>
+
+        <span class="cov0" title="0">sorted := make([]*model.Company, len(companies))
+        copy(sorted, companies)
+
+        sort.Slice(sorted, func(i, j int) bool </span><span class="cov0" title="0">{
+                pi := priorityMap[string(sorted[i].IndustryType)]
+                pj := priorityMap[string(sorted[j].IndustryType)]
+                if pi != pj </span><span class="cov0" title="0">{
+                        return pi &gt; pj
+                }</span>
+                // 同优先级按可调整空间排序
+                <span class="cov0" title="0">spaceI := sorted[i].SalesCurrentMonth - sorted[i].RetailCurrentMonth
+                spaceJ := sorted[j].SalesCurrentMonth - sorted[j].RetailCurrentMonth
+                return spaceI &gt; spaceJ</span>
+        })
+
+        <span class="cov0" title="0">return sorted</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package excel
+
+import (
+        "fmt"
+
+        "github.com/xuri/excelize/v2"
+
+        "northstar/internal/model"
+)
+
+// Exporter Excel导出器
+type Exporter struct{}
+
+// NewExporter 创建导出器
+func NewExporter() *Exporter <span class="cov0" title="0">{
+        return &amp;Exporter{}
+}</span>
+
+// Export 导出企业数据到Excel
+func (e *Exporter) Export(companies []*model.Company, indicators *model.Indicators, includeChanges bool) (*excelize.File, error) <span class="cov0" title="0">{
+        f := excelize.NewFile()
+
+        // 创建企业数据表
+        sheetName := "企业数据"
+        f.SetSheetName("Sheet1", sheetName)
+
+        // 设置表头
+        headers := []string{
+                "企业名称", "统一社会信用代码", "行业代码", "行业类型", "单位规模",
+                "本期零售额", "上年同期零售额", "当月增速",
+                "本年累计零售额", "上年累计零售额", "累计增速",
+                "本期销售额", "上年同期销售额",
+        }
+        if includeChanges </span><span class="cov0" title="0">{
+                headers = append(headers, "原始零售额", "调整幅度")
+        }</span>
+
+        <span class="cov0" title="0">for i, h := range headers </span><span class="cov0" title="0">{
+                cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+                f.SetCellValue(sheetName, cell, h)
+        }</span>
+
+        // 设置表头样式
+        <span class="cov0" title="0">headerStyle, _ := f.NewStyle(&amp;excelize.Style{
+                Font:      &amp;excelize.Font{Bold: true},
+                Fill:      excelize.Fill{Type: "pattern", Color: []string{"#E2E8F0"}, Pattern: 1},
+                Alignment: &amp;excelize.Alignment{Horizontal: "center"},
+        })
+        f.SetRowStyle(sheetName, 1, 1, headerStyle)
+
+        // 写入数据
+        for i, c := range companies </span><span class="cov0" title="0">{
+                row := i + 2
+                f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), c.Name)
+                f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), c.CreditCode)
+                f.SetCellValue(sheetName, fmt.Sprintf("C%d", row), c.IndustryCode)
+                f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), string(c.IndustryType))
+                f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), c.CompanyScale)
+                f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), c.RetailCurrentMonth)
+                f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), c.RetailLastYearMonth)
+                f.SetCellValue(sheetName, fmt.Sprintf("H%d", row), fmt.Sprintf("%.2f%%", c.MonthGrowthRate()*100))
+                f.SetCellValue(sheetName, fmt.Sprintf("I%d", row), c.RetailCurrentCumulative)
+                f.SetCellValue(sheetName, fmt.Sprintf("J%d", row), c.RetailLastYearCumulative)
+                f.SetCellValue(sheetName, fmt.Sprintf("K%d", row), fmt.Sprintf("%.2f%%", c.CumulativeGrowthRate()*100))
+                f.SetCellValue(sheetName, fmt.Sprintf("L%d", row), c.SalesCurrentMonth)
+                f.SetCellValue(sheetName, fmt.Sprintf("M%d", row), c.SalesLastYearMonth)
+
+                if includeChanges </span><span class="cov0" title="0">{
+                        f.SetCellValue(sheetName, fmt.Sprintf("N%d", row), c.OriginalRetailCurrentMonth)
+                        change := c.RetailCurrentMonth - c.OriginalRetailCurrentMonth
+                        f.SetCellValue(sheetName, fmt.Sprintf("O%d", row), change)
+                }</span>
+        }
+
+        // 创建指标汇总表
+        <span class="cov0" title="0">if indicators != nil </span><span class="cov0" title="0">{
+                indicatorSheet := "指标汇总"
+                f.NewSheet(indicatorSheet)
+
+                indicatorData := [][]interface{}{
+                        {"指标名称", "数值"},
+                        {"限上社零额(当月值)", indicators.LimitAboveMonthValue},
+                        {"限上社零额增速(当月)", fmt.Sprintf("%.2f%%", indicators.LimitAboveMonthRate*100)},
+                        {"限上社零额(累计值)", indicators.LimitAboveCumulativeValue},
+                        {"限上社零额增速(累计)", fmt.Sprintf("%.2f%%", indicators.LimitAboveCumulativeRate*100)},
+                        {"吃穿用增速(当月)", fmt.Sprintf("%.2f%%", indicators.EatWearUseMonthRate*100)},
+                        {"小微企业增速(当月)", fmt.Sprintf("%.2f%%", indicators.MicroSmallMonthRate*100)},
+                        {"社零总额(累计值)", indicators.TotalSocialCumulativeValue},
+                        {"社零总额增速(累计)", fmt.Sprintf("%.2f%%", indicators.TotalSocialCumulativeRate*100)},
+                }
+
+                // 四大行业增速
+                for industryType, rate := range indicators.IndustryRates </span><span class="cov0" title="0">{
+                        indicatorData = append(indicatorData, []interface{}{
+                                fmt.Sprintf("%s销售额增速(当月)", industryType), fmt.Sprintf("%.2f%%", rate.MonthRate*100),
+                        })
+                        indicatorData = append(indicatorData, []interface{}{
+                                fmt.Sprintf("%s销售额增速(累计)", industryType), fmt.Sprintf("%.2f%%", rate.CumulativeRate*100),
+                        })
+                }</span>
+
+                <span class="cov0" title="0">for i, row := range indicatorData </span><span class="cov0" title="0">{
+                        for j, val := range row </span><span class="cov0" title="0">{
+                                cell, _ := excelize.CoordinatesToCellName(j+1, i+1)
+                                f.SetCellValue(indicatorSheet, cell, val)
+                        }</span>
+                }
+
+                // 设置表头样式
+                <span class="cov0" title="0">f.SetRowStyle(indicatorSheet, 1, 1, headerStyle)</span>
+        }
+
+        // 设置列宽
+        <span class="cov0" title="0">f.SetColWidth(sheetName, "A", "A", 30)
+        f.SetColWidth(sheetName, "B", "B", 25)
+        f.SetColWidth(sheetName, "C", "M", 15)
+
+        return f, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package excel
+
+import (
+        "math"
+        "math/rand"
+        "time"
+
+        "northstar/internal/model"
+)
+
+// Generator 历史数据生成器
+type Generator struct {
+        rng *rand.Rand
+}
+
+// NewGenerator 创建生成器
+func NewGenerator() *Generator <span class="cov0" title="0">{
+        return &amp;Generator{
+                rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+        }
+}</span>
+
+// GenerateHistory 为新入库企业生成历史数据
+func (g *Generator) GenerateHistory(company *model.Company, rule *model.GenerationRule) <span class="cov0" title="0">{
+        if company.RetailLastYearMonth &gt; 0 &amp;&amp; company.RetailLastYearCumulative &gt; 0 </span><span class="cov0" title="0">{
+                // 已有历史数据，不生成
+                return
+        }</span>
+
+        <span class="cov0" title="0">if rule == nil </span><span class="cov0" title="0">{
+                rule = g.defaultRule(company.IndustryType)
+        }</span>
+
+        // 生成上年累计销售额目标值
+        <span class="cov0" title="0">targetCumulative := g.randomInRange(rule.MinThreshold, rule.MaxThreshold)
+
+        // 按月份拆分，引入季节性波动
+        monthlyData := g.generateMonthlyData(targetCumulative, 12, rule.MonthlyVariance)
+
+        // 设置上年同期（假设当前月份为6月）
+        currentMonth := 6 // 可以从config获取
+        company.RetailLastYearMonth = monthlyData[currentMonth-1]
+
+        // 设置上年累计
+        cumulative := 0.0
+        for i := 0; i &lt; currentMonth; i++ </span><span class="cov0" title="0">{
+                cumulative += monthlyData[i]
+        }</span>
+        <span class="cov0" title="0">company.RetailLastYearCumulative = cumulative
+
+        // 同步设置销售额
+        company.SalesLastYearMonth = company.RetailLastYearMonth * 1.1
+        company.SalesLastYearCumulative = company.RetailLastYearCumulative * 1.1</span>
+}
+
+// defaultRule 默认生成规则
+func (g *Generator) defaultRule(industryType model.IndustryType) *model.GenerationRule <span class="cov0" title="0">{
+        switch industryType </span>{
+        case model.IndustryWholesale:<span class="cov0" title="0">
+                return &amp;model.GenerationRule{
+                        MinThreshold:    20000000,
+                        MaxThreshold:    30000000,
+                        MonthlyVariance: 0.15,
+                }</span>
+        case model.IndustryRetail:<span class="cov0" title="0">
+                return &amp;model.GenerationRule{
+                        MinThreshold:    5000000,
+                        MaxThreshold:    6000000,
+                        MonthlyVariance: 0.20,
+                }</span>
+        case model.IndustryAccommodation:<span class="cov0" title="0">
+                return &amp;model.GenerationRule{
+                        MinThreshold:    2000000,
+                        MaxThreshold:    3000000,
+                        MonthlyVariance: 0.25,
+                }</span>
+        case model.IndustryCatering:<span class="cov0" title="0">
+                return &amp;model.GenerationRule{
+                        MinThreshold:    2000000,
+                        MaxThreshold:    3000000,
+                        MonthlyVariance: 0.20,
+                }</span>
+        default:<span class="cov0" title="0">
+                return &amp;model.GenerationRule{
+                        MinThreshold:    5000000,
+                        MaxThreshold:    6000000,
+                        MonthlyVariance: 0.20,
+                }</span>
+        }
+}
+
+// randomInRange 在范围内生成随机数
+func (g *Generator) randomInRange(min, max float64) float64 <span class="cov0" title="0">{
+        return min + g.rng.Float64()*(max-min)
+}</span>
+
+// generateMonthlyData 生成月度数据（带季节性波动）
+func (g *Generator) generateMonthlyData(total float64, months int, variance float64) []float64 <span class="cov0" title="0">{
+        data := make([]float64, months)
+        baseValue := total / float64(months)
+
+        sum := 0.0
+        for i := 0; i &lt; months; i++ </span><span class="cov0" title="0">{
+                // 季节性波动：使用正弦函数模拟
+                seasonalFactor := 1.0 + 0.15*math.Sin(float64(i)*math.Pi/6.0)
+                // 随机噪声
+                noiseFactor := 1.0 + (g.rng.Float64()-0.5)*variance*2
+                data[i] = baseValue * seasonalFactor * noiseFactor
+                sum += data[i]
+        }</span>
+
+        // 调整使总和等于目标值
+        <span class="cov0" title="0">ratio := total / sum
+        for i := range data </span><span class="cov0" title="0">{
+                data[i] *= ratio
+        }</span>
+
+        <span class="cov0" title="0">return data</span>
+}
+
+// BatchGenerateHistory 批量生成历史数据
+func (g *Generator) BatchGenerateHistory(companies []*model.Company, rules map[model.IndustryType]*model.GenerationRule) int <span class="cov0" title="0">{
+        generated := 0
+        for _, c := range companies </span><span class="cov0" title="0">{
+                if c.RetailLastYearMonth == 0 || c.RetailLastYearCumulative == 0 </span><span class="cov0" title="0">{
+                        rule := rules[c.IndustryType]
+                        g.GenerateHistory(c, rule)
+                        generated++
+                }</span>
+        }
+        <span class="cov0" title="0">return generated</span>
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package excel
+
+import (
+        "errors"
+        "fmt"
+        "io"
+        "strconv"
+        "strings"
+
+        "github.com/google/uuid"
+        "github.com/xuri/excelize/v2"
+
+        "northstar/internal/model"
+)
+
+// Parser Excel解析器
+type Parser struct {
+        file    *excelize.File
+        fileID  string
+        mapping *model.FieldMapping
+}
+
+// NewParser 创建解析器
+func NewParser() *Parser <span class="cov0" title="0">{
+        return &amp;Parser{
+                fileID: uuid.New().String(),
+        }
+}</span>
+
+// LoadFile 加载Excel文件
+func (p *Parser) LoadFile(reader io.Reader) error <span class="cov0" title="0">{
+        file, err := excelize.OpenReader(reader)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to open excel: %w", err)
+        }</span>
+        <span class="cov0" title="0">p.file = file
+        return nil</span>
+}
+
+// GetFileID 获取文件ID
+func (p *Parser) GetFileID() string <span class="cov0" title="0">{
+        return p.fileID
+}</span>
+
+// GetSheets 获取工作表列表
+func (p *Parser) GetSheets() ([]model.SheetInfo, error) <span class="cov0" title="0">{
+        if p.file == nil </span><span class="cov0" title="0">{
+                return nil, errors.New("no file loaded")
+        }</span>
+
+        <span class="cov0" title="0">sheets := p.file.GetSheetList()
+        result := make([]model.SheetInfo, 0, len(sheets))
+
+        for _, name := range sheets </span><span class="cov0" title="0">{
+                rows, err := p.file.GetRows(name)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">result = append(result, model.SheetInfo{
+                        Name:     name,
+                        RowCount: len(rows),
+                })</span>
+        }
+
+        <span class="cov0" title="0">return result, nil</span>
+}
+
+// GetColumns 获取列名
+func (p *Parser) GetColumns(sheet string) ([]string, error) <span class="cov0" title="0">{
+        if p.file == nil </span><span class="cov0" title="0">{
+                return nil, errors.New("no file loaded")
+        }</span>
+
+        <span class="cov0" title="0">rows, err := p.file.GetRows(sheet)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if len(rows) == 0 </span><span class="cov0" title="0">{
+                return nil, errors.New("empty sheet")
+        }</span>
+
+        <span class="cov0" title="0">return rows[0], nil</span>
+}
+
+// GetPreviewRows 获取预览行
+func (p *Parser) GetPreviewRows(sheet string, limit int) ([][]string, error) <span class="cov0" title="0">{
+        if p.file == nil </span><span class="cov0" title="0">{
+                return nil, errors.New("no file loaded")
+        }</span>
+
+        <span class="cov0" title="0">rows, err := p.file.GetRows(sheet)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if len(rows) &lt;= 1 </span><span class="cov0" title="0">{
+                return [][]string{}, nil
+        }</span>
+
+        <span class="cov0" title="0">end := limit + 1
+        if end &gt; len(rows) </span><span class="cov0" title="0">{
+                end = len(rows)
+        }</span>
+
+        <span class="cov0" title="0">return rows[1:end], nil</span>
+}
+
+// SetMapping 设置字段映射
+func (p *Parser) SetMapping(mapping *model.FieldMapping) <span class="cov0" title="0">{
+        p.mapping = mapping
+}</span>
+
+// Parse 解析企业数据
+func (p *Parser) Parse(sheet string) ([]*model.Company, error) <span class="cov0" title="0">{
+        if p.file == nil </span><span class="cov0" title="0">{
+                return nil, errors.New("no file loaded")
+        }</span>
+        <span class="cov0" title="0">if p.mapping == nil </span><span class="cov0" title="0">{
+                return nil, errors.New("no mapping configured")
+        }</span>
+
+        <span class="cov0" title="0">rows, err := p.file.GetRows(sheet)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if len(rows) &lt;= 1 </span><span class="cov0" title="0">{
+                return []*model.Company{}, nil
+        }</span>
+
+        // 构建列名到索引的映射
+        <span class="cov0" title="0">header := rows[0]
+        colIndex := make(map[string]int)
+        for i, col := range header </span><span class="cov0" title="0">{
+                colIndex[col] = i
+        }</span>
+
+        <span class="cov0" title="0">companies := make([]*model.Company, 0, len(rows)-1)
+
+        for i, row := range rows[1:] </span><span class="cov0" title="0">{
+                company, err := p.parseRow(row, colIndex, i+2)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span> // 跳过错误行
+                }
+                <span class="cov0" title="0">companies = append(companies, company)</span>
+        }
+
+        <span class="cov0" title="0">return companies, nil</span>
+}
+
+// parseRow 解析单行数据
+func (p *Parser) parseRow(row []string, colIndex map[string]int, rowNum int) (*model.Company, error) <span class="cov0" title="0">{
+        getValue := func(field string) string </span><span class="cov0" title="0">{
+                if idx, ok := colIndex[field]; ok &amp;&amp; idx &lt; len(row) </span><span class="cov0" title="0">{
+                        return strings.TrimSpace(row[idx])
+                }</span>
+                <span class="cov0" title="0">return ""</span>
+        }
+
+        <span class="cov0" title="0">getFloat := func(field string) float64 </span><span class="cov0" title="0">{
+                val := getValue(field)
+                if val == "" </span><span class="cov0" title="0">{
+                        return 0
+                }</span>
+                // 移除千分位分隔符
+                <span class="cov0" title="0">val = strings.ReplaceAll(val, ",", "")
+                f, _ := strconv.ParseFloat(val, 64)
+                return f</span>
+        }
+
+        <span class="cov0" title="0">getInt := func(field string) int </span><span class="cov0" title="0">{
+                val := getValue(field)
+                if val == "" </span><span class="cov0" title="0">{
+                        return 0
+                }</span>
+                <span class="cov0" title="0">i, _ := strconv.Atoi(val)
+                return i</span>
+        }
+
+        <span class="cov0" title="0">name := getValue(p.mapping.CompanyName)
+        if name == "" </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("row %d: empty company name", rowNum)
+        }</span>
+
+        <span class="cov0" title="0">company := &amp;model.Company{
+                ID:                       uuid.New().String(),
+                Name:                     name,
+                CreditCode:               getValue(p.mapping.CreditCode),
+                IndustryCode:             getValue(p.mapping.IndustryCode),
+                CompanyScale:             getInt(p.mapping.CompanyScale),
+                RetailCurrentMonth:       getFloat(p.mapping.RetailCurrentMonth),
+                RetailLastYearMonth:      getFloat(p.mapping.RetailLastYearMonth),
+                RetailCurrentCumulative:  getFloat(p.mapping.RetailCurrentCumulative),
+                RetailLastYearCumulative: getFloat(p.mapping.RetailLastYearCumulative),
+                SalesCurrentMonth:        getFloat(p.mapping.SalesCurrentMonth),
+                SalesLastYearMonth:       getFloat(p.mapping.SalesLastYearMonth),
+                SalesCurrentCumulative:   getFloat(p.mapping.SalesCurrentCumulative),
+                SalesLastYearCumulative:  getFloat(p.mapping.SalesLastYearCumulative),
+        }
+
+        // 根据行业代码判断行业类型
+        company.IndustryType = detectIndustryType(company.IndustryCode)
+        // 判断是否属于吃穿用类
+        company.IsEatWearUse = isEatWearUse(company.IndustryCode)
+
+        return company, nil</span>
+}
+
+// detectIndustryType 根据行业代码判断行业类型
+func detectIndustryType(code string) model.IndustryType <span class="cov0" title="0">{
+        if len(code) &lt; 2 </span><span class="cov0" title="0">{
+                return model.IndustryRetail
+        }</span>
+
+        <span class="cov0" title="0">prefix := code[:2]
+        switch prefix </span>{
+        case "51":<span class="cov0" title="0"> // 批发业
+                return model.IndustryWholesale</span>
+        case "52":<span class="cov0" title="0"> // 零售业
+                return model.IndustryRetail</span>
+        case "61":<span class="cov0" title="0"> // 住宿业
+                return model.IndustryAccommodation</span>
+        case "62":<span class="cov0" title="0"> // 餐饮业
+                return model.IndustryCatering</span>
+        default:<span class="cov0" title="0">
+                return model.IndustryRetail</span>
+        }
+}
+
+// isEatWearUse 判断是否属于吃穿用类
+func isEatWearUse(code string) bool <span class="cov0" title="0">{
+        // 吃穿用行业代码列表 (简化版)
+        eatWearUseCodes := []string{
+                "5211", "5212", "5213", // 食品零售
+                "5221", "5222", "5223", // 服装零售
+                "5241", "5242", "5243", // 日用品零售
+                "5122", "5123",         // 食品批发
+        }
+
+        for _, c := range eatWearUseCodes </span><span class="cov0" title="0">{
+                if strings.HasPrefix(code, c) </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+        }
+        <span class="cov0" title="0">return false</span>
+}
+
+// Close 关闭文件
+func (p *Parser) Close() error <span class="cov0" title="0">{
+        if p.file != nil </span><span class="cov0" title="0">{
+                return p.file.Close()
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package store
+
+import (
+        "errors"
+        "sync"
+
+        "northstar/internal/model"
+)
+
+// MemoryStore 内存数据存储
+type MemoryStore struct {
+        companies map[string]*model.Company
+        config    *model.Config
+        mu        sync.RWMutex
+}
+
+// NewMemoryStore 创建内存存储
+func NewMemoryStore() *MemoryStore <span class="cov8" title="1">{
+        return &amp;MemoryStore{
+                companies: make(map[string]*model.Company),
+                config: &amp;model.Config{
+                        CurrentMonth:                 6,
+                        LastYearLimitBelowCumulative: 50000,
+                },
+        }
+}</span>
+
+// GetAllCompanies 获取所有企业
+func (s *MemoryStore) GetAllCompanies() []*model.Company <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+
+        result := make([]*model.Company, 0, len(s.companies))
+        for _, c := range s.companies </span><span class="cov8" title="1">{
+                result = append(result, c)
+        }</span>
+        <span class="cov8" title="1">return result</span>
+}
+
+// GetCompany 获取单个企业
+func (s *MemoryStore) GetCompany(id string) (*model.Company, error) <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+
+        company, ok := s.companies[id]
+        if !ok </span><span class="cov8" title="1">{
+                return nil, errors.New("company not found")
+        }</span>
+        <span class="cov8" title="1">return company, nil</span>
+}
+
+// SetCompanies 设置企业列表
+func (s *MemoryStore) SetCompanies(companies []*model.Company) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+
+        s.companies = make(map[string]*model.Company)
+        for _, c := range companies </span><span class="cov8" title="1">{
+                // 保存原始值用于重置
+                c.OriginalRetailCurrentMonth = c.RetailCurrentMonth
+                s.companies[c.ID] = c
+        }</span>
+}
+
+// UpdateCompanyRetail 更新企业零售额
+func (s *MemoryStore) UpdateCompanyRetail(id string, newRetailCurrentMonth float64) (*model.Company, error) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+
+        company, ok := s.companies[id]
+        if !ok </span><span class="cov0" title="0">{
+                return nil, errors.New("company not found")
+        }</span>
+
+        // 计算变化量，同步更新累计值
+        <span class="cov8" title="1">delta := newRetailCurrentMonth - company.RetailCurrentMonth
+        company.RetailCurrentMonth = newRetailCurrentMonth
+        company.RetailCurrentCumulative += delta
+
+        return company, nil</span>
+}
+
+// BatchUpdateCompanyRetail 批量更新企业零售额
+func (s *MemoryStore) BatchUpdateCompanyRetail(updates map[string]float64) error <span class="cov0" title="0">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+
+        for id, newValue := range updates </span><span class="cov0" title="0">{
+                company, ok := s.companies[id]
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">delta := newValue - company.RetailCurrentMonth
+                company.RetailCurrentMonth = newValue
+                company.RetailCurrentCumulative += delta</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// ResetCompanies 重置企业数据
+func (s *MemoryStore) ResetCompanies(ids []string) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+
+        if len(ids) == 0 </span><span class="cov8" title="1">{
+                // 重置全部
+                for _, c := range s.companies </span><span class="cov8" title="1">{
+                        delta := c.OriginalRetailCurrentMonth - c.RetailCurrentMonth
+                        c.RetailCurrentMonth = c.OriginalRetailCurrentMonth
+                        c.RetailCurrentCumulative += delta
+                }</span>
+        } else<span class="cov8" title="1"> {
+                // 重置指定企业
+                for _, id := range ids </span><span class="cov8" title="1">{
+                        if c, ok := s.companies[id]; ok </span><span class="cov8" title="1">{
+                                delta := c.OriginalRetailCurrentMonth - c.RetailCurrentMonth
+                                c.RetailCurrentMonth = c.OriginalRetailCurrentMonth
+                                c.RetailCurrentCumulative += delta
+                        }</span>
+                }
+        }
+}
+
+// GetConfig 获取配置
+func (s *MemoryStore) GetConfig() *model.Config <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        return s.config
+}</span>
+
+// SetConfig 设置配置
+func (s *MemoryStore) SetConfig(config *model.Config) <span class="cov0" title="0">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        s.config = config
+}</span>
+
+// UpdateConfig 更新配置
+func (s *MemoryStore) UpdateConfig(updates map[string]interface{}) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+
+        if v, ok := updates["currentMonth"].(int); ok </span><span class="cov8" title="1">{
+                s.config.CurrentMonth = v
+        }</span>
+        <span class="cov8" title="1">if v, ok := updates["lastYearLimitBelowCumulative"].(float64); ok </span><span class="cov0" title="0">{
+                s.config.LastYearLimitBelowCumulative = v
+        }</span>
+}
+
+// Count 获取企业数量
+func (s *MemoryStore) Count() int <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        return len(s.companies)
+}</span>
+
+// AddCompany 添加单个企业
+func (s *MemoryStore) AddCompany(c *model.Company) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        c.OriginalRetailCurrentMonth = c.RetailCurrentMonth
+        s.companies[c.ID] = c
+}</span>
+
+// Clear 清空所有企业数据
+func (s *MemoryStore) Clear() <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        s.companies = make(map[string]*model.Company)
+}</span>
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package util
+
+import (
+        "fmt"
+        "os/exec"
+        "runtime"
+)
+
+// OpenBrowser 打开默认浏览器
+// 支持 Windows 7/10/11, macOS, Linux
+func OpenBrowser(url string) error <span class="cov0" title="0">{
+        var cmd *exec.Cmd
+
+        switch runtime.GOOS </span>{
+        case "windows":<span class="cov0" title="0">
+                // Windows 7+ 兼容方式：使用 rundll32 调用 url.dll
+                // 这比 cmd /c start 更稳定，特别是在 Windows 7 上
+                // 同时也支持 Windows 10/11
+                cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)</span>
+        case "darwin":<span class="cov0" title="0">
+                cmd = exec.Command("open", url)</span>
+        default:<span class="cov0" title="0">
+                // Linux: 尝试多种方式打开浏览器
+                // 优先使用 xdg-open，如果失败则尝试其他方式
+                cmd = exec.Command("xdg-open", url)</span>
+        }
+
+        <span class="cov0" title="0">return cmd.Start()</span>
+}
+
+// OpenBrowserWithFallback 带降级方案的浏览器打开
+// 如果主要方式失败，会尝试备选方式
+func OpenBrowserWithFallback(url string) error <span class="cov0" title="0">{
+        err := OpenBrowser(url)
+        if err == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        // 降级方案
+        <span class="cov0" title="0">switch runtime.GOOS </span>{
+        case "windows":<span class="cov0" title="0">
+                // 备选方案：使用 explorer
+                return exec.Command("explorer", url).Start()</span>
+        case "linux":<span class="cov0" title="0">
+                // 尝试常见浏览器
+                browsers := []string{"google-chrome", "firefox", "chromium-browser", "sensible-browser"}
+                for _, browser := range browsers </span><span class="cov0" title="0">{
+                        if err := exec.Command(browser, url).Start(); err == nil </span><span class="cov0" title="0">{
+                                return nil
+                        }</span>
+                }
+        }
+
+        <span class="cov0" title="0">return err</span>
+}
+
+// FindAvailablePort 查找可用端口
+func FindAvailablePort(startPort int) int <span class="cov0" title="0">{
+        // 简单实现：返回起始端口
+        // 实际应用中应该检测端口是否被占用
+        return startPort
+}</span>
+
+// FormatPercent 格式化百分比
+func FormatPercent(value float64) string <span class="cov0" title="0">{
+        sign := ""
+        if value &gt; 0 </span><span class="cov0" title="0">{
+                sign = "+"
+        }</span>
+        <span class="cov0" title="0">return fmt.Sprintf("%s%.2f%%", sign, value*100)</span>
+}
+
+// FormatCurrency 格式化货币（千分位）
+func FormatCurrency(value float64) string <span class="cov0" title="0">{
+        // 简单实现
+        return fmt.Sprintf("%.2f", value)
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

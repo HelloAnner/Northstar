@@ -1,0 +1,22 @@
+# Northstar 配置文件
+# 此文件应放置在可执行文件同目录下
+
+[server]
+# 服务端口
+port = 8080
+# 开发模式 (true: 不自动打开浏览器)
+dev_mode = false
+
+[data]
+# 数据存储目录 (相对于可执行文件目录)
+data_dir = "data"
+# 自动备份
+auto_backup = true
+
+[business]
+# 默认操作月份 (1-12)
+default_month = 1
+# 最大增速限制
+max_growth = 0.5
+# 最小增速限制
+min_growth = -0.3

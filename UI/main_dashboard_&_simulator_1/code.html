@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>增长目标模拟平台</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#13a4ec",
+              "background": "#f8fafc",
+              "surface": "#ffffff",
+              "border-color": "#e2e8f0",
+              "text-primary": "#1e293b",
+              "text-secondary": "#64748b",
+              "text-tertiary": "#94a3b8",
+              "success": "#38A169",
+              "error": "#E53E3E",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            boxShadow: {
+                "sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+                "md": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background font-display text-text-primary antialiased">
+<div class="flex h-screen w-full flex-col">
+<header class="flex flex-none items-center justify-between whitespace-nowrap border-b border-solid border-border-color bg-surface/80 px-8 py-3 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<div class="size-8 text-primary">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M12.0799 24L4 19.2479L9.95537 8.75216L18.04 13.4961L18.0446 4H29.9554L29.96 13.4961L38.0446 8.75216L44 19.2479L35.92 24L44 28.7521L38.0446 39.2479L29.96 34.5039L29.9554 44H18.0446L18.04 34.5039L9.95537 39.2479L4 28.7521L12.0799 24Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h1 class="text-text-primary text-base font-medium leading-normal">数据管理与模拟平台</h1>
+</div>
+<div class="w-px h-8 bg-border-color"></div>
+<div class="flex flex-col gap-1 items-start">
+<p class="text-text-secondary text-xs font-medium">限上社零额增速 (当月)</p>
+<input class="form-input w-28 text-center bg-background border-transparent rounded-md py-1 text-text-primary font-semibold text-lg focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="3.45%"/>
+</div>
+<div class="flex flex-col gap-1 items-start">
+<p class="text-text-secondary text-xs font-medium">限上社零额增速 (累计)</p>
+<input class="form-input w-28 text-center bg-background border-transparent rounded-md py-1 text-text-primary font-semibold text-lg focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="15.82%"/>
+</div>
+</div>
+<div class="flex items-center justify-end gap-3">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary/20 text-primary text-sm font-bold leading-normal tracking-[0.015em] gap-2 hover:bg-primary/30 transition-colors">
+<span class="material-symbols-outlined text-lg">auto_fix_high</span>
+<span class="truncate">智能调整</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-slate-200 text-text-primary text-sm font-bold leading-normal tracking-[0.015em] hover:bg-slate-300 transition-colors">
+<span class="truncate">重置</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] gap-2 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-lg">download</span>
+<span class="truncate">导出</span>
+</button>
+</div>
+</header>
+<main class="flex-1 flex-col overflow-y-auto">
+<div class="flex-1 p-8">
+<div class="flex flex-col gap-6">
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-3 bg-surface border border-border-color rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+<h3 class="font-semibold text-text-primary text-base">限上社零额</h3>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">当期零售额 (万元)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="15,820"/>
+</div>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">同期零售额 (万元)</p>
+<div class="w-24 text-right bg-slate-100/60 border-transparent rounded p-1 text-text-primary font-semibold">12,650</div>
+</div>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">当月增速 (%)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="3.45"/>
+</div>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">累计增速 (%)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="15.82"/>
+</div>
+</div>
+<div class="col-span-2 bg-surface border border-border-color rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+<h3 class="font-semibold text-text-primary text-base">专项增速</h3>
+<div class="flex flex-col gap-4 text-sm flex-grow justify-around">
+<div>
+<p class="text-text-secondary mb-1">吃穿用增速 (当月)</p>
+<input class="form-input w-full text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="4.8%"/>
+</div>
+<div>
+<p class="text-text-secondary mb-1">小微企业增速 (当月)</p>
+<input class="form-input w-full text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="8.1%"/>
+</div>
+</div>
+</div>
+<div class="col-span-4 bg-surface border border-border-color rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+<h3 class="font-semibold text-text-primary text-base">四大行业增速</h3>
+<div class="grid grid-cols-4 gap-x-4 h-full">
+<div class="flex flex-col justify-around gap-1">
+<p class="font-medium text-sm text-text-primary text-center">批发业</p>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="pifa-dangyue">当月:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="pifa-dangyue" type="text" value="3.1%"/>
+</div>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="pifa-leiji">累计:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="pifa-leiji" type="text" value="2.9%"/>
+</div>
+</div>
+<div class="flex flex-col justify-around gap-1">
+<p class="font-medium text-sm text-text-primary text-center">零售业</p>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="lingshou-dangyue">当月:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="lingshou-dangyue" type="text" value="-1.4%"/>
+</div>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="lingshou-leiji">累计:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="lingshou-leiji" type="text" value="-0.8%"/>
+</div>
+</div>
+<div class="flex flex-col justify-around gap-1">
+<p class="font-medium text-sm text-text-primary text-center">住宿业</p>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="zhusu-dangyue">当月:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="zhusu-dangyue" type="text" value="6.5%"/>
+</div>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="zhusu-leiji">累计:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="zhusu-leiji" type="text" value="7.2%"/>
+</div>
+</div>
+<div class="flex flex-col justify-around gap-1">
+<p class="font-medium text-sm text-text-primary text-center">餐饮业</p>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="canyin-dangyue">当月:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="canyin-dangyue" type="text" value="9.2%"/>
+</div>
+<div class="flex items-center gap-1.5 text-xs">
+<label class="text-text-secondary" for="canyin-leiji">累计:</label><input class="form-input flex-1 min-w-0 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold text-sm focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" id="canyin-leiji" type="text" value="10.1%"/>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-3 bg-surface border border-border-color rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+<h3 class="font-semibold text-text-primary text-base">社零总额估算</h3>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">社零总额 (估算)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="35,800"/>
+</div>
+<div class="h-full flex flex-col justify-around">
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">同比增速 (%)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="4.1"/>
+</div>
+<div class="flex justify-between items-center text-sm">
+<p class="text-text-secondary">累计增速 (%)</p>
+<input class="form-input w-24 text-right bg-slate-100 border-transparent rounded p-1 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="5.8"/>
+</div>
+</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col bg-surface rounded-xl border border-border-color overflow-hidden shadow-md">
+<div class="p-6 border-b border-border-color flex justify-between items-center">
+<h3 class="text-lg font-bold text-text-primary">企业数据微调</h3>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary text-xl">search</span>
+<input class="form-input w-64 bg-background border border-border-color rounded-lg h-10 pl-10 text-sm text-text-primary placeholder:text-text-tertiary focus:ring-1 focus:ring-primary" placeholder="按行业/规模查找企业..." type="text"/>
+</div>
+<button class="flex items-center gap-2 h-10 px-4 rounded-lg bg-slate-200 text-sm text-text-primary font-medium hover:bg-slate-300 transition-colors">筛选<span class="material-symbols-outlined text-base">filter_list</span></button>
+<button class="flex items-center gap-2 h-10 px-4 rounded-lg bg-slate-200 text-sm text-text-primary font-medium hover:bg-slate-300 transition-colors">排序<span class="material-symbols-outlined text-base">swap_vert</span></button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-sm text-left text-text-secondary">
+<thead class="text-xs text-text-secondary uppercase bg-background">
+<tr>
+<th class="px-6 py-3" scope="col">企业名称</th>
+<th class="px-6 py-3 text-right" scope="col">总销售额</th>
+<th class="px-6 py-3 text-right" scope="col">本期零售额</th>
+<th class="px-6 py-3 text-right" scope="col">同期零售额</th>
+<th class="px-6 py-3 text-right" scope="col">增速</th>
+</tr>
+</thead>
+<tbody>
+<tr class="border-b border-border-color">
+<th class="px-6 py-4 font-medium text-text-primary whitespace-nowrap" scope="row">大型商超 A</th>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">1,250,000</div></td>
+<td class="px-6 py-4 text-right">
+<input class="form-input w-32 text-right bg-primary/10 border border-primary/50 rounded-md p-2 text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none" type="text" value="1,285,000"/>
+</td>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">1,100,000</div></td>
+<td class="px-6 py-4 text-right text-success">+16.82%</td>
+</tr>
+<tr class="border-b border-border-color">
+<th class="px-6 py-4 font-medium text-text-primary whitespace-nowrap" scope="row">汽车销售公司 B</th>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">3,400,000</div></td>
+<td class="px-6 py-4 text-right">
+<input class="form-input w-32 text-right bg-slate-100 border border-transparent rounded-md p-2 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="3,400,000"/>
+</td>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">3,550,000</div></td>
+<td class="px-6 py-4 text-right text-error">-4.23%</td>
+</tr>
+<tr class="border-b border-border-color">
+<th class="px-6 py-4 font-medium text-text-primary whitespace-nowrap" scope="row">电商平台 C</th>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">980,000</div></td>
+<td class="px-6 py-4 text-right relative group">
+<input class="form-input w-32 text-right bg-error/10 border border-error/50 rounded-md p-2 text-error font-semibold focus:ring-1 focus:ring-error focus:outline-none" type="text" value="1,050,000"/>
+<div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max bg-error text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">零售额不能超过总销售额</div>
+</td>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">990,000</div></td>
+<td class="px-6 py-4 text-right text-success">+6.06%</td>
+</tr>
+<tr class="border-b border-border-color">
+<th class="px-6 py-4 font-medium text-text-primary whitespace-nowrap" scope="row">连锁酒店 D</th>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">2,150,000</div></td>
+<td class="px-6 py-4 text-right">
+<input class="form-input w-32 text-right bg-slate-100 border border-transparent rounded-md p-2 text-text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none hover:border-border-color transition-colors" type="text" value="2,150,000"/>
+</td>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">2,000,000</div></td>
+<td class="px-6 py-4 text-right text-success">+7.50%</td>
+</tr>
+<tr class="border-b border-border-color">
+<th class="px-6 py-4 font-medium text-text-primary whitespace-nowrap" scope="row">餐饮集团 E</th>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">500,000</div></td>
+<td class="px-6 py-4 text-right">
+<input class="form-input w-32 text-right bg-primary/10 border border-primary/50 rounded-md p-2 text-primary font-semibold focus:ring-1 focus:ring-primary focus:outline-none" type="text" value="575,000"/>
+</td>
+<td class="px-6 py-4 text-right"><div class="inline-block w-32 text-right bg-slate-100/60 border-transparent rounded-md p-2 text-text-primary font-semibold">480,000</div></td>
+<td class="px-6 py-4 text-right text-success">+19.79%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
