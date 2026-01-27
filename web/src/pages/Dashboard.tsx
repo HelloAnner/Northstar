@@ -13,6 +13,16 @@ import {
   Filter,
   ArrowUpDown,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 // Logo 组件
 function Logo() {
@@ -135,10 +145,10 @@ function CompanyTable() {
         <h3 className="text-lg font-bold text-text-primary">企业数据微调</h3>
         <div className="flex items-center gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary w-4 h-4 pointer-events-none" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary w-4 h-4 pointer-events-none z-10" />
+            <Input
               type="text"
-              className="w-64 bg-background border border-border-color rounded-lg h-10 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-tertiary focus:ring-1 focus:ring-primary focus:outline-none"
+              className="w-64 h-10 pl-10 pr-3 text-sm"
               placeholder="按企业名称搜索..."
               onChange={(e) => handleSearch(e.target.value)}
             />
@@ -274,29 +284,38 @@ export default function Dashboard() {
   const { indicators, fetchIndicators, resetCompanies } = useDataStore()
   const [optimizing, setOptimizing] = useState(false)
 
+  // 对话框状态
+  const [optimizeDialogOpen, setOptimizeDialogOpen] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resultDialogOpen, setResultDialogOpen] = useState(false)
+  const [resultMessage, setResultMessage] = useState({ title: '', description: '', isError: false })
+  const [targetRate, setTargetRate] = useState('0.075')
+
   useEffect(() => {
     fetchIndicators()
   }, [fetchIndicators])
 
   const handleOptimize = async () => {
-    const target = prompt('请输入目标累计增速（如 0.075 表示 7.5%）：', '0.075')
-    if (!target) return
-
+    setOptimizeDialogOpen(false)
     setOptimizing(true)
     try {
-      await optimizeApi.run(parseFloat(target))
+      await optimizeApi.run(parseFloat(targetRate))
       await fetchIndicators()
-      alert('智能调整完成！')
+      setResultMessage({ title: '调整成功', description: '智能调整已完成，指标数据已更新。', isError: false })
+      setResultDialogOpen(true)
     } catch (e) {
-      alert('调整失败：' + (e as Error).message)
+      setResultMessage({ title: '调整失败', description: (e as Error).message, isError: true })
+      setResultDialogOpen(true)
     } finally {
       setOptimizing(false)
     }
   }
 
   const handleReset = async () => {
-    if (!confirm('确定要重置所有企业数据吗？')) return
+    setResetDialogOpen(false)
     await resetCompanies()
+    setResultMessage({ title: '重置成功', description: '所有企业数据已恢复到初始状态。', isError: false })
+    setResultDialogOpen(true)
   }
 
   const handleExport = async () => {
@@ -308,7 +327,8 @@ export default function Dashboard() {
       })
       window.open(result.downloadUrl, '_blank')
     } catch (e) {
-      alert('导出失败：' + (e as Error).message)
+      setResultMessage({ title: '导出失败', description: (e as Error).message, isError: true })
+      setResultDialogOpen(true)
     }
   }
 
@@ -346,7 +366,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-end gap-3">
           <button
             className="flex items-center gap-2 h-10 px-4 rounded-lg bg-primary/20 text-primary text-sm font-bold hover:bg-primary/30 transition-colors"
-            onClick={handleOptimize}
+            onClick={() => setOptimizeDialogOpen(true)}
             disabled={optimizing}
           >
             <Sparkles className="w-4 h-4" />
@@ -354,7 +374,7 @@ export default function Dashboard() {
           </button>
           <button
             className="flex items-center gap-2 h-10 px-4 rounded-lg bg-slate-200 text-text-primary text-sm font-bold hover:bg-slate-300 transition-colors"
-            onClick={handleReset}
+            onClick={() => setResetDialogOpen(true)}
           >
             <RotateCcw className="w-4 h-4" />
             重置
@@ -437,6 +457,83 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* 智能调整对话框 */}
+      <Dialog open={optimizeDialogOpen} onOpenChange={setOptimizeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>智能调整</DialogTitle>
+            <DialogDescription>
+              输入目标累计增速，系统将自动调整企业数据以达成目标。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-foreground">目标累计增速</label>
+            <div className="flex items-center gap-2 mt-2">
+              <Input
+                type="text"
+                value={targetRate}
+                onChange={(e) => setTargetRate(e.target.value)}
+                placeholder="如 0.075 表示 7.5%"
+                className="flex-1"
+              />
+              <span className="text-sm text-muted-foreground">
+                ({(parseFloat(targetRate) * 100 || 0).toFixed(1)}%)
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              例如：输入 0.075 表示目标增速为 7.5%
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOptimizeDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleOptimize}>
+              开始调整
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 重置确认对话框 */}
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认重置</DialogTitle>
+            <DialogDescription>
+              此操作将重置所有企业数据到初始状态，已修改的数据将会丢失。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleReset}>
+              确认重置
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 结果提示对话框 */}
+      <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className={resultMessage.isError ? 'text-destructive' : ''}>
+              {resultMessage.title}
+            </DialogTitle>
+            <DialogDescription>
+              {resultMessage.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setResultDialogOpen(false)}>
+              确定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
