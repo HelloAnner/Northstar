@@ -16,6 +16,7 @@ import (
 var (
 	port    = flag.Int("port", 0, "服务端口 (覆盖配置文件)")
 	devMode = flag.Bool("dev", false, "开发模式")
+	dataDir = flag.String("dataDir", "", "数据目录 (覆盖配置文件)")
 )
 
 func main() {
@@ -39,6 +40,9 @@ func main() {
 	if *devMode {
 		cfg.Server.DevMode = true
 	}
+	if *dataDir != "" {
+		cfg.Data.DataDir = *dataDir
+	}
 
 	// 确保数据目录存在
 	dataDir, err := config.EnsureDataDir(cfg)
@@ -49,7 +53,7 @@ func main() {
 	}
 
 	// 创建服务器
-	srv := server.NewServer(cfg.Server.DevMode)
+	srv := server.NewServer(cfg)
 
 	// 构建地址
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -81,4 +85,7 @@ func main() {
 	<-quit
 
 	fmt.Println("\n正在关闭服务...")
+	if err := srv.SaveNow(); err != nil {
+		log.Printf("退出前保存失败: %v", err)
+	}
 }

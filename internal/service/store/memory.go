@@ -14,6 +14,22 @@ type MemoryStore struct {
 	mu        sync.RWMutex
 }
 
+func cloneCompany(c *model.Company) *model.Company {
+	if c == nil {
+		return nil
+	}
+	cp := *c
+	return &cp
+}
+
+func cloneConfig(c *model.Config) *model.Config {
+	if c == nil {
+		return nil
+	}
+	cp := *c
+	return &cp
+}
+
 // NewMemoryStore 创建内存存储
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
@@ -32,7 +48,7 @@ func (s *MemoryStore) GetAllCompanies() []*model.Company {
 
 	result := make([]*model.Company, 0, len(s.companies))
 	for _, c := range s.companies {
-		result = append(result, c)
+		result = append(result, cloneCompany(c))
 	}
 	return result
 }
@@ -46,7 +62,7 @@ func (s *MemoryStore) GetCompany(id string) (*model.Company, error) {
 	if !ok {
 		return nil, errors.New("company not found")
 	}
-	return company, nil
+	return cloneCompany(company), nil
 }
 
 // SetCompanies 设置企业列表
@@ -56,10 +72,35 @@ func (s *MemoryStore) SetCompanies(companies []*model.Company) {
 
 	s.companies = make(map[string]*model.Company)
 	for _, c := range companies {
-		// 保存原始值用于重置
-		c.OriginalRetailCurrentMonth = c.RetailCurrentMonth
+		// 兼容旧数据：若未持久化原始快照，则以当前 state 作为基线初始化一次。
+		if !c.OriginalInitialized {
+			c.OriginalInitialized = true
+			c.OriginalName = c.Name
+			c.OriginalRetailLastYearMonth = c.RetailLastYearMonth
+			c.OriginalRetailCurrentMonth = c.RetailCurrentMonth
+			c.OriginalRetailLastYearCumulative = c.RetailLastYearCumulative
+			c.OriginalRetailCurrentCumulative = c.RetailCurrentCumulative
+			c.OriginalSalesLastYearMonth = c.SalesLastYearMonth
+			c.OriginalSalesCurrentMonth = c.SalesCurrentMonth
+			c.OriginalSalesLastYearCumulative = c.SalesLastYearCumulative
+			c.OriginalSalesCurrentCumulative = c.SalesCurrentCumulative
+		}
 		s.companies[c.ID] = c
 	}
+}
+
+// UpdateCompanyName 更新企业名称
+func (s *MemoryStore) UpdateCompanyName(id string, name string) (*model.Company, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	company, ok := s.companies[id]
+	if !ok {
+		return nil, errors.New("company not found")
+	}
+
+	company.Name = name
+	return cloneCompany(company), nil
 }
 
 // UpdateCompanyRetail 更新企业零售额
@@ -77,7 +118,41 @@ func (s *MemoryStore) UpdateCompanyRetail(id string, newRetailCurrentMonth float
 	company.RetailCurrentMonth = newRetailCurrentMonth
 	company.RetailCurrentCumulative += delta
 
-	return company, nil
+	return cloneCompany(company), nil
+}
+
+// UpdateCompanyRetailLastYearMonth 更新企业上年同期零售额
+func (s *MemoryStore) UpdateCompanyRetailLastYearMonth(id string, newRetailLastYearMonth float64) (*model.Company, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	company, ok := s.companies[id]
+	if !ok {
+		return nil, errors.New("company not found")
+	}
+
+	delta := newRetailLastYearMonth - company.RetailLastYearMonth
+	company.RetailLastYearMonth = newRetailLastYearMonth
+	company.RetailLastYearCumulative += delta
+
+	return cloneCompany(company), nil
+}
+
+// UpdateCompanySales 更新企业销售额（本期）
+func (s *MemoryStore) UpdateCompanySales(id string, newSalesCurrentMonth float64) (*model.Company, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	company, ok := s.companies[id]
+	if !ok {
+		return nil, errors.New("company not found")
+	}
+
+	delta := newSalesCurrentMonth - company.SalesCurrentMonth
+	company.SalesCurrentMonth = newSalesCurrentMonth
+	company.SalesCurrentCumulative += delta
+
+	return cloneCompany(company), nil
 }
 
 // BatchUpdateCompanyRetail 批量更新企业零售额
@@ -98,25 +173,116 @@ func (s *MemoryStore) BatchUpdateCompanyRetail(updates map[string]float64) error
 	return nil
 }
 
+// UpdateCompanyRetailCumulative 更新企业零售额（本年累计）
+func (s *MemoryStore) UpdateCompanyRetailCumulative(id string, newRetailCurrentCumulative float64) (*model.Company, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	company, ok := s.companies[id]
+	if !ok {
+		return nil, errors.New("company not found")
+	}
+
+	company.RetailCurrentCumulative = newRetailCurrentCumulative
+	return cloneCompany(company), nil
+}
+
+// BatchUpdateCompanyRetailCumulative 批量更新企业零售额（本年累计）
+func (s *MemoryStore) BatchUpdateCompanyRetailCumulative(updates map[string]float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id, newValue := range updates {
+		company, ok := s.companies[id]
+		if !ok {
+			continue
+		}
+		company.RetailCurrentCumulative = newValue
+	}
+
+	return nil
+}
+
+// BatchUpdateCompanySales 批量更新企业销售额（本期）
+func (s *MemoryStore) BatchUpdateCompanySales(updates map[string]float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id, newValue := range updates {
+		company, ok := s.companies[id]
+		if !ok {
+			continue
+		}
+		delta := newValue - company.SalesCurrentMonth
+		company.SalesCurrentMonth = newValue
+		company.SalesCurrentCumulative += delta
+	}
+
+	return nil
+}
+
+// UpdateCompanySalesCumulative 更新企业销售额（本年累计）
+func (s *MemoryStore) UpdateCompanySalesCumulative(id string, newSalesCurrentCumulative float64) (*model.Company, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	company, ok := s.companies[id]
+	if !ok {
+		return nil, errors.New("company not found")
+	}
+
+	company.SalesCurrentCumulative = newSalesCurrentCumulative
+	return cloneCompany(company), nil
+}
+
+// BatchUpdateCompanySalesCumulative 批量更新企业销售额（本年累计）
+func (s *MemoryStore) BatchUpdateCompanySalesCumulative(updates map[string]float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id, newValue := range updates {
+		company, ok := s.companies[id]
+		if !ok {
+			continue
+		}
+		company.SalesCurrentCumulative = newValue
+	}
+
+	return nil
+}
+
 // ResetCompanies 重置企业数据
 func (s *MemoryStore) ResetCompanies(ids []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	resetOne := func(c *model.Company) {
+		if !c.OriginalInitialized {
+			return
+		}
+		c.Name = c.OriginalName
+
+		c.RetailLastYearMonth = c.OriginalRetailLastYearMonth
+		c.RetailCurrentMonth = c.OriginalRetailCurrentMonth
+		c.RetailLastYearCumulative = c.OriginalRetailLastYearCumulative
+		c.RetailCurrentCumulative = c.OriginalRetailCurrentCumulative
+
+		c.SalesLastYearMonth = c.OriginalSalesLastYearMonth
+		c.SalesCurrentMonth = c.OriginalSalesCurrentMonth
+		c.SalesLastYearCumulative = c.OriginalSalesLastYearCumulative
+		c.SalesCurrentCumulative = c.OriginalSalesCurrentCumulative
+	}
+
 	if len(ids) == 0 {
 		// 重置全部
 		for _, c := range s.companies {
-			delta := c.OriginalRetailCurrentMonth - c.RetailCurrentMonth
-			c.RetailCurrentMonth = c.OriginalRetailCurrentMonth
-			c.RetailCurrentCumulative += delta
+			resetOne(c)
 		}
 	} else {
 		// 重置指定企业
 		for _, id := range ids {
 			if c, ok := s.companies[id]; ok {
-				delta := c.OriginalRetailCurrentMonth - c.RetailCurrentMonth
-				c.RetailCurrentMonth = c.OriginalRetailCurrentMonth
-				c.RetailCurrentCumulative += delta
+				resetOne(c)
 			}
 		}
 	}
@@ -126,14 +292,14 @@ func (s *MemoryStore) ResetCompanies(ids []string) {
 func (s *MemoryStore) GetConfig() *model.Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.config
+	return cloneConfig(s.config)
 }
 
 // SetConfig 设置配置
 func (s *MemoryStore) SetConfig(config *model.Config) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.config = config
+	s.config = cloneConfig(config)
 }
 
 // UpdateConfig 更新配置

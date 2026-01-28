@@ -8,10 +8,18 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # 目录
 DIST_DIR := dist
+INSTALL_ROOT := $(DIST_DIR)/install
 WEB_DIR := web
 STATIC_DIR := internal/server/dist
 E2E_DIR := tests/e2e
 REPORTS_DIR := tests/e2e-result
+
+# 当前平台
+HOST_OS := $(shell go env GOOS)
+HOST_ARCH := $(shell go env GOARCH)
+HOST_EXT := $(shell [ "$$(go env GOOS)" = "windows" ] && echo ".exe" || echo "")
+HOST_INSTALL_DIR := $(INSTALL_ROOT)/$(HOST_OS)-$(HOST_ARCH)
+HOST_BIN := $(HOST_INSTALL_DIR)/northstar$(HOST_EXT)
 
 # Go 编译参数
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
@@ -21,7 +29,7 @@ TEST_PORT := 18080
 
 # 默认目标
 .PHONY: all
-all: build
+all: install
 
 # 帮助信息
 .PHONY: help
@@ -29,12 +37,14 @@ help:
 	@echo "Northstar 构建脚本"
 	@echo ""
 	@echo "用法:"
-	@echo "  make build          - 构建当前平台可执行文件"
-	@echo "  make build-all      - 构建全部三个平台可执行文件"
+	@echo "  make install        - 生成当前平台发布包（可执行文件 + config.toml + readme.txt）"
+	@echo "  make install-all    - 生成全部平台发布包（每个平台一个文件夹）"
 	@echo "  make test           - 运行全部测试（单元测试 + E2E测试）"
 	@echo "  make test-unit      - 仅运行单元测试"
 	@echo "  make test-e2e       - 仅运行E2E测试"
-	@echo "  make start          - 启动可执行文件"
+	@echo "  make start          - 完整构建并启动（含前端编译）"
+	@echo "  make start-quick    - 快速启动（跳过前端编译）"
+	@echo "  make run            - 直接运行（不重新编译）"
 	@echo "  make dev            - 开发模式启动（热更新）"
 	@echo "  make clean          - 清理构建产物"
 	@echo "  make deps           - 安装依赖"
@@ -53,6 +63,10 @@ deps:
 .PHONY: build-web
 build-web:
 	@echo ">>> 构建前端..."
+	@cd $(WEB_DIR) && if [ ! -d "node_modules" ] || [ ! -x "node_modules/.bin/tsc" ]; then \
+		echo ">>> 检测到前端依赖缺失，执行 npm ci..."; \
+		npm ci; \
+	fi
 	cd $(WEB_DIR) && npm run build
 	@echo ">>> 前端构建完成"
 
@@ -61,75 +75,108 @@ build-web:
 ensure-static:
 	@mkdir -p $(STATIC_DIR)
 
-# 构建当前平台
+# 生成当前平台发布包
+.PHONY: install
+install: build-web ensure-static
+	@echo ">>> 生成当前平台发布包 ($(HOST_OS)/$(HOST_ARCH))..."
+	@mkdir -p $(HOST_INSTALL_DIR)
+	go build $(LDFLAGS) -o $(HOST_BIN) ./cmd/northstar
+	@cp config.toml.example $(HOST_INSTALL_DIR)/config.toml
+	@cp packaging/readme.txt $(HOST_INSTALL_DIR)/readme.txt
+	@echo ">>> 完成: $(HOST_INSTALL_DIR)/"
+
+# 兼容旧目标（不在 help 中展示）
 .PHONY: build
-build: build-web ensure-static
-	@echo ">>> 构建当前平台可执行文件..."
-	@mkdir -p $(DIST_DIR)
-	go build $(LDFLAGS) -o $(DIST_DIR)/northstar ./cmd/northstar
-	@cp config.toml.example $(DIST_DIR)/config.toml.example
-	@echo ">>> 构建完成: $(DIST_DIR)/northstar"
+build: install
 
-# 构建 Windows (amd64)
+# Windows (amd64) 发布包
+.PHONY: install-windows-amd64
+install-windows-amd64: build-web ensure-static
+	@echo ">>> 生成 Windows (amd64) 发布包..."
+	@mkdir -p $(INSTALL_ROOT)/windows-amd64
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(INSTALL_ROOT)/windows-amd64/northstar.exe ./cmd/northstar
+	@cp config.toml.example $(INSTALL_ROOT)/windows-amd64/config.toml
+	@cp packaging/readme.txt $(INSTALL_ROOT)/windows-amd64/readme.txt
+	@echo ">>> 完成: $(INSTALL_ROOT)/windows-amd64/"
+
 .PHONY: build-windows
-build-windows: build-web ensure-static
-	@echo ">>> 构建 Windows (amd64)..."
-	@mkdir -p $(DIST_DIR)
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-windows-amd64.exe ./cmd/northstar
-	@echo ">>> Windows 构建完成"
+build-windows: install-windows-amd64
 
-# 构建 macOS (amd64)
+# macOS (amd64) 发布包
+.PHONY: install-darwin-amd64
+install-darwin-amd64: build-web ensure-static
+	@echo ">>> 生成 macOS (amd64) 发布包..."
+	@mkdir -p $(INSTALL_ROOT)/darwin-amd64
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(INSTALL_ROOT)/darwin-amd64/northstar ./cmd/northstar
+	@cp config.toml.example $(INSTALL_ROOT)/darwin-amd64/config.toml
+	@cp packaging/readme.txt $(INSTALL_ROOT)/darwin-amd64/readme.txt
+	@echo ">>> 完成: $(INSTALL_ROOT)/darwin-amd64/"
+
 .PHONY: build-darwin-amd64
-build-darwin-amd64: build-web ensure-static
-	@echo ">>> 构建 macOS (amd64)..."
-	@mkdir -p $(DIST_DIR)
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-darwin-amd64 ./cmd/northstar
-	@echo ">>> macOS amd64 构建完成"
+build-darwin-amd64: install-darwin-amd64
 
-# 构建 macOS (arm64)
+# macOS (arm64) 发布包
+.PHONY: install-darwin-arm64
+install-darwin-arm64: build-web ensure-static
+	@echo ">>> 生成 macOS (arm64) 发布包..."
+	@mkdir -p $(INSTALL_ROOT)/darwin-arm64
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(INSTALL_ROOT)/darwin-arm64/northstar ./cmd/northstar
+	@cp config.toml.example $(INSTALL_ROOT)/darwin-arm64/config.toml
+	@cp packaging/readme.txt $(INSTALL_ROOT)/darwin-arm64/readme.txt
+	@echo ">>> 完成: $(INSTALL_ROOT)/darwin-arm64/"
+
 .PHONY: build-darwin-arm64
-build-darwin-arm64: build-web ensure-static
-	@echo ">>> 构建 macOS (arm64)..."
-	@mkdir -p $(DIST_DIR)
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-darwin-arm64 ./cmd/northstar
-	@echo ">>> macOS arm64 构建完成"
+build-darwin-arm64: install-darwin-arm64
 
-# 构建 Linux (amd64)
+# Linux (amd64) 发布包
+.PHONY: install-linux-amd64
+install-linux-amd64: build-web ensure-static
+	@echo ">>> 生成 Linux (amd64) 发布包..."
+	@mkdir -p $(INSTALL_ROOT)/linux-amd64
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(INSTALL_ROOT)/linux-amd64/northstar ./cmd/northstar
+	@cp config.toml.example $(INSTALL_ROOT)/linux-amd64/config.toml
+	@cp packaging/readme.txt $(INSTALL_ROOT)/linux-amd64/readme.txt
+	@echo ">>> 完成: $(INSTALL_ROOT)/linux-amd64/"
+
 .PHONY: build-linux
-build-linux: build-web ensure-static
-	@echo ">>> 构建 Linux (amd64)..."
-	@mkdir -p $(DIST_DIR)
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-linux-amd64 ./cmd/northstar
-	@echo ">>> Linux 构建完成"
+build-linux: install-linux-amd64
 
-# 构建全部平台
-.PHONY: build-all
-build-all: build-web ensure-static
-	@echo ">>> 构建全部平台..."
-	@mkdir -p $(DIST_DIR)
-
-	@echo ">>> [1/4] Windows (amd64)..."
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-windows-amd64.exe ./cmd/northstar
-
-	@echo ">>> [2/4] macOS (amd64)..."
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-darwin-amd64 ./cmd/northstar
-
-	@echo ">>> [3/4] macOS (arm64)..."
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-darwin-arm64 ./cmd/northstar
-
-	@echo ">>> [4/4] Linux (amd64)..."
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/northstar-linux-amd64 ./cmd/northstar
-
-	@cp config.toml.example $(DIST_DIR)/
+# 生成全部平台发布包
+.PHONY: install-all
+install-all: install-windows-amd64 install-darwin-amd64 install-darwin-arm64 install-linux-amd64
 	@echo ""
-	@echo ">>> 全部平台构建完成!"
-	@ls -la $(DIST_DIR)/
+	@echo ">>> 全部平台发布包已生成: $(INSTALL_ROOT)/"
+	@ls -la $(INSTALL_ROOT)/
+
+# 兼容旧目标（不在 help 中展示）
+.PHONY: build-all
+build-all: install-all
 
 # 开发模式启动（模拟可执行文件）
 .PHONY: start
-start: build
+start: install
 	@echo ">>> 启动 Northstar..."
-	$(DIST_DIR)/northstar
+	$(HOST_BIN)
+
+# 快速启动（跳过前端编译，仅编译后端）
+.PHONY: start-quick
+start-quick: ensure-static
+	@echo ">>> 快速启动 Northstar (跳过前端编译)..."
+	@mkdir -p $(HOST_INSTALL_DIR)
+	go build $(LDFLAGS) -o $(HOST_BIN) ./cmd/northstar
+	@cp config.toml.example $(HOST_INSTALL_DIR)/config.toml
+	@cp packaging/readme.txt $(HOST_INSTALL_DIR)/readme.txt
+	$(HOST_BIN)
+
+# 仅运行（不重新编译，使用已有的可执行文件）
+.PHONY: run
+run:
+	@echo ">>> 运行 Northstar..."
+	@if [ ! -f "$(HOST_BIN)" ]; then \
+		echo "错误: 可执行文件不存在，请先运行 make install"; \
+		exit 1; \
+	fi
+	$(HOST_BIN)
 
 # 开发模式启动（代码热更新）
 .PHONY: dev
@@ -193,12 +240,12 @@ test-unit: clean-test-reports prepare-test-reports test-unit-only
 
 # 仅运行 E2E 测试（独立运行，包含清理和数据生成）
 .PHONY: test-e2e
-test-e2e: build clean-test-reports prepare-test-reports generate-test-data test-e2e-only
+test-e2e: install clean-test-reports prepare-test-reports generate-test-data test-e2e-only
 	@echo ">>> 测试报告: $(REPORTS_DIR)/report.html"
 
 # 运行全部测试（单元测试 + E2E 测试）
 .PHONY: test
-test: build clean-test-reports prepare-test-reports generate-test-data test-unit-only test-e2e-only
+test: install clean-test-reports prepare-test-reports generate-test-data test-unit-only test-e2e-only
 	@echo ""
 	@echo "=========================================="
 	@echo "  全部测试完成"
@@ -238,7 +285,7 @@ test-e2e-only:
 	@pkill -f "northstar -port $(TEST_PORT)" 2>/dev/null || true
 	@sleep 1
 	@echo ">>> 启动测试服务器 (端口: $(TEST_PORT))..."
-	@$(DIST_DIR)/northstar -port $(TEST_PORT) > $(REPORTS_DIR)/server.log 2>&1 &
+	@$(HOST_BIN) -port $(TEST_PORT) -dataDir $(REPORTS_DIR)/data > $(REPORTS_DIR)/server.log 2>&1 &
 	@echo ">>> 等待服务器启动..."
 	@sleep 3
 	@echo ">>> 执行 E2E 测试用例..."

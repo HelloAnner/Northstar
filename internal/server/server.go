@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"northstar/internal/config"
 	"northstar/internal/server/handlers"
 	"northstar/internal/service/calculator"
+	"northstar/internal/service/project"
 	"northstar/internal/service/store"
 )
 
@@ -21,11 +23,13 @@ type Server struct {
 	store     *store.MemoryStore
 	engine    *calculator.Engine
 	optimizer *calculator.Optimizer
+	projects  *project.Manager
 	handlers  *handlers.Handlers
 }
 
 // NewServer 创建服务器
-func NewServer(devMode bool) *Server {
+func NewServer(cfg *config.AppConfig) *Server {
+	devMode := cfg.Server.DevMode
 	if !devMode {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -33,13 +37,24 @@ func NewServer(devMode bool) *Server {
 	memStore := store.NewMemoryStore()
 	calcEngine := calculator.NewEngine(memStore)
 	opt := calculator.NewOptimizer(memStore, calcEngine)
-	h := handlers.NewHandlers(memStore, calcEngine, opt)
+
+	dataDir, err := config.EnsureDataDir(cfg)
+	if err != nil {
+		dataDir = cfg.Data.DataDir
+	}
+	projectManager, err := project.NewManager(dataDir, memStore, calcEngine)
+	if err != nil {
+		projectManager, _ = project.NewManager(cfg.Data.DataDir, memStore, calcEngine)
+	}
+
+	h := handlers.NewHandlers(memStore, calcEngine, opt, projectManager)
 
 	s := &Server{
 		router:    gin.Default(),
 		store:     memStore,
 		engine:    calcEngine,
 		optimizer: opt,
+		projects:  projectManager,
 		handlers:  h,
 	}
 
@@ -65,6 +80,16 @@ func (s *Server) setupRoutes(devMode bool) {
 	// API路由
 	api := s.router.Group("/api/v1")
 	{
+		// 项目
+		api.GET("/projects", s.handlers.ListProjects)
+		api.POST("/projects", s.handlers.CreateProject)
+		api.GET("/projects/current", s.handlers.GetCurrentProject)
+		api.POST("/projects/current/save", s.handlers.SaveCurrentProject)
+		api.POST("/projects/current/undo", s.handlers.UndoCurrentProject)
+		api.POST("/projects/:projectId/select", s.handlers.SelectProject)
+		api.GET("/projects/:projectId", s.handlers.GetProjectDetail)
+		api.DELETE("/projects/:projectId", s.handlers.DeleteProject)
+
 		// 导入相关
 		api.POST("/import/upload", s.handlers.UploadFile)
 		api.GET("/import/:fileId/columns", s.handlers.GetColumns)
@@ -80,6 +105,7 @@ func (s *Server) setupRoutes(devMode bool) {
 
 		// 指标
 		api.GET("/indicators", s.handlers.GetIndicators)
+		api.POST("/indicators/adjust", s.handlers.AdjustIndicator)
 
 		// 智能调整
 		api.POST("/optimize", s.handlers.Optimize)
@@ -135,6 +161,14 @@ func (s *Server) setupRoutes(devMode bool) {
 // Run 启动服务器
 func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
+}
+
+// SaveNow 立即持久化当前项目（用于退出前防止数据丢失）
+func (s *Server) SaveNow() error {
+	if s.projects == nil {
+		return nil
+	}
+	return s.projects.SaveNow()
 }
 
 // GetStore 获取存储（用于测试）

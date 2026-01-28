@@ -131,3 +131,52 @@ export interface ListResponse<T> {
   pageSize: number
   items: T[]
 }
+
+// ==================== Projects（specs/002） ====================
+
+export interface ProjectSummary {
+  projectId: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  lastOpenedAt: string
+  hasData: boolean
+  companyCount: number
+  lastImportAt: string
+  lastFileName: string
+  lastSheetName: string
+}
+
+export interface ProjectsIndex {
+  schemaVersion: number
+  lastActiveProjectId: string
+  lastEditedProjectId: string
+  items: ProjectSummary[]
+}
+
+export interface ProjectMeta {
+  schemaVersion: number
+  projectId: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ImportHistoryItem {
+  importedAt: string
+  fileName: string
+  sheet: string
+  importedCount: number
+  generatedHistoryCount: number
+}
+
+export interface ProjectDetail {
+  project: ProjectSummary
+  meta: ProjectMeta
+  history: ImportHistoryItem[]
+}
+
+export interface CurrentProject {
+  project: ProjectSummary
+  hasData: boolean
+}

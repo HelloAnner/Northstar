@@ -7,6 +7,10 @@ import type {
   ListResponse,
   OptimizeConstraints,
   OptimizeResult,
+  CurrentProject,
+  ProjectDetail,
+  ProjectsIndex,
+  ProjectSummary,
   SheetInfo,
 } from '@/types'
 
@@ -77,25 +81,76 @@ export const importApi = {
     ),
 }
 
+// 项目
+export const projectsApi = {
+  list: () => request<ProjectsIndex>('/projects'),
+
+  create: (name: string) =>
+    request<ProjectSummary>('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  select: (projectId: string) =>
+    request<ProjectSummary>(`/projects/${encodeURIComponent(projectId)}/select`, {
+      method: 'POST',
+    }),
+
+  current: () => request<CurrentProject>('/projects/current'),
+
+  save: () =>
+    request<{ saved: boolean }>('/projects/current/save', {
+      method: 'POST',
+    }),
+
+  detail: (projectId: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`),
+
+  delete: (projectId: string) =>
+    request<{ deleted: boolean }>(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }),
+
+  undoCurrent: () =>
+    request<{ indicators: Indicators }>('/projects/current/undo', {
+      method: 'POST',
+    }),
+}
+
 // 企业数据
 export const companiesApi = {
-  list: (params?: { page?: number; pageSize?: number; search?: string; industry?: string; scale?: string }) => {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    industry?: string
+    scale?: string
+    sortBy?: string
+    sortDir?: 'asc' | 'desc'
+  }) => {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', String(params.page))
     if (params?.pageSize) query.set('pageSize', String(params.pageSize))
     if (params?.search) query.set('search', params.search)
     if (params?.industry) query.set('industry', params.industry)
     if (params?.scale) query.set('scale', params.scale)
+    if (params?.sortBy) query.set('sortBy', params.sortBy)
+    if (params?.sortDir) query.set('sortDir', params.sortDir)
 
     return request<ListResponse<Company>>(`/companies?${query}`)
   },
 
   get: (id: string) => request<Company>(`/companies/${id}`),
 
-  update: (id: string, retailCurrentMonth: number) =>
+  update: (
+    id: string,
+    patch: {
+      name?: string
+      retailCurrentMonth?: number
+      retailLastYearMonth?: number
+      salesCurrentMonth?: number
+    }
+  ) =>
     request<{ company: Partial<Company>; indicators: Indicators }>(`/companies/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ retailCurrentMonth }),
+      body: JSON.stringify(patch),
     }),
 
   batchUpdate: (updates: { id: string; retailCurrentMonth: number }[]) =>
@@ -114,6 +169,12 @@ export const companiesApi = {
 // 指标
 export const indicatorsApi = {
   get: () => request<Indicators>('/indicators'),
+
+  adjust: (key: string, value: number) =>
+    request<Indicators>('/indicators/adjust', {
+      method: 'POST',
+      body: JSON.stringify({ key, value }),
+    }),
 }
 
 // 智能调整

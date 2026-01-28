@@ -33,7 +33,16 @@ type Company struct {
 	SalesCurrentCumulative  float64 `json:"salesCurrentCumulative"`  // 本年累计销售额
 
 	// 原始值（用于重置）
-	OriginalRetailCurrentMonth float64 `json:"-"`
+	OriginalInitialized              bool    `json:"originalInitialized"`
+	OriginalName                     string  `json:"originalName"`
+	OriginalRetailLastYearMonth      float64 `json:"originalRetailLastYearMonth"`
+	OriginalRetailCurrentMonth       float64 `json:"originalRetailCurrentMonth"`
+	OriginalRetailLastYearCumulative float64 `json:"originalRetailLastYearCumulative"`
+	OriginalRetailCurrentCumulative  float64 `json:"originalRetailCurrentCumulative"`
+	OriginalSalesLastYearMonth       float64 `json:"originalSalesLastYearMonth"`
+	OriginalSalesCurrentMonth        float64 `json:"originalSalesCurrentMonth"`
+	OriginalSalesLastYearCumulative  float64 `json:"originalSalesLastYearCumulative"`
+	OriginalSalesCurrentCumulative   float64 `json:"originalSalesCurrentCumulative"`
 }
 
 // IsMicroSmall 判断是否为小微企业

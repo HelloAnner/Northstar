@@ -204,6 +204,18 @@ func (p *Parser) parseRow(row []string, colIndex map[string]int, rowNum int) (*m
 	// 判断是否属于吃穿用类
 	company.IsEatWearUse = isEatWearUse(company.IndustryCode)
 
+	// 记录 Excel 原始值：用于“重置为原始导入数据”
+	company.OriginalInitialized = true
+	company.OriginalName = company.Name
+	company.OriginalRetailLastYearMonth = company.RetailLastYearMonth
+	company.OriginalRetailCurrentMonth = company.RetailCurrentMonth
+	company.OriginalRetailLastYearCumulative = company.RetailLastYearCumulative
+	company.OriginalRetailCurrentCumulative = company.RetailCurrentCumulative
+	company.OriginalSalesLastYearMonth = company.SalesLastYearMonth
+	company.OriginalSalesCurrentMonth = company.SalesCurrentMonth
+	company.OriginalSalesLastYearCumulative = company.SalesLastYearCumulative
+	company.OriginalSalesCurrentCumulative = company.SalesCurrentCumulative
+
 	return company, nil
 }
 
@@ -235,7 +247,7 @@ func isEatWearUse(code string) bool {
 		"5211", "5212", "5213", // 食品零售
 		"5221", "5222", "5223", // 服装零售
 		"5241", "5242", "5243", // 日用品零售
-		"5122", "5123",         // 食品批发
+		"5122", "5123", // 食品批发
 	}
 
 	for _, c := range eatWearUseCodes {
