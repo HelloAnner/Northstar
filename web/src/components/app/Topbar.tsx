@@ -19,7 +19,7 @@ export default function Topbar({ title, statusText }: { title: string; statusTex
   const { current, index, refreshIndex, refreshCurrent, selectProject } = useProjectStore()
 
   const currentLabel = current?.project?.projectId
-    ? `当前项目：${current.project.name || current.project.projectId}`
+    ? `当前项目：${current.project.name?.trim() || '未命名项目'}`
     : '当前项目：未选择'
 
   const items = index?.items ?? []
@@ -80,7 +80,7 @@ export default function Topbar({ title, statusText }: { title: string; statusTex
                       }
                     }}
                   >
-                    <span className="truncate text-white">{p.name || p.projectId}</span>
+                    <span className="truncate text-white">{p.name?.trim() || '未命名项目'}</span>
                     <span className="ml-2 text-[11px] text-[#A3A3A3]">{p.hasData ? '已就绪' : '需要导入'}</span>
                   </DropdownMenuItem>
                 )

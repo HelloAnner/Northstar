@@ -39,6 +39,7 @@ help:
 	@echo "用法:"
 	@echo "  make install        - 生成当前平台发布包（可执行文件 + config.toml + readme.txt）"
 	@echo "  make install-all    - 生成全部平台发布包（每个平台一个文件夹）"
+	@echo "  make check          - 编译前端与后端（仅编译校验）"
 	@echo "  make test           - 运行全部测试（单元测试 + E2E测试）"
 	@echo "  make test-unit      - 仅运行单元测试"
 	@echo "  make test-e2e       - 仅运行E2E测试"
@@ -89,6 +90,14 @@ install: build-web ensure-static
 .PHONY: build
 build: install
 
+# 编译校验（前端 + 后端）
+.PHONY: check
+check: build-web
+	@echo ">>> 编译后端..."
+	@mkdir -p $(DIST_DIR)/check
+	go build $(LDFLAGS) -o $(DIST_DIR)/check/northstar$(HOST_EXT) ./cmd/northstar
+	@echo ">>> 编译校验完成"
+
 # Windows (amd64) 发布包
 .PHONY: install-windows-amd64
 install-windows-amd64: build-web ensure-static
@@ -97,6 +106,7 @@ install-windows-amd64: build-web ensure-static
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(INSTALL_ROOT)/windows-amd64/northstar.exe ./cmd/northstar
 	@cp config.toml.example $(INSTALL_ROOT)/windows-amd64/config.toml
 	@cp packaging/readme.txt $(INSTALL_ROOT)/windows-amd64/readme.txt
+	@cp packaging/start.bat $(INSTALL_ROOT)/windows-amd64/start.bat
 	@echo ">>> 完成: $(INSTALL_ROOT)/windows-amd64/"
 
 .PHONY: build-windows

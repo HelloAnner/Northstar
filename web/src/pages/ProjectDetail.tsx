@@ -40,17 +40,18 @@ export default function ProjectDetail() {
 
   const statusText = detail?.project?.hasData ? '已保存' : '等待导入'
   const subtitle = detail?.project?.hasData ? '数据状态：已导入（可进入仪表盘）' : '数据状态：未导入（需先进入导入向导）'
+  const projectName = detail?.project?.name?.trim() || detail?.meta?.name?.trim() || '未命名项目'
 
   const history = useMemo(() => (detail?.history ?? []).slice(0, 3), [detail?.history])
 
   return (
     <>
-      <Topbar title={`项目详情 / ${projectId || '-'}`} statusText={statusText} />
+      <Topbar title={`项目详情 / ${projectName}`} statusText={statusText} />
 
       <div className="flex-1 overflow-y-scroll p-6">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-2xl font-semibold">项目详情：{projectId}{detail?.meta?.name ? `（${detail.meta.name}）` : ''}</div>
+            <div className="text-2xl font-semibold">项目详情：{projectName}</div>
             <div className="mt-1 text-sm text-[#A3A3A3]">{subtitle}</div>
           </div>
 
@@ -88,8 +89,8 @@ export default function ProjectDetail() {
               <div className="mt-1 text-sm text-[#A3A3A3]">基础信息与数据概况</div>
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div className="text-[#A3A3A3]">项目ID</div>
-                <div className="text-white">{detail?.project?.projectId || projectId}</div>
+                <div className="text-[#A3A3A3]">项目名称</div>
+                <div className="text-white">{projectName}</div>
                 <div className="text-[#A3A3A3]">企业数量</div>
                 <div className="text-white">{detail?.project?.companyCount ?? 0}</div>
                 <div className="text-[#A3A3A3]">创建时间</div>

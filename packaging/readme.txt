@@ -2,7 +2,8 @@ Northstar 发布包
 
 1) 运行
 - macOS/Linux: ./northstar
-- Windows: northstar.exe
+- Windows: 双击 start.bat（窗口保持运行表示服务在运行，关闭窗口停止服务）
+  - 或者直接运行 northstar.exe
 
 2) 配置文件
 - 程序启动时会自动读取同目录下的 config.toml

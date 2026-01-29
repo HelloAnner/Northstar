@@ -19,6 +19,8 @@ import (
 const (
 	schemaVersion     = 1
 	saveDebounceDelay = time.Second
+	undoDebounceDelay = 600 * time.Millisecond
+	undoStackLimit    = 30
 )
 
 // Manager 项目管理器：负责索引维护、切换项目、持久化与自动保存
@@ -34,6 +36,15 @@ type Manager struct {
 	saveTimer  *time.Timer
 	lastImport ImportHistoryItem
 	hasImport  bool
+
+	undoStack          []undoSnapshot
+	lastUndoSnapshotAt time.Time
+}
+
+type undoSnapshot struct {
+	savedAt   time.Time
+	config    *model.Config
+	companies []*model.Company
 }
 
 func NewManager(dataDir string, store *store.MemoryStore, engine *calculator.Engine) (*Manager, error) {
@@ -105,6 +116,11 @@ func (m *Manager) loadIndex() error {
 	return nil
 }
 
+func (m *Manager) resetUndoLocked() {
+	m.undoStack = nil
+	m.lastUndoSnapshotAt = time.Time{}
+}
+
 func (m *Manager) saveIndexLocked() error {
 	return writeJSONAtomic(m.indexPath(), m.index)
 }
@@ -174,6 +190,7 @@ func (m *Manager) CreateProject(name string) (ProjectSummary, error) {
 
 	m.store.Clear()
 	m.store.SetConfig(store.NewMemoryStore().GetConfig())
+	m.resetUndoLocked()
 
 	if err := m.saveIndexLocked(); err != nil {
 		return ProjectSummary{}, err
@@ -207,6 +224,7 @@ func (m *Manager) SelectProject(projectID string) (ProjectSummary, error) {
 	m.index.LastActiveProjectID = projectID
 	m.activeID = projectID
 	_ = m.loadProjectState(projectID)
+	m.resetUndoLocked()
 
 	if err := m.saveIndexLocked(); err != nil {
 		return ProjectSummary{}, err
@@ -274,6 +292,7 @@ func (m *Manager) DeleteProject(projectID string) error {
 		}
 		m.store.Clear()
 		m.store.SetConfig(store.NewMemoryStore().GetConfig())
+		m.resetUndoLocked()
 	} else if m.index.LastActiveProjectID == projectID {
 		m.index.LastActiveProjectID = m.activeID
 		if m.index.LastEditedProjectID == projectID {
@@ -331,7 +350,7 @@ func (m *Manager) SaveLatestXlsx(projectID string, data []byte) error {
 	return writeBytesAtomic(path, data)
 }
 
-// SaveUndoSnapshot 保存“撤销”快照（单步）：在每次数据写入前调用，记录写入前的状态
+// SaveUndoSnapshot 保存“撤销”快照（多步）：在每次数据写入前调用，记录写入前的状态
 func (m *Manager) SaveUndoSnapshot() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -340,24 +359,25 @@ func (m *Manager) SaveUndoSnapshot() error {
 		return nil
 	}
 
-	state := struct {
-		SchemaVersion int              `json:"schemaVersion"`
-		ProjectID     string           `json:"projectId"`
-		SavedAt       time.Time        `json:"savedAt"`
-		Config        *model.Config    `json:"config"`
-		Companies     []*model.Company `json:"companies"`
-	}{
-		SchemaVersion: schemaVersion,
-		ProjectID:     m.activeID,
-		SavedAt:       time.Now().UTC(),
-		Config:        m.store.GetConfig(),
-		Companies:     m.store.GetAllCompanies(),
+	now := time.Now().UTC()
+	if !m.lastUndoSnapshotAt.IsZero() && now.Sub(m.lastUndoSnapshotAt) < undoDebounceDelay {
+		return nil
 	}
 
-	return writeJSONAtomic(m.undoStatePath(m.activeID), state)
+	snapshot := undoSnapshot{
+		savedAt:   now,
+		config:    m.store.GetConfig(),
+		companies: m.store.GetAllCompanies(),
+	}
+	m.undoStack = append(m.undoStack, snapshot)
+	if len(m.undoStack) > undoStackLimit {
+		m.undoStack = m.undoStack[len(m.undoStack)-undoStackLimit:]
+	}
+	m.lastUndoSnapshotAt = now
+	return nil
 }
 
-// UndoLast 撤销上一次修改：恢复为上一次快照，并清空快照（单步撤销）
+// UndoLast 撤销上一次修改：恢复为上一次快照（多步撤销）
 func (m *Manager) UndoLast() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -366,27 +386,22 @@ func (m *Manager) UndoLast() error {
 		return errors.New("no active project")
 	}
 
-	path := m.undoStatePath(m.activeID)
-	if !fileExists(path) {
+	if len(m.undoStack) == 0 {
 		return errors.New("no undo snapshot")
 	}
 
-	var state struct {
-		Config    *model.Config    `json:"config"`
-		Companies []*model.Company `json:"companies"`
+	lastIndex := len(m.undoStack) - 1
+	state := m.undoStack[lastIndex]
+	m.undoStack = m.undoStack[:lastIndex]
+	m.lastUndoSnapshotAt = time.Time{}
+
+	if state.config != nil {
+		m.store.SetConfig(state.config)
 	}
-	if err := readJSON(path, &state); err != nil {
-		return err
+	if state.companies != nil {
+		m.store.SetCompanies(state.companies)
 	}
 
-	if state.Config != nil {
-		m.store.SetConfig(state.Config)
-	}
-	if state.Companies != nil {
-		m.store.SetCompanies(state.Companies)
-	}
-
-	_ = os.Remove(path)
 	return nil
 }
 
@@ -502,7 +517,24 @@ func (m *Manager) loadProjectState(projectID string) error {
 func (m *Manager) refreshHasDataLocked() {
 	for i := range m.index.Items {
 		id := m.index.Items[i].ProjectID
-		m.index.Items[i].HasData = fileExists(m.statePath(id))
+		statePath := m.statePath(id)
+		if !fileExists(statePath) {
+			m.index.Items[i].HasData = false
+			m.index.Items[i].CompanyCount = 0
+			continue
+		}
+
+		companyCount := m.index.Items[i].CompanyCount
+		if companyCount <= 0 {
+			var state struct {
+				Companies []*model.Company `json:"companies"`
+			}
+			if err := readJSON(statePath, &state); err == nil {
+				companyCount = len(state.Companies)
+				m.index.Items[i].CompanyCount = companyCount
+			}
+		}
+		m.index.Items[i].HasData = companyCount > 0
 	}
 	sort.SliceStable(m.index.Items, func(i, j int) bool {
 		return m.index.Items[i].LastOpenedAt.After(m.index.Items[j].LastOpenedAt)

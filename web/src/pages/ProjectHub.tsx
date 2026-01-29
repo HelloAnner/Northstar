@@ -45,7 +45,7 @@ export default function ProjectHub() {
   const filtered = useMemo(() => {
     const k = keyword.trim()
     if (!k) return items
-    return items.filter((p) => p.projectId.includes(k) || p.name.includes(k))
+    return items.filter((p) => p.name.includes(k))
   }, [items, keyword])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
@@ -160,7 +160,7 @@ export default function ProjectHub() {
                             className="h-auto p-0 text-left text-[14px] font-medium text-white underline-offset-4 hover:text-white"
                             onClick={() => navigate(`/projects/${encodeURIComponent(p.projectId)}`)}
                           >
-                            {p.projectId}{p.name ? `（${p.name}）` : ''}
+                            {p.name?.trim() || '未命名项目'}
                           </Button>
                           <div className="mt-0.5 text-[12px] text-[#D4D4D4]">
                             {p.hasData ? `企业：${p.companyCount || 0}` : '未导入数据'}

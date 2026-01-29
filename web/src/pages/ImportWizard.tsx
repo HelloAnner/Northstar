@@ -368,7 +368,7 @@ export default function ImportWizard() {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-end gap-2">
+        <div className="sticky bottom-6 z-10 mt-6 flex items-center justify-end gap-2 rounded-xl border border-white/10 bg-[#0D0D0D]/80 p-2 backdrop-blur">
           <Button
             variant="secondary"
             className="border border-white/10 bg-white/5 text-white hover:bg-white/10"
