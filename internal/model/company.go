@@ -13,6 +13,7 @@ const (
 // Company 企业数据模型
 type Company struct {
 	ID           string       `json:"id"`
+	RowNo        int          `json:"rowNo"`
 	Name         string       `json:"name"`
 	CreditCode   string       `json:"creditCode"`
 	IndustryCode string       `json:"industryCode"`
@@ -32,8 +33,25 @@ type Company struct {
 	SalesLastYearCumulative float64 `json:"salesLastYearCumulative"` // 上年累计销售额
 	SalesCurrentCumulative  float64 `json:"salesCurrentCumulative"`  // 本年累计销售额
 
+	// 住餐：明细拆分（不参与零售额汇总）
+	RoomRevenueLastYearMonth      float64 `json:"roomRevenueLastYearMonth"`      // 上年同期客房收入
+	RoomRevenueCurrentMonth       float64 `json:"roomRevenueCurrentMonth"`       // 本期客房收入
+	RoomRevenueLastYearCumulative float64 `json:"roomRevenueLastYearCumulative"` // 上年累计客房收入
+	RoomRevenueCurrentCumulative  float64 `json:"roomRevenueCurrentCumulative"`  // 本年累计客房收入
+
+	FoodRevenueLastYearMonth      float64 `json:"foodRevenueLastYearMonth"`      // 上年同期餐费收入
+	FoodRevenueCurrentMonth       float64 `json:"foodRevenueCurrentMonth"`       // 本期餐费收入
+	FoodRevenueLastYearCumulative float64 `json:"foodRevenueLastYearCumulative"` // 上年累计餐费收入
+	FoodRevenueCurrentCumulative  float64 `json:"foodRevenueCurrentCumulative"`  // 本年累计餐费收入
+
+	GoodsSalesLastYearMonth      float64 `json:"goodsSalesLastYearMonth"`      // 上年同期商品销售额
+	GoodsSalesCurrentMonth       float64 `json:"goodsSalesCurrentMonth"`       // 本期商品销售额
+	GoodsSalesLastYearCumulative float64 `json:"goodsSalesLastYearCumulative"` // 上年累计商品销售额
+	GoodsSalesCurrentCumulative  float64 `json:"goodsSalesCurrentCumulative"`  // 本年累计商品销售额
+
 	// 原始值（用于重置）
 	OriginalInitialized              bool    `json:"originalInitialized"`
+	OriginalRowNo                    int     `json:"originalRowNo"`
 	OriginalName                     string  `json:"originalName"`
 	OriginalRetailLastYearMonth      float64 `json:"originalRetailLastYearMonth"`
 	OriginalRetailCurrentMonth       float64 `json:"originalRetailCurrentMonth"`
@@ -43,6 +61,21 @@ type Company struct {
 	OriginalSalesCurrentMonth        float64 `json:"originalSalesCurrentMonth"`
 	OriginalSalesLastYearCumulative  float64 `json:"originalSalesLastYearCumulative"`
 	OriginalSalesCurrentCumulative   float64 `json:"originalSalesCurrentCumulative"`
+
+	OriginalRoomRevenueLastYearMonth      float64 `json:"originalRoomRevenueLastYearMonth"`
+	OriginalRoomRevenueCurrentMonth       float64 `json:"originalRoomRevenueCurrentMonth"`
+	OriginalRoomRevenueLastYearCumulative float64 `json:"originalRoomRevenueLastYearCumulative"`
+	OriginalRoomRevenueCurrentCumulative  float64 `json:"originalRoomRevenueCurrentCumulative"`
+
+	OriginalFoodRevenueLastYearMonth      float64 `json:"originalFoodRevenueLastYearMonth"`
+	OriginalFoodRevenueCurrentMonth       float64 `json:"originalFoodRevenueCurrentMonth"`
+	OriginalFoodRevenueLastYearCumulative float64 `json:"originalFoodRevenueLastYearCumulative"`
+	OriginalFoodRevenueCurrentCumulative  float64 `json:"originalFoodRevenueCurrentCumulative"`
+
+	OriginalGoodsSalesLastYearMonth      float64 `json:"originalGoodsSalesLastYearMonth"`
+	OriginalGoodsSalesCurrentMonth       float64 `json:"originalGoodsSalesCurrentMonth"`
+	OriginalGoodsSalesLastYearCumulative float64 `json:"originalGoodsSalesLastYearCumulative"`
+	OriginalGoodsSalesCurrentCumulative  float64 `json:"originalGoodsSalesCurrentCumulative"`
 }
 
 // IsMicroSmall 判断是否为小微企业
@@ -78,7 +111,8 @@ func (c *Company) Validate() []ValidationError {
 	var errors []ValidationError
 
 	// 零售额不能超过销售额
-	if c.RetailCurrentMonth > c.SalesCurrentMonth && c.SalesCurrentMonth > 0 {
+	if (c.IndustryType == IndustryWholesale || c.IndustryType == IndustryRetail) &&
+		c.RetailCurrentMonth > c.SalesCurrentMonth && c.SalesCurrentMonth > 0 {
 		errors = append(errors, ValidationError{
 			Field:    "retailCurrentMonth",
 			Message:  "零售额不能超过总销售额",

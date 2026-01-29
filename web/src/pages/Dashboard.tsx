@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { exportApi, indicatorsApi, optimizeApi, projectsApi } from '@/services/api'
-import type { IndustryType } from '@/types'
+import { companiesApi, exportApi, indicatorsApi, optimizeApi, projectsApi } from '@/services/api'
+import type { Company, IndustryType } from '@/types'
 import { ArrowUpDown, ArrowLeft, ArrowRight, Check, Filter, Search, Sparkles, Download, RotateCcw, Undo2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -468,6 +468,8 @@ export default function Dashboard() {
 
   const [bootstrapped, setBootstrapped] = useState(false)
   const [undoing, setUndoing] = useState(false)
+  const [summaryCompanies, setSummaryCompanies] = useState<Company[]>([])
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   const selectedIndustries = useMemo(() => {
     const raw = (industryFilter || '').trim()
@@ -561,6 +563,63 @@ export default function Dashboard() {
   useEffect(() => {
     fetchCompanies()
   }, [fetchCompanies, searchKeyword, currentPage, pageSize, industryFilter, scaleFilter, sortBy, sortDir])
+
+  useEffect(() => {
+    if (!currentProjectId || !currentHasData) {
+      setSummaryCompanies([])
+      return
+    }
+    let canceled = false
+    ;(async () => {
+      setSummaryLoading(true)
+      try {
+        const res = await companiesApi.list({
+          page: 1,
+          pageSize: 10000,
+          search: searchKeyword,
+          industry: industryFilter,
+          scale: scaleFilter,
+          sortBy,
+          sortDir,
+        })
+        if (!canceled) {
+          setSummaryCompanies(res.items)
+        }
+      } finally {
+        if (!canceled) setSummaryLoading(false)
+      }
+    })()
+    return () => {
+      canceled = true
+    }
+  }, [currentProjectId, currentHasData, searchKeyword, industryFilter, scaleFilter, sortBy, sortDir])
+
+  const summaryRows = useMemo(() => {
+    const sum = (items: Company[], pick: (c: Company) => number) => items.reduce((acc, c) => acc + pick(c), 0)
+    const rate = (cur: number, last: number) => {
+      if (!last) return 0
+      return (cur - last) / last
+    }
+
+    const br = summaryCompanies.filter((c) => c.industryType === 'wholesale' || c.industryType === 'retail')
+    const ac = summaryCompanies.filter((c) => c.industryType === 'accommodation' || c.industryType === 'catering')
+    const eatWear = summaryCompanies.filter((c) => c.isEatWearUse)
+    const micro = summaryCompanies.filter((c) => c.companyScale === 3 || c.companyScale === 4)
+
+    const build = (label: string, items: Company[]) => {
+      const cur = sum(items, (c) => c.retailCurrentMonth || 0)
+      const last = sum(items, (c) => c.retailLastYearMonth || 0)
+      return {
+        label,
+        count: items.length,
+        cur,
+        last,
+        r: rate(cur, last),
+      }
+    }
+
+    return [build('批零（批发+零售）', br), build('住餐（住宿+餐饮）', ac), build('吃穿用', eatWear), build('小微', micro)]
+  }, [summaryCompanies])
 
   useEffect(() => {
     if (loading) return
@@ -789,6 +848,61 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mt-6 border-white/10 bg-[#0D0D0D] p-4">
+          <CardHeader className="space-y-1 p-0">
+            <div className="text-lg font-semibold text-white">归纳数据（当前筛选）</div>
+            <div className="text-sm text-[#A3A3A3]">按筛选范围聚合（最多 10000 条）</div>
+          </CardHeader>
+          <CardContent className="mt-4 p-0">
+            <div className="overflow-hidden rounded-lg border border-white/10">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10">
+                    <TableHead className="text-[#A3A3A3]">视图</TableHead>
+                    <TableHead className="text-right text-[#A3A3A3]">企业数</TableHead>
+                    <TableHead className="text-right text-[#A3A3A3]">本期零售额合计</TableHead>
+                    <TableHead className="text-right text-[#A3A3A3]">上年同期合计</TableHead>
+                    <TableHead className="text-right text-[#A3A3A3]">当月增速</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summaryLoading ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <TableRow key={`summary-loading-${idx}`} className="border-white/10">
+                        <TableCell>
+                          <Skeleton className="h-6 w-[160px] bg-white/5" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-6 w-[60px] bg-white/5" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-6 w-[120px] bg-white/5" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-6 w-[120px] bg-white/5" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-6 w-[80px] bg-white/5" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    summaryRows.map((r) => (
+                      <TableRow key={r.label} className="border-white/10">
+                        <TableCell className="text-white">{r.label}</TableCell>
+                        <TableCell className="text-right text-white">{r.count}</TableCell>
+                        <TableCell className="text-right text-white">{formatCurrency(r.cur)}</TableCell>
+                        <TableCell className="text-right text-white">{formatCurrency(r.last)}</TableCell>
+                        <TableCell className="text-right text-white">{formatPercent(r.r)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="mt-6 border-white/10 bg-[#0D0D0D] p-4">
           <CardHeader className="space-y-1 p-0">

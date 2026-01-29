@@ -12,6 +12,9 @@ import type {
   ProjectsIndex,
   ProjectSummary,
   SheetInfo,
+  SheetRecognition,
+  SheetType,
+  ResolveResult,
 } from '@/types'
 
 const BASE_URL = '/api/v1'
@@ -54,6 +57,8 @@ export const importApi = {
       fileName: string
       fileSize: number
       sheets: SheetInfo[]
+      recognition: SheetRecognition[]
+      months: number[]
     }
   },
 
@@ -79,6 +84,12 @@ export const importApi = {
         body: JSON.stringify({ sheet, generateHistory, currentMonth }),
       }
     ),
+
+  resolve: (fileId: string, month: number, overrides: Record<string, SheetType>) =>
+    request<ResolveResult>(`/import/${fileId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ month, overrides }),
+    }),
 }
 
 // 项目

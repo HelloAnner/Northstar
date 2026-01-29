@@ -12,6 +12,7 @@ type AppConfig struct {
 	Server   ServerConfig   `toml:"server"`
 	Data     DataConfig     `toml:"data"`
 	Business BusinessConfig `toml:"business"`
+	Excel    ExcelConfig    `toml:"excel"`
 }
 
 // ServerConfig 服务器配置
@@ -33,6 +34,11 @@ type BusinessConfig struct {
 	MinGrowth    float64 `toml:"min_growth"`
 }
 
+// ExcelConfig Excel 导出相关配置
+type ExcelConfig struct {
+	TemplatePath string `toml:"template_path"`
+}
+
 // DefaultConfig 默认配置
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
@@ -48,6 +54,9 @@ func DefaultConfig() *AppConfig {
 			DefaultMonth: 1,
 			MaxGrowth:    0.5,
 			MinGrowth:    -0.3,
+		},
+		Excel: ExcelConfig{
+			TemplatePath: "",
 		},
 	}
 }
@@ -85,6 +94,11 @@ func LoadConfig() (*AppConfig, error) {
 
 	if err := toml.Unmarshal(data, config); err != nil {
 		return nil, err
+	}
+
+	// 环境变量覆盖（用于 E2E / 本地运行）
+	if v := os.Getenv("NORTHSTAR_EXCEL_TEMPLATE_PATH"); v != "" {
+		config.Excel.TemplatePath = v
 	}
 
 	return config, nil

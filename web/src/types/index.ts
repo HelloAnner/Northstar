@@ -117,6 +117,35 @@ export interface SheetInfo {
   rowCount: number
 }
 
+export type SheetType =
+  | 'unknown'
+  | 'wholesale_main'
+  | 'retail_main'
+  | 'accommodation_main'
+  | 'catering_main'
+  | 'wholesale_retail_snapshot'
+  | 'accommodation_catering_snapshot'
+  | 'eat_wear_use'
+  | 'micro_small'
+  | 'eat_wear_use_excluded'
+  | 'fixed_social_retail'
+  | 'fixed_summary'
+
+export interface SheetRecognition {
+  sheetName: string
+  type: SheetType
+  score: number
+  missingFields: string[]
+}
+
+export interface ResolveResult {
+  month: number
+  mainSheets: Record<string, string>
+  snapshotSheets: Record<string, string>
+  unknownSheets: string[]
+  unusedSheets: string[]
+}
+
 // API 响应
 export interface ApiResponse<T> {
   code: number

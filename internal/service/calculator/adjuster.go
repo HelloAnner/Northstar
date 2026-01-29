@@ -32,26 +32,42 @@ func (a *Adjuster) Adjust(key string, value float64) (*model.Indicators, error) 
 
 	switch {
 	case key == "limitAboveMonthValue":
-		return a.adjustRetailMonthAll(value)
+		return a.withCompanyValidation(a.adjustRetailMonthAll(value))
 	case key == "limitAboveMonthRate":
-		return a.adjustRetailMonthRateAll(value)
+		return a.withCompanyValidation(a.adjustRetailMonthRateAll(value))
 	case key == "limitAboveCumulativeValue":
-		return a.adjustRetailCumulativeAll(value)
+		return a.withCompanyValidation(a.adjustRetailCumulativeAll(value))
 	case key == "limitAboveCumulativeRate":
-		return a.adjustRetailCumulativeRateAll(value)
+		return a.withCompanyValidation(a.adjustRetailCumulativeRateAll(value))
 	case key == "eatWearUseMonthRate":
-		return a.adjustRetailMonthRateEatWearUse(value)
+		return a.withCompanyValidation(a.adjustRetailMonthRateEatWearUse(value))
 	case key == "microSmallMonthRate":
-		return a.adjustRetailMonthRateMicroSmall(value)
+		return a.withCompanyValidation(a.adjustRetailMonthRateMicroSmall(value))
+	case strings.HasPrefix(key, "industry."):
+		return a.withCompanyValidation(a.adjustIndustryRate(key, value))
 	case key == "totalSocialCumulativeValue":
 		return a.adjustTotalSocialCumulativeValue(value)
 	case key == "totalSocialCumulativeRate":
 		return a.adjustTotalSocialCumulativeRate(value)
-	case strings.HasPrefix(key, "industry."):
-		return a.adjustIndustryRate(key, value)
 	default:
 		return nil, fmt.Errorf("unsupported key: %s", key)
 	}
+}
+
+func (a *Adjuster) withCompanyValidation(indicators *model.Indicators, err error) (*model.Indicators, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	companies := a.store.GetAllCompanies()
+	for _, c := range companies {
+		errs := ValidateCompany(c)
+		if len(errs) > 0 {
+			return nil, errors.New(errs[0])
+		}
+	}
+
+	return indicators, nil
 }
 
 // ==================== Retail: All ====================

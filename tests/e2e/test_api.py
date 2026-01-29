@@ -10,6 +10,7 @@ import pytest
 import requests
 import time
 import json
+from openpyxl import Workbook
 
 
 def extract_data(response):
@@ -368,6 +369,45 @@ class TestImportAPI:
         assert response.status_code == 200
         code = get_code(response)
         assert code != 0, "没有文件时应返回错误码"
+
+    def test_upload_returns_sheet_recognition(self, api_client, tmp_path):
+        """TC-IMP-003: 上传接口返回识别结果与月份列表"""
+        session, base_url = api_client
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "2025年11月批零"
+        ws.append([
+            "统一社会信用代码",
+            "单位详细名称",
+            "201-1-行业代码（GB/T4754-2017）",
+            "商品销售额;本年-本月",
+            "商品销售额;本年-1—本月",
+            "零售额;本年-本月",
+            "零售额;本年-1—本月",
+            "201-1-单位规模",
+        ])
+
+        file_path = tmp_path / "upload_recognition.xlsx"
+        wb.save(file_path)
+
+        with open(file_path, "rb") as f:
+            files = {
+                "file": (
+                    "upload_recognition.xlsx",
+                    f,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            }
+            response = session.post(f"{base_url}/api/v1/import/upload", files=files)
+
+        assert response.status_code == 200
+        data = extract_data(response)
+
+        assert "recognition" in data, "返回应包含 recognition"
+        assert "months" in data, "返回应包含 months"
+        assert isinstance(data["recognition"], list), "recognition 应为数组"
+        assert 11 in data["months"], "应能从sheet名解析到11月"
 
     def test_get_columns_invalid_file(self, api_client):
         """TC-IMP-002: 无效文件 ID 获取列信息应返回错误"""

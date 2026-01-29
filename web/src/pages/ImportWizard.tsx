@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { importApi } from '@/services/api'
 import { useImportStore, useProjectStore, useDataStore } from '@/store'
 import { ArrowLeft, ArrowRight, Upload } from 'lucide-react'
+import type { SheetType } from '@/types'
 
 function StepDot({ n, active }: { n: number; active: boolean }) {
   return (
@@ -28,9 +29,10 @@ function StepDot({ n, active }: { n: number; active: boolean }) {
 function Stepper({ step }: { step: number }) {
   const items = [
     { n: 1, label: '文件上传' },
-    { n: 2, label: '字段映射' },
-    { n: 3, label: '生成规则' },
-    { n: 4, label: '执行导入' },
+    { n: 2, label: '识别确认' },
+    { n: 3, label: '字段映射' },
+    { n: 4, label: '生成规则' },
+    { n: 5, label: '执行导入' },
   ]
   return (
     <div className="flex items-center gap-3">
@@ -62,6 +64,10 @@ export default function ImportWizard() {
     fileId,
     fileName,
     sheets,
+    recognition,
+    months,
+    overrides,
+    resolveResult,
     selectedSheet,
     columns,
     mapping,
@@ -69,6 +75,8 @@ export default function ImportWizard() {
     currentMonth,
     setStep,
     setFileInfo,
+    setOverride,
+    setResolveResult,
     setSelectedSheet,
     setColumns,
     setMapping,
@@ -152,11 +160,32 @@ export default function ImportWizard() {
     return requiredKeys.every((k) => String(mapping[k] || '').trim().length > 0)
   }, [mapping, mappingRows])
 
+  const monthValid = useMemo(() => currentMonth >= 1 && currentMonth <= 12, [currentMonth])
+
   const canNext =
-    (step === 1 && !!fileId && !!selectedSheet) ||
-    (step === 2 && !!fileId && !!selectedSheet && requiredMappingReady) ||
-    step === 3 ||
-    step === 4
+    (step === 1 && !!fileId) ||
+    (step === 2 && !!fileId && monthValid) ||
+    (step === 3 && !!fileId && !!selectedSheet && requiredMappingReady) ||
+    step === 4 ||
+    step === 5
+
+  const sheetTypeLabel: Record<SheetType, string> = useMemo(
+    () => ({
+      unknown: '未知',
+      wholesale_main: '批发主表',
+      retail_main: '零售主表',
+      accommodation_main: '住宿主表',
+      catering_main: '餐饮主表',
+      wholesale_retail_snapshot: '批零快照',
+      accommodation_catering_snapshot: '住餐快照',
+      eat_wear_use: '吃穿用',
+      micro_small: '小微',
+      eat_wear_use_excluded: '吃穿用（剔除）',
+      fixed_social_retail: '社零额（定）',
+      fixed_summary: '汇总表（定）',
+    }),
+    []
+  )
 
   return (
     <>
@@ -166,7 +195,9 @@ export default function ImportWizard() {
         <div className="flex items-start justify-between">
           <div>
             <div className="text-2xl font-semibold">数据导入与配置</div>
-            <div className="mt-1 text-sm text-[#A3A3A3]">上传 Excel → 字段映射 → 生成规则 → 执行导入</div>
+            <div className="mt-1 text-sm text-[#A3A3A3]">
+              上传 Excel → 识别确认 → 字段映射 → 生成规则 → 执行导入
+            </div>
           </div>
         </div>
 
@@ -205,7 +236,10 @@ export default function ImportWizard() {
                           setUploading(true)
                           try {
                             const res = await importApi.upload(file)
-                            setFileInfo(res.fileId, res.fileName, res.sheets)
+                            setFileInfo(res.fileId, res.fileName, res.sheets, res.recognition || [], res.months || [])
+                            if ((res.months || []).length > 0) {
+                              setCurrentMonth((res.months || [])[res.months.length - 1] || 0)
+                            }
                             setMappingValid(false)
                             setStep(1)
                           } finally {
@@ -263,37 +297,146 @@ export default function ImportWizard() {
             <div className="w-full shrink-0 px-1">
               <Card className="border-white/10 bg-[#0D0D0D] p-4">
                 <CardHeader className="space-y-1 p-0">
-                  <div className="text-lg font-semibold text-white">2. 配置关键字段映射</div>
+                  <div className="text-lg font-semibold text-white">2. 识别结果与确认</div>
+                  <div className="text-sm text-[#A3A3A3]">确认 sheet 类型与操作月份（疑似/未知可手动指定）</div>
+                </CardHeader>
+                <CardContent className="mt-4 space-y-4 p-0">
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div>
+                      <div className="text-sm text-white">操作月份</div>
+                      <div className="text-[12px] text-[#A3A3A3]">用于选择当月主表与快照（1-12）</div>
+                    </div>
+                    {months.length > 0 ? (
+                      <Select value={String(currentMonth)} onValueChange={(v) => setCurrentMonth(Number(v))}>
+                        <SelectTrigger className="h-9 w-28 border-white/10 bg-white/5 text-right text-white">
+                          <SelectValue placeholder="选择" />
+                        </SelectTrigger>
+                        <SelectContent className="border-white/10 bg-[#0D0D0D] text-white">
+                          {months.map((m) => (
+                            <SelectItem key={m} value={String(m)}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        type="number"
+                        value={currentMonth}
+                        onChange={(e) => setCurrentMonth(Number(e.target.value || 0))}
+                        className="h-9 w-28 border-white/10 bg-white/5 text-right text-white"
+                      />
+                    )}
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-white/10">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/10">
+                          <TableHead className="text-[#A3A3A3]">Sheet</TableHead>
+                          <TableHead className="text-[#A3A3A3]">识别类型</TableHead>
+                          <TableHead className="text-[#A3A3A3]">得分</TableHead>
+                          <TableHead className="text-[#A3A3A3]">缺失字段</TableHead>
+                          <TableHead className="text-[#A3A3A3]">人工确认</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {recognition.length === 0 ? (
+                          <TableRow className="border-white/10">
+                            <TableCell className="py-10 text-center text-[#A3A3A3]" colSpan={5}>
+                              暂无识别结果（请先上传文件）
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          recognition.map((r) => {
+                            const override = overrides[r.sheetName]
+                            const currentType = override || r.type
+                            return (
+                              <TableRow key={r.sheetName} className="border-white/10">
+                                <TableCell className="text-white">{r.sheetName}</TableCell>
+                                <TableCell className="text-white">
+                                  <span className="rounded bg-white/5 px-2 py-1 text-xs">{sheetTypeLabel[r.type]}</span>
+                                </TableCell>
+                                <TableCell className="text-white">{(r.score * 100).toFixed(0)}%</TableCell>
+                                <TableCell className="text-[#A3A3A3]">
+                                  {r.missingFields?.length ? (
+                                    <div className="max-w-[360px] truncate">{r.missingFields.join('、')}</div>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={currentType}
+                                    onValueChange={(v) => setOverride(r.sheetName, v as SheetType)}
+                                  >
+                                    <SelectTrigger className="h-9 border-white/10 bg-white/5 text-white">
+                                      <SelectValue placeholder="选择类型" />
+                                    </SelectTrigger>
+                                    <SelectContent className="border-white/10 bg-[#0D0D0D] text-white">
+                                      {Object.entries(sheetTypeLabel).map(([k, label]) => (
+                                        <SelectItem key={k} value={k}>
+                                          {label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {resolveResult && (
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                      <div className="text-white">已解析选择</div>
+                      <div className="mt-1 text-[12px] text-[#A3A3A3]">
+                        主表：{Object.values(resolveResult.mainSheets || {}).join('、') || '—'}；快照：
+                        {Object.values(resolveResult.snapshotSheets || {}).join('、') || '—'}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="w-full shrink-0 px-1">
+              <Card className="border-white/10 bg-[#0D0D0D] p-4">
+                <CardHeader className="space-y-1 p-0">
+                  <div className="text-lg font-semibold text-white">3. 配置关键字段映射</div>
                   <div className="text-sm text-[#A3A3A3]">将 Excel 列映射到系统字段，确保导入准确</div>
                 </CardHeader>
                 <CardContent className="mt-4 p-0">
                   <div className="overflow-hidden rounded-lg border border-white/10">
                     <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10">
-                        <TableHead className="text-[#A3A3A3]">系统字段</TableHead>
-                        <TableHead className="text-[#A3A3A3]">描述</TableHead>
-                        <TableHead className="text-[#A3A3A3]">Excel 列名</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mappingRows.map((r) => (
-                        <TableRow key={r.key} className="border-white/10">
-                          <TableCell className="text-white">
-                            <div className="flex items-center gap-2">
-                              <div>{r.name}</div>
-                              {r.required && (
-                                <div className="rounded bg-[#FF6B35] px-2 py-0.5 text-[10px] font-semibold text-black">
-                                  必填
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-[#A3A3A3]">{r.desc}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={(mapping[r.key] as string) || undefined}
-                              onValueChange={(v) => {
+                      <TableHeader>
+                        <TableRow className="border-white/10">
+                          <TableHead className="text-[#A3A3A3]">系统字段</TableHead>
+                          <TableHead className="text-[#A3A3A3]">描述</TableHead>
+                          <TableHead className="text-[#A3A3A3]">Excel 列名</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mappingRows.map((r) => (
+                          <TableRow key={r.key} className="border-white/10">
+                            <TableCell className="text-white">
+                              <div className="flex items-center gap-2">
+                                <div>{r.name}</div>
+                                {r.required && (
+                                  <div className="rounded bg-[#FF6B35] px-2 py-0.5 text-[10px] font-semibold text-black">
+                                    必填
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-[#A3A3A3]">{r.desc}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={(mapping[r.key] as string) || undefined}
+                                onValueChange={(v) => {
                                   setMapping(r.key, v)
                                   setMappingValid(false)
                                 }}
@@ -320,32 +463,19 @@ export default function ImportWizard() {
               </Card>
             </div>
 
-            <div className="w-full shrink-0 px-1">
+            <div className="w-full shrink-0 pl-2">
               <Card className="border-white/10 bg-[#0D0D0D] p-4">
                 <CardHeader className="space-y-1 p-0">
-                  <div className="text-lg font-semibold text-white">3. 生成规则</div>
+                  <div className="text-lg font-semibold text-white">4. 生成规则</div>
                   <div className="text-sm text-white">是否生成历史数据与当前操作月份</div>
                 </CardHeader>
                 <CardContent className="mt-4 space-y-4 p-0">
                   <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div>
-                    <div className="text-sm text-white">生成历史数据</div>
-                    <div className="text-[12px] text-[#A3A3A3]">用于补齐缺失月份（可选）</div>
-                  </div>
+                    <div>
+                      <div className="text-sm text-white">生成历史数据</div>
+                      <div className="text-[12px] text-[#A3A3A3]">用于补齐缺失月份（可选）</div>
+                    </div>
                     <Switch checked={generateHistory} onCheckedChange={setGenerateHistory} />
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
-                  <div>
-                    <div className="text-sm text-white">当前操作月份</div>
-                    <div className="text-[12px] text-[#A3A3A3]">用于导入后的配置更新</div>
-                  </div>
-                    <Input
-                      type="number"
-                      value={currentMonth}
-                      onChange={(e) => setCurrentMonth(Number(e.target.value || 0))}
-                      className="h-9 w-28 border-white/10 bg-white/5 text-right text-white"
-                    />
                   </div>
                 </CardContent>
               </Card>
@@ -354,7 +484,7 @@ export default function ImportWizard() {
             <div className="w-full shrink-0 pl-2">
               <Card className="border-white/10 bg-[#0D0D0D] p-4">
                 <CardHeader className="space-y-1 p-0">
-                  <div className="text-lg font-semibold text-white">4. 执行导入</div>
+                  <div className="text-lg font-semibold text-white">5. 执行导入</div>
                   <div className="text-sm text-white">确认配置后执行导入并进入仪表盘</div>
                 </CardHeader>
                 <CardContent className="mt-4 space-y-2 p-0 text-sm text-white">
@@ -388,17 +518,24 @@ export default function ImportWizard() {
                 return
               }
               if (step === 2) {
-                if (!fileId || !selectedSheet) return
-                await importApi.setMapping(fileId, selectedSheet, mapping)
-                setMappingValid(true)
+                if (!fileId) return
+                const resolved = await importApi.resolve(fileId, currentMonth, overrides)
+                setResolveResult(resolved)
                 setStep(3)
                 return
               }
               if (step === 3) {
+                if (!fileId || !selectedSheet) return
+                await importApi.setMapping(fileId, selectedSheet, mapping)
+                setMappingValid(true)
                 setStep(4)
                 return
               }
               if (step === 4) {
+                setStep(5)
+                return
+              }
+              if (step === 5) {
                 if (!fileId || !selectedSheet) return
                 await importApi.execute(fileId, selectedSheet, generateHistory, currentMonth)
                 await Promise.all([fetchCompanies(), fetchIndicators(), fetchConfig()])
@@ -412,7 +549,7 @@ export default function ImportWizard() {
           </Button>
         </div>
 
-        {mappingValid && step >= 3 && (
+        {mappingValid && step >= 4 && (
           <div className="mt-3 text-sm text-[#A3A3A3]">
             提示：字段映射已提交，后端会根据映射解析并导入数据。
           </div>

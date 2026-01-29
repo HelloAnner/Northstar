@@ -9,6 +9,7 @@ import time
 import shutil
 import pytest
 import requests
+from openpyxl import load_workbook
 
 from test_data_generator import generate_company_data, create_excel_file, get_field_mapping
 
@@ -370,6 +371,27 @@ class TestFullWorkflow:
         assert file_size > 1000, f"导出文件太小: {file_size} bytes"
 
         print(f"导出文件大小: {file_size} bytes")
+
+    def test_12b_export_matches_template(self, setup_test_environment):
+        """验证导出结构与定稿模板一致（sheet 数量与顺序）"""
+        output_file = os.path.join(setup_test_environment['output_dir'], 'exported_data.xlsx')
+        assert os.path.exists(output_file), "需要先生成导出文件"
+
+        wb = load_workbook(output_file)
+        expected = [
+            "批零总表",
+            "住餐总表",
+            "批发",
+            "零售",
+            "住宿",
+            "餐饮",
+            "吃穿用",
+            "小微",
+            "吃穿用（剔除）",
+            "社零额（定）",
+            "汇总表（定）",
+        ]
+        assert wb.sheetnames == expected, f"sheetnames 不一致: {wb.sheetnames}"
 
     def test_13_reset_companies(self, api_session):
         """测试重置企业数据"""

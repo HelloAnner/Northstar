@@ -75,6 +75,7 @@ func (s *MemoryStore) SetCompanies(companies []*model.Company) {
 		// 兼容旧数据：若未持久化原始快照，则以当前 state 作为基线初始化一次。
 		if !c.OriginalInitialized {
 			c.OriginalInitialized = true
+			c.OriginalRowNo = c.RowNo
 			c.OriginalName = c.Name
 			c.OriginalRetailLastYearMonth = c.RetailLastYearMonth
 			c.OriginalRetailCurrentMonth = c.RetailCurrentMonth
@@ -84,6 +85,21 @@ func (s *MemoryStore) SetCompanies(companies []*model.Company) {
 			c.OriginalSalesCurrentMonth = c.SalesCurrentMonth
 			c.OriginalSalesLastYearCumulative = c.SalesLastYearCumulative
 			c.OriginalSalesCurrentCumulative = c.SalesCurrentCumulative
+
+			c.OriginalRoomRevenueLastYearMonth = c.RoomRevenueLastYearMonth
+			c.OriginalRoomRevenueCurrentMonth = c.RoomRevenueCurrentMonth
+			c.OriginalRoomRevenueLastYearCumulative = c.RoomRevenueLastYearCumulative
+			c.OriginalRoomRevenueCurrentCumulative = c.RoomRevenueCurrentCumulative
+
+			c.OriginalFoodRevenueLastYearMonth = c.FoodRevenueLastYearMonth
+			c.OriginalFoodRevenueCurrentMonth = c.FoodRevenueCurrentMonth
+			c.OriginalFoodRevenueLastYearCumulative = c.FoodRevenueLastYearCumulative
+			c.OriginalFoodRevenueCurrentCumulative = c.FoodRevenueCurrentCumulative
+
+			c.OriginalGoodsSalesLastYearMonth = c.GoodsSalesLastYearMonth
+			c.OriginalGoodsSalesCurrentMonth = c.GoodsSalesCurrentMonth
+			c.OriginalGoodsSalesLastYearCumulative = c.GoodsSalesLastYearCumulative
+			c.OriginalGoodsSalesCurrentCumulative = c.GoodsSalesCurrentCumulative
 		}
 		s.companies[c.ID] = c
 	}
@@ -260,6 +276,7 @@ func (s *MemoryStore) ResetCompanies(ids []string) {
 		if !c.OriginalInitialized {
 			return
 		}
+		c.RowNo = c.OriginalRowNo
 		c.Name = c.OriginalName
 
 		c.RetailLastYearMonth = c.OriginalRetailLastYearMonth
@@ -271,6 +288,21 @@ func (s *MemoryStore) ResetCompanies(ids []string) {
 		c.SalesCurrentMonth = c.OriginalSalesCurrentMonth
 		c.SalesLastYearCumulative = c.OriginalSalesLastYearCumulative
 		c.SalesCurrentCumulative = c.OriginalSalesCurrentCumulative
+
+		c.RoomRevenueLastYearMonth = c.OriginalRoomRevenueLastYearMonth
+		c.RoomRevenueCurrentMonth = c.OriginalRoomRevenueCurrentMonth
+		c.RoomRevenueLastYearCumulative = c.OriginalRoomRevenueLastYearCumulative
+		c.RoomRevenueCurrentCumulative = c.OriginalRoomRevenueCurrentCumulative
+
+		c.FoodRevenueLastYearMonth = c.OriginalFoodRevenueLastYearMonth
+		c.FoodRevenueCurrentMonth = c.OriginalFoodRevenueCurrentMonth
+		c.FoodRevenueLastYearCumulative = c.OriginalFoodRevenueLastYearCumulative
+		c.FoodRevenueCurrentCumulative = c.OriginalFoodRevenueCurrentCumulative
+
+		c.GoodsSalesLastYearMonth = c.OriginalGoodsSalesLastYearMonth
+		c.GoodsSalesCurrentMonth = c.OriginalGoodsSalesCurrentMonth
+		c.GoodsSalesLastYearCumulative = c.OriginalGoodsSalesLastYearCumulative
+		c.GoodsSalesCurrentCumulative = c.OriginalGoodsSalesCurrentCumulative
 	}
 
 	if len(ids) == 0 {

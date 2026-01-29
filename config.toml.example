@@ -20,3 +20,7 @@ default_month = 1
 max_growth = 0.5
 # 最小增速限制
 min_growth = -0.3
+
+[excel]
+# 定稿模板路径（可选；配置后导出将按模板填值并保留样式/公式）
+template_path = ""

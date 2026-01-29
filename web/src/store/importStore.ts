@@ -1,11 +1,15 @@
 import { create } from 'zustand'
-import type { FieldMapping, SheetInfo } from '@/types'
+import type { FieldMapping, ResolveResult, SheetInfo, SheetRecognition, SheetType } from '@/types'
 
 interface ImportStore {
   step: number
   fileId: string | null
   fileName: string | null
   sheets: SheetInfo[]
+  recognition: SheetRecognition[]
+  months: number[]
+  overrides: Record<string, SheetType>
+  resolveResult: ResolveResult | null
   selectedSheet: string | null
   columns: string[]
   previewRows: string[][]
@@ -14,7 +18,15 @@ interface ImportStore {
   currentMonth: number
 
   setStep: (step: number) => void
-  setFileInfo: (fileId: string, fileName: string, sheets: SheetInfo[]) => void
+  setFileInfo: (
+    fileId: string,
+    fileName: string,
+    sheets: SheetInfo[],
+    recognition: SheetRecognition[],
+    months: number[]
+  ) => void
+  setOverride: (sheetName: string, sheetType: SheetType) => void
+  setResolveResult: (result: ResolveResult) => void
   setSelectedSheet: (sheet: string) => void
   setColumns: (columns: string[], previewRows: string[][]) => void
   setMapping: (field: keyof FieldMapping, value: string) => void
@@ -43,6 +55,10 @@ export const useImportStore = create<ImportStore>((set) => ({
   fileId: null,
   fileName: null,
   sheets: [],
+  recognition: [],
+  months: [],
+  overrides: {},
+  resolveResult: null,
   selectedSheet: null,
   columns: [],
   previewRows: [],
@@ -51,8 +67,25 @@ export const useImportStore = create<ImportStore>((set) => ({
   currentMonth: 6,
 
   setStep: (step) => set({ step }),
-  setFileInfo: (fileId, fileName, sheets) =>
-    set({ fileId, fileName, sheets, selectedSheet: sheets[0]?.name || null }),
+  setFileInfo: (fileId, fileName, sheets, recognition, months) =>
+    set({
+      fileId,
+      fileName,
+      sheets,
+      recognition,
+      months,
+      overrides: {},
+      resolveResult: null,
+      selectedSheet: sheets[0]?.name || null,
+    }),
+  setOverride: (sheetName, sheetType) =>
+    set((state) => ({
+      overrides: {
+        ...state.overrides,
+        [sheetName]: sheetType,
+      },
+    })),
+  setResolveResult: (result) => set({ resolveResult: result }),
   setSelectedSheet: (sheet) => set({ selectedSheet: sheet }),
   setColumns: (columns, previewRows) => set({ columns, previewRows }),
   setMapping: (field, value) =>
@@ -65,6 +98,10 @@ export const useImportStore = create<ImportStore>((set) => ({
       fileId: null,
       fileName: null,
       sheets: [],
+      recognition: [],
+      months: [],
+      overrides: {},
+      resolveResult: null,
       selectedSheet: null,
       columns: [],
       previewRows: [],
@@ -73,4 +110,3 @@ export const useImportStore = create<ImportStore>((set) => ({
       currentMonth: 6,
     }),
 }))
-

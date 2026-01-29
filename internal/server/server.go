@@ -47,7 +47,7 @@ func NewServer(cfg *config.AppConfig) *Server {
 		projectManager, _ = project.NewManager(cfg.Data.DataDir, memStore, calcEngine)
 	}
 
-	h := handlers.NewHandlers(memStore, calcEngine, opt, projectManager)
+	h := handlers.NewHandlers(memStore, calcEngine, opt, projectManager, cfg.Excel.TemplatePath)
 
 	s := &Server{
 		router:    gin.Default(),
@@ -94,6 +94,8 @@ func (s *Server) setupRoutes(devMode bool) {
 		api.POST("/import/upload", s.handlers.UploadFile)
 		api.GET("/import/:fileId/columns", s.handlers.GetColumns)
 		api.POST("/import/:fileId/mapping", s.handlers.SetMapping)
+		api.POST("/import/:fileId/resolve", s.handlers.ResolveImport)
+		api.POST("/import/:fileId/execute-report", s.handlers.ExecuteReportImport)
 		api.POST("/import/:fileId/execute", s.handlers.ExecuteImport)
 
 		// 企业数据

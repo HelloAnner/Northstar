@@ -291,11 +291,19 @@ test-e2e-only:
 	@echo "  运行 E2E 端到端测试"
 	@echo "=========================================="
 	@echo ""
+	@echo ">>> 编译当前后端（E2E）..."
+	@mkdir -p $(HOST_INSTALL_DIR)
+	go build $(LDFLAGS) -o $(HOST_BIN) ./cmd/northstar
+	@cp config.toml.example $(HOST_INSTALL_DIR)/config.toml 2>/dev/null || true
+	@cp packaging/readme.txt $(HOST_INSTALL_DIR)/readme.txt 2>/dev/null || true
 	@echo ">>> 清理可能残留的测试服务器..."
 	@pkill -f "northstar -port $(TEST_PORT)" 2>/dev/null || true
 	@sleep 1
 	@echo ">>> 启动测试服务器 (端口: $(TEST_PORT))..."
-	@$(HOST_BIN) -port $(TEST_PORT) -dataDir $(REPORTS_DIR)/data > $(REPORTS_DIR)/server.log 2>&1 &
+	@NS_MONTH_REPORT_TEMPLATE_XLSX="$${NS_MONTH_REPORT_TEMPLATE_XLSX:-$(CURDIR)/prd/12月月报（定）.xlsx}" \
+		NS_MONTH_REPORT_ESTIMATE_XLSX="$${NS_MONTH_REPORT_ESTIMATE_XLSX:-$(CURDIR)/prd/12月月报（预估）.xlsx}" \
+		NORTHSTAR_EXCEL_TEMPLATE_PATH="$${NS_MONTH_REPORT_TEMPLATE_XLSX:-$(CURDIR)/prd/12月月报（定）.xlsx}" \
+			$(HOST_BIN) -port $(TEST_PORT) -dataDir $(REPORTS_DIR)/data > $(REPORTS_DIR)/server.log 2>&1 &
 	@echo ">>> 等待服务器启动..."
 	@sleep 3
 	@echo ">>> 执行 E2E 测试用例..."

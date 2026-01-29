@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 
 	"northstar/internal/model"
 	"northstar/internal/service/calculator"
@@ -25,11 +26,12 @@ import (
 
 // Handlers API处理器
 type Handlers struct {
-	store     *store.MemoryStore
-	engine    *calculator.Engine
-	optimizer *calculator.Optimizer
-	adjuster  *calculator.Adjuster
-	projects  *project.Manager
+	store        *store.MemoryStore
+	engine       *calculator.Engine
+	optimizer    *calculator.Optimizer
+	adjuster     *calculator.Adjuster
+	projects     *project.Manager
+	templatePath string
 
 	// 文件缓存
 	parsers   map[string]*excel.Parser
@@ -50,16 +52,17 @@ type uploadedFile struct {
 }
 
 // NewHandlers 创建处理器
-func NewHandlers(store *store.MemoryStore, engine *calculator.Engine, optimizer *calculator.Optimizer, projects *project.Manager) *Handlers {
+func NewHandlers(store *store.MemoryStore, engine *calculator.Engine, optimizer *calculator.Optimizer, projects *project.Manager, templatePath string) *Handlers {
 	return &Handlers{
-		store:     store,
-		engine:    engine,
-		optimizer: optimizer,
-		adjuster:  calculator.NewAdjuster(store, engine),
-		projects:  projects,
-		parsers:   make(map[string]*excel.Parser),
-		uploads:   make(map[string]*uploadedFile),
-		exports:   make(map[string]string),
+		store:        store,
+		engine:       engine,
+		optimizer:    optimizer,
+		adjuster:     calculator.NewAdjuster(store, engine),
+		projects:     projects,
+		templatePath: templatePath,
+		parsers:      make(map[string]*excel.Parser),
+		uploads:      make(map[string]*uploadedFile),
+		exports:      make(map[string]string),
 	}
 }
 
@@ -255,6 +258,17 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 		return
 	}
 
+	rec := excel.NewRecognizer()
+	recognitionMap := rec.RecognizeWorkbook(parser.Workbook())
+	recognition := make([]model.SheetRecognition, 0, len(recognitionMap))
+	for _, v := range recognitionMap {
+		recognition = append(recognition, v)
+	}
+	sort.Slice(recognition, func(i, j int) bool {
+		return recognition[i].SheetName < recognition[j].SheetName
+	})
+	months := rec.ExtractMonths(parser.Workbook())
+
 	fileID := parser.GetFileID()
 
 	// 缓存parser
@@ -270,10 +284,12 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 	h.uploadsMu.Unlock()
 
 	success(c, gin.H{
-		"fileId":   fileID,
-		"fileName": header.Filename,
-		"fileSize": header.Size,
-		"sheets":   sheets,
+		"fileId":      fileID,
+		"fileName":    header.Filename,
+		"fileSize":    header.Size,
+		"sheets":      sheets,
+		"recognition": recognition,
+		"months":      months,
 	})
 }
 
@@ -303,6 +319,32 @@ func (h *Handlers) GetColumns(c *gin.Context) {
 		"columns":     columns,
 		"previewRows": previewRows,
 	})
+}
+
+// ResolveImport 解析阶段：根据“月份 + 用户确认”选出主表/快照
+func (h *Handlers) ResolveImport(c *gin.Context) {
+	fileID := c.Param("fileId")
+
+	var req model.ResolveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errorResponse(c, 1001, "参数错误")
+		return
+	}
+
+	h.parsersMu.RLock()
+	parser, ok := h.parsers[fileID]
+	h.parsersMu.RUnlock()
+	if !ok {
+		errorResponse(c, 2001, "文件不存在或已过期")
+		return
+	}
+
+	result := excel.ResolveWorkbook(parser.Workbook(), excel.ResolveOptions{
+		Month:     req.Month,
+		Overrides: req.Overrides,
+	})
+
+	success(c, result)
 }
 
 // SetMapping 设置字段映射
@@ -419,6 +461,132 @@ func (h *Handlers) ExecuteImport(c *gin.Context) {
 	})
 }
 
+// ExecuteReportImport 执行“月报（预估）”导入（基于固定口径解析，不依赖字段映射）
+func (h *Handlers) ExecuteReportImport(c *gin.Context) {
+	fileID := c.Param("fileId")
+
+	var req struct {
+		Month     int                        `json:"month"`
+		Overrides map[string]model.SheetType `json:"overrides"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errorResponse(c, 1001, "参数错误")
+		return
+	}
+
+	h.parsersMu.RLock()
+	parser, ok := h.parsers[fileID]
+	h.parsersMu.RUnlock()
+	if !ok {
+		errorResponse(c, 2001, "文件不存在或已过期")
+		return
+	}
+
+	parsed, err := excel.ParseCanonical(parser.Workbook(), excel.ParseOptions{
+		Month:     req.Month,
+		Overrides: req.Overrides,
+	})
+	if err != nil {
+		errorResponse(c, 3001, "解析失败: "+err.Error())
+		return
+	}
+
+	companies := make([]*model.Company, 0, len(parsed.Companies))
+	for _, cc := range parsed.Companies {
+		if cc == nil {
+			continue
+		}
+		company := &model.Company{
+			ID:           uuid.New().String(),
+			RowNo:        cc.RowNo,
+			Name:         cc.Name,
+			CreditCode:   cc.CreditCode,
+			IndustryCode: cc.IndustryCode,
+			IndustryType: cc.IndustryType,
+			CompanyScale: cc.CompanyScale,
+			IsEatWearUse: cc.IsEatWearUse,
+
+			RetailLastYearMonth:      cc.Retail.LastYearMonth,
+			RetailCurrentMonth:       cc.Retail.CurrentMonth,
+			RetailLastYearCumulative: cc.Retail.LastYearCumulative,
+			RetailCurrentCumulative:  cc.Retail.CurrentCumulative,
+
+			SalesLastYearMonth:      cc.Sales.LastYearMonth,
+			SalesCurrentMonth:       cc.Sales.CurrentMonth,
+			SalesLastYearCumulative: cc.Sales.LastYearCumulative,
+			SalesCurrentCumulative:  cc.Sales.CurrentCumulative,
+
+			RoomRevenueLastYearMonth:      cc.RoomRevenue.LastYearMonth,
+			RoomRevenueCurrentMonth:       cc.RoomRevenue.CurrentMonth,
+			RoomRevenueLastYearCumulative: cc.RoomRevenue.LastYearCumulative,
+			RoomRevenueCurrentCumulative:  cc.RoomRevenue.CurrentCumulative,
+
+			FoodRevenueLastYearMonth:      cc.FoodRevenue.LastYearMonth,
+			FoodRevenueCurrentMonth:       cc.FoodRevenue.CurrentMonth,
+			FoodRevenueLastYearCumulative: cc.FoodRevenue.LastYearCumulative,
+			FoodRevenueCurrentCumulative:  cc.FoodRevenue.CurrentCumulative,
+
+			GoodsSalesLastYearMonth:      cc.GoodsSales.LastYearMonth,
+			GoodsSalesCurrentMonth:       cc.GoodsSales.CurrentMonth,
+			GoodsSalesLastYearCumulative: cc.GoodsSales.LastYearCumulative,
+			GoodsSalesCurrentCumulative:  cc.GoodsSales.CurrentCumulative,
+		}
+
+		// 住餐口径：指标引擎的行业增速统一读 Sales* 字段，这里把“营业额”同步映射到 Sales。
+		if company.IndustryType == model.IndustryAccommodation || company.IndustryType == model.IndustryCatering {
+			company.SalesLastYearMonth = cc.Revenue.LastYearMonth
+			company.SalesCurrentMonth = cc.Revenue.CurrentMonth
+			company.SalesLastYearCumulative = cc.Revenue.LastYearCumulative
+			company.SalesCurrentCumulative = cc.Revenue.CurrentCumulative
+
+			// 社零口径（限上零售额）在住餐行业里取“餐费收入 + 商品销售额”。
+			company.RetailLastYearMonth = cc.FoodRevenue.LastYearMonth + cc.GoodsSales.LastYearMonth
+			company.RetailCurrentMonth = cc.FoodRevenue.CurrentMonth + cc.GoodsSales.CurrentMonth
+			company.RetailLastYearCumulative = cc.FoodRevenue.LastYearCumulative + cc.GoodsSales.LastYearCumulative
+			company.RetailCurrentCumulative = cc.FoodRevenue.CurrentCumulative + cc.GoodsSales.CurrentCumulative
+		}
+
+		companies = append(companies, company)
+	}
+
+	// 当输入的“预估”缺失当月/累计值时，用“定稿模板”作为默认基线回填（保证导出 1:1 模板一致且可微调）。
+	if h.templatePath != "" {
+		if _, err := excel.ApplyMonthReportBaseline(h.templatePath, companies); err != nil {
+			errorResponse(c, 3001, "解析失败: 定稿模板不可用")
+			return
+		}
+	}
+
+	if h.projects != nil {
+		_ = h.projects.SaveUndoSnapshot()
+	}
+
+	h.store.SetCompanies(companies)
+	if req.Month > 0 {
+		h.store.UpdateConfig(map[string]interface{}{"currentMonth": req.Month})
+	}
+	indicators := h.engine.Calculate()
+
+	if h.projects != nil {
+		cp, _ := h.projects.Current()
+		if cp != nil && cp.Project.ProjectID != "" {
+			h.uploadsMu.RLock()
+			upload := h.uploads[fileID]
+			h.uploadsMu.RUnlock()
+			if upload != nil && len(upload.Bytes) > 0 {
+				_ = h.projects.SaveLatestXlsx(cp.Project.ProjectID, upload.Bytes)
+				h.projects.UpdateImportMeta(upload.FileName, "", len(companies), 0)
+			}
+			_ = h.projects.SaveNow()
+		}
+	}
+
+	success(c, gin.H{
+		"importedCount": len(companies),
+		"indicators":    indicators,
+	})
+}
+
 // ListCompanies 获取企业列表
 func (h *Handlers) ListCompanies(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -480,9 +648,40 @@ func (h *Handlers) ListCompanies(c *gin.Context) {
 		a := filtered[i]
 		b := filtered[j]
 		less := false
+		industryOrder := func(t model.IndustryType) int {
+			switch t {
+			case model.IndustryWholesale:
+				return 1
+			case model.IndustryRetail:
+				return 2
+			case model.IndustryAccommodation:
+				return 3
+			case model.IndustryCatering:
+				return 4
+			default:
+				return 99
+			}
+		}
 		switch sortBy {
 		case "name":
-			less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
+			an := strings.ToLower(strings.TrimSpace(a.Name))
+			bn := strings.ToLower(strings.TrimSpace(b.Name))
+			if an != bn {
+				less = an < bn
+				break
+			}
+			// 名称相同（例如脱敏空值）时：按行业顺序 + 行号保证稳定
+			ai := industryOrder(a.IndustryType)
+			bi := industryOrder(b.IndustryType)
+			if ai != bi {
+				less = ai < bi
+				break
+			}
+			if a.RowNo != b.RowNo {
+				less = a.RowNo < b.RowNo
+				break
+			}
+			less = a.ID < b.ID
 		case "salesCurrentMonth":
 			less = a.SalesCurrentMonth < b.SalesCurrentMonth
 		case "retailCurrentMonth":
@@ -492,7 +691,23 @@ func (h *Handlers) ListCompanies(c *gin.Context) {
 		case "monthGrowthRate":
 			less = a.MonthGrowthRate() < b.MonthGrowthRate()
 		default:
-			less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
+			an := strings.ToLower(strings.TrimSpace(a.Name))
+			bn := strings.ToLower(strings.TrimSpace(b.Name))
+			if an != bn {
+				less = an < bn
+				break
+			}
+			ai := industryOrder(a.IndustryType)
+			bi := industryOrder(b.IndustryType)
+			if ai != bi {
+				less = ai < bi
+				break
+			}
+			if a.RowNo != b.RowNo {
+				less = a.RowNo < b.RowNo
+				break
+			}
+			less = a.ID < b.ID
 		}
 		if desc {
 			return !less
@@ -897,14 +1112,40 @@ func (h *Handlers) Export(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&req)
 
-	companies := h.store.GetAllCompanies()
 	var indicators *model.Indicators
 	if req.IncludeIndicators {
 		indicators = h.engine.Calculate()
 	}
 
-	exporter := excel.NewExporter()
-	file, err := exporter.Export(companies, indicators, req.IncludeChanges)
+	var file *excelize.File
+	var err error
+
+	if h.templatePath != "" {
+		tmpl, openErr := excel.OpenTemplate(h.templatePath)
+		if openErr != nil {
+			errorResponse(c, 3001, "导出失败: 模板不可用")
+			return
+		}
+		reportExporter := excel.NewMonthReportExporter(tmpl)
+		if err = reportExporter.FillFromCompanies(h.store.GetAllCompanies()); err != nil {
+			errorResponse(c, 3001, "导出失败")
+			return
+		}
+		file = tmpl
+	} else {
+		tmpl := excel.NewFixedTemplateWorkbook()
+		// 无模板时：仅输出固定结构骨架（不保证数值与真实定稿一致）
+		exporter := excel.NewTemplateExporter(tmpl)
+		val := 0.0
+		if indicators != nil {
+			val = indicators.LimitAboveMonthValue
+		}
+		if err = exporter.WriteSummary(excel.SummaryValues{G4: val}); err != nil {
+			errorResponse(c, 3001, "导出失败")
+			return
+		}
+		file = tmpl
+	}
 	if err != nil {
 		errorResponse(c, 3001, "导出失败")
 		return
