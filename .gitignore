@@ -102,6 +102,6 @@ coverage/
 # Bower dependency directory (https://bower.io/)
 bower_components
 **/*.xlsx
+**/*.pdf
 tests/e2e-result/
 **/fixtures
-prd/
