@@ -104,3 +104,4 @@ bower_components
 **/*.xlsx
 tests/e2e-result/
 **/fixtures
+prd/

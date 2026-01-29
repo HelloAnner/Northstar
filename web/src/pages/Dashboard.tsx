@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { exportApi, indicatorsApi, optimizeApi, projectsApi } from '@/services/api'
 import type { IndustryType } from '@/types'
-import { ArrowUpDown, ArrowLeft, ArrowRight, Filter, Search, Sparkles, Download, RotateCcw, Undo2 } from 'lucide-react'
+import { ArrowUpDown, ArrowLeft, ArrowRight, Check, Filter, Search, Sparkles, Download, RotateCcw, Undo2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 function parseNumber(text: string) {
@@ -469,6 +469,65 @@ export default function Dashboard() {
   const [bootstrapped, setBootstrapped] = useState(false)
   const [undoing, setUndoing] = useState(false)
 
+  const selectedIndustries = useMemo(() => {
+    const raw = (industryFilter || '').trim()
+    if (!raw) return new Set<string>()
+    return new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+  }, [industryFilter])
+
+  const selectedScales = useMemo(() => {
+    const raw = (scaleFilter || '').trim()
+    if (!raw) return new Set<string>()
+    return new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+  }, [scaleFilter])
+
+  const setIndustrySet = (next: Set<string>) => {
+    const value = Array.from(next).sort().join(',')
+    pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
+    setIndustryFilter(value)
+  }
+
+  const toggleIndustry = (key: string) => {
+    const next = new Set(selectedIndustries)
+    if (next.has(key)) {
+      next.delete(key)
+    } else {
+      next.add(key)
+    }
+    setIndustrySet(next)
+  }
+
+  const toggleScaleGroup = (keys: string[]) => {
+    const next = new Set(selectedScales)
+    const allSelected = keys.every((k) => next.has(k))
+    if (allSelected) {
+      keys.forEach((k) => next.delete(k))
+    } else {
+      keys.forEach((k) => next.add(k))
+    }
+    pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
+    setScaleFilter(Array.from(next).sort().join(','))
+  }
+
+  const applySort = (nextBy: string, nextDir: 'asc' | 'desc') => {
+    pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
+    if (sortBy === nextBy && sortDir === nextDir) {
+      setSort('name', 'asc')
+      return
+    }
+    setSort(nextBy, nextDir)
+  }
+
   useEffect(() => {
     ;(async () => {
       await refreshCurrent()
@@ -769,86 +828,116 @@ export default function Dashboard() {
                   </DropdownMenuItem>
                   <DropdownMenuItem className="text-[12px] text-[#A3A3A3]">行业</DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', !industryFilter ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setIndustryFilter('')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedIndustries.size === 0 ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => setIndustrySet(new Set())}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedIndustries.size === 0 ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     全部行业
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', industryFilter === 'retail' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setIndustryFilter('retail')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedIndustries.has('retail') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleIndustry('retail')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedIndustries.has('retail') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     零售业
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', industryFilter === 'wholesale' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setIndustryFilter('wholesale')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedIndustries.has('wholesale') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleIndustry('wholesale')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedIndustries.has('wholesale') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     批发业
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', industryFilter === 'accommodation' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setIndustryFilter('accommodation')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedIndustries.has('accommodation') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleIndustry('accommodation')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedIndustries.has('accommodation') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     住宿业
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', industryFilter === 'catering' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setIndustryFilter('catering')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedIndustries.has('catering') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleIndustry('catering')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedIndustries.has('catering') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     餐饮业
                   </DropdownMenuItem>
 
                   <DropdownMenuItem className="text-[12px] text-[#A3A3A3]">规模</DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', !scaleFilter ? 'text-white' : 'text-[#A3A3A3]')}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedScales.size === 0 ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
                     onSelect={() => {
                       pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
                       setScaleFilter('')
                     }}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedScales.size === 0 ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     全部规模
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', scaleFilter === '1' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setScaleFilter('1')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedScales.has('1') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleScaleGroup(['1'])}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedScales.has('1') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     大型
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', scaleFilter === '2' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setScaleFilter('2')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedScales.has('2') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleScaleGroup(['2'])}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedScales.has('2') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     中型
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', scaleFilter === '3,4' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setScaleFilter('3,4')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      selectedScales.has('3') && selectedScales.has('4') ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => toggleScaleGroup(['3', '4'])}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {selectedScales.has('3') && selectedScales.has('4') ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     小微
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -863,78 +952,87 @@ export default function Dashboard() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="border-white/10 bg-[#0D0D0D] text-white">
                   <DropdownMenuItem
-                    className="text-[12px] text-white"
+                    className="flex items-center gap-2 text-[12px] text-white"
                     onSelect={() => {
                       pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
                       setSort('name', 'asc')
                     }}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'name' && sortDir === 'asc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     清除排序
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', sortBy === 'name' && sortDir === 'asc' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('name', 'asc')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'name' && sortDir === 'asc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => applySort('name', 'asc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'name' && sortDir === 'asc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     企业名称 ↑
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    className={cn('text-[12px]', sortBy === 'name' && sortDir === 'desc' ? 'text-white' : 'text-[#A3A3A3]')}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('name', 'desc')
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'name' && sortDir === 'desc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
+                    )}
+                    onSelect={() => applySort('name', 'desc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'name' && sortDir === 'desc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     企业名称 ↓
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      'text-[12px]',
-                      sortBy === 'salesCurrentMonth' && sortDir === 'desc' ? 'text-white' : 'text-[#A3A3A3]'
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'salesCurrentMonth' && sortDir === 'desc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
                     )}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('salesCurrentMonth', 'desc')
-                    }}
+                    onSelect={() => applySort('salesCurrentMonth', 'desc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'salesCurrentMonth' && sortDir === 'desc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     总销售额 ↓
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      'text-[12px]',
-                      sortBy === 'retailCurrentMonth' && sortDir === 'desc' ? 'text-white' : 'text-[#A3A3A3]'
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'retailCurrentMonth' && sortDir === 'desc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
                     )}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('retailCurrentMonth', 'desc')
-                    }}
+                    onSelect={() => applySort('retailCurrentMonth', 'desc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'retailCurrentMonth' && sortDir === 'desc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     本期零售额 ↓
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      'text-[12px]',
-                      sortBy === 'retailLastYearMonth' && sortDir === 'desc' ? 'text-white' : 'text-[#A3A3A3]'
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'retailLastYearMonth' && sortDir === 'desc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
                     )}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('retailLastYearMonth', 'desc')
-                    }}
+                    onSelect={() => applySort('retailLastYearMonth', 'desc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'retailLastYearMonth' && sortDir === 'desc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     同期零售额 ↓
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={cn(
-                      'text-[12px]',
-                      sortBy === 'monthGrowthRate' && sortDir === 'desc' ? 'text-white' : 'text-[#A3A3A3]'
+                      'flex items-center gap-2 text-[12px]',
+                      sortBy === 'monthGrowthRate' && sortDir === 'desc' ? 'bg-white/5 text-white' : 'text-[#A3A3A3]',
                     )}
-                    onSelect={() => {
-                      pendingScrollTopRef.current = pageScrollRef.current?.scrollTop ?? null
-                      setSort('monthGrowthRate', 'desc')
-                    }}
+                    onSelect={() => applySort('monthGrowthRate', 'desc')}
                   >
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      {sortBy === 'monthGrowthRate' && sortDir === 'desc' ? <Check className="h-4 w-4" /> : null}
+                    </span>
                     增速 ↓
                   </DropdownMenuItem>
                 </DropdownMenuContent>

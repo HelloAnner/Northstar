@@ -431,6 +431,18 @@ func (h *Handlers) ListCompanies(c *gin.Context) {
 
 	companies := h.store.GetAllCompanies()
 
+	industrySet := make(map[string]bool)
+	if strings.TrimSpace(industry) != "" {
+		parts := strings.Split(industry, ",")
+		for _, p := range parts {
+			v := strings.TrimSpace(p)
+			if v == "" {
+				continue
+			}
+			industrySet[v] = true
+		}
+	}
+
 	// 筛选
 	filtered := make([]*model.Company, 0, len(companies))
 	for _, c := range companies {
@@ -439,7 +451,7 @@ func (h *Handlers) ListCompanies(c *gin.Context) {
 			continue
 		}
 		// 行业筛选
-		if industry != "" && string(c.IndustryType) != industry {
+		if len(industrySet) > 0 && !industrySet[string(c.IndustryType)] {
 			continue
 		}
 		// 规模筛选
