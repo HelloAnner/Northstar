@@ -196,9 +196,12 @@ var wrMainMappingRules = []MappingRule{
 
 ### 动态年月识别
 
+Excel 中的列名和 Sheet 名都包含年月信息，解析器需要智能识别并正确映射。
+
 ```go
-// 从列名中提取年月信息，动态调整映射
+// 从列名中提取年月信息
 func extractYearMonth(columnName string) (year, month int, found bool) {
+    // 匹配模式: "2025年12月销售额" -> year=2025, month=12
     re := regexp.MustCompile(`(\d{4})年(\d{1,2})月`)
     matches := re.FindStringSubmatch(columnName)
     if len(matches) >= 3 {
@@ -209,16 +212,181 @@ func extractYearMonth(columnName string) (year, month int, found bool) {
     return 0, 0, false
 }
 
-// 判断是"本年"还是"上年"
-func isCurrentYear(year int, configYear int) bool {
-    return year == configYear
+// 从 Sheet 名提取年月
+func extractSheetYearMonth(sheetName string) (year, month int, found bool) {
+    // 匹配: "2024年12月批零" / "2025年1月" 等
+    re := regexp.MustCompile(`(\d{4})年(\d{1,2})月`)
+    matches := re.FindStringSubmatch(sheetName)
+    if len(matches) >= 3 {
+        year, _ = strconv.Atoi(matches[1])
+        month, _ = strconv.Atoi(matches[2])
+        return year, month, true
+    }
+    return 0, 0, false
 }
 
-// 判断是"当月"还是"累计"
-func isCumulative(columnName string) bool {
-    return strings.Contains(columnName, "1-") || strings.Contains(columnName, "累计")
+// 判断列名对应的字段类型
+type FieldTimeType int
+
+const (
+    CurrentMonth     FieldTimeType = iota // 本月/当月
+    PrevMonth                             // 上月
+    LastYearMonth                         // 去年同期
+    CurrentCumulative                     // 本年累计
+    PrevCumulative                        // 本年累计到上月
+    LastYearCumulative                    // 上年累计
+)
+
+// 智能推断字段时间类型
+func inferFieldTimeType(columnName string, currentYear, currentMonth int) FieldTimeType {
+    year, month, found := extractYearMonth(columnName)
+    if !found {
+        // 无法提取年月，通过关键词判断
+        if strings.Contains(columnName, "上年") || strings.Contains(columnName, "去年") {
+            if strings.Contains(columnName, "1-") || strings.Contains(columnName, "累计") {
+                return LastYearCumulative
+            }
+            return LastYearMonth
+        }
+        return CurrentMonth
+    }
+
+    // 判断是累计还是单月
+    isCumulative := strings.Contains(columnName, "1-") || strings.Contains(columnName, "累计")
+
+    // 判断时间关系
+    if year == currentYear {
+        if isCumulative {
+            if month == currentMonth {
+                return CurrentCumulative
+            } else if month == currentMonth-1 {
+                return PrevCumulative
+            }
+        } else {
+            if month == currentMonth {
+                return CurrentMonth
+            } else if month == currentMonth-1 {
+                return PrevMonth
+            }
+        }
+    } else if year == currentYear-1 {
+        if isCumulative {
+            return LastYearCumulative
+        }
+        return LastYearMonth
+    }
+
+    return CurrentMonth // 默认
+}
+
+// 字段映射示例
+func mapColumnToDBField(columnName string, currentYear, currentMonth int, sheetType string) string {
+    timeType := inferFieldTimeType(columnName, currentYear, currentMonth)
+
+    if sheetType == "wholesale" || sheetType == "retail" {
+        // 判断是销售额还是零售额
+        isSales := strings.Contains(columnName, "销售额")
+        isRetail := strings.Contains(columnName, "零售额")
+
+        if isSales {
+            switch timeType {
+            case CurrentMonth:
+                return "sales_current_month"
+            case PrevMonth:
+                return "sales_prev_month"
+            case LastYearMonth:
+                return "sales_last_year_month"
+            case CurrentCumulative:
+                return "sales_current_cumulative"
+            case PrevCumulative:
+                return "sales_prev_cumulative"
+            case LastYearCumulative:
+                return "sales_last_year_cumulative"
+            }
+        } else if isRetail {
+            switch timeType {
+            case CurrentMonth:
+                return "retail_current_month"
+            case PrevMonth:
+                return "retail_prev_month"
+            case LastYearMonth:
+                return "retail_last_year_month"
+            case CurrentCumulative:
+                return "retail_current_cumulative"
+            case PrevCumulative:
+                return "retail_prev_cumulative"
+            case LastYearCumulative:
+                return "retail_last_year_cumulative"
+            }
+        }
+    }
+
+    // 住餐类似处理
+    // ...
+
+    return ""
 }
 ```
+
+### 月份自适应解析流程
+
+```
+1. 读取主表 Sheet (批发/零售/住宿/餐饮)
+   ↓
+2. 提取所有列名中的年月信息
+   - 找出最大的 year+month 组合 (如 2026年1月)
+   - 作为当前数据月份: data_year=2026, data_month=1
+   ↓
+3. 计算相对月份
+   - current_year = 2026, current_month = 1
+   - prev_month = 上一个月 (2025年12月)
+   - last_year_month = 去年同期 (2025年1月)
+   ↓
+4. 遍历每一列
+   - 提取列名中的年月
+   - 判断与当前月份的关系
+   - 映射到对应的数据库字段
+   ↓
+5. 设置企业记录的 data_year 和 data_month
+   - 所有企业记录标记为 data_year=2026, data_month=1
+```
+
+### 示例：解析 1月数据
+
+假设导入 "2026年1月月报.xlsx"，批发 Sheet 列名如下：
+
+```
+| 2025年12月销售额 | 2026年1月销售额 | 2025年1月销售额 | 2026年1月销售额 | 2025年1月销售额 |
+| (上月)           | (本月)          | (去年同期)      | (本年累计)      | (上年累计)      |
+```
+
+解析逻辑：
+1. 识别 data_year=2026, data_month=1
+2. 列名映射：
+   - "2025年12月销售额" → sales_prev_month (上月)
+   - "2026年1月销售额" (无累计关键词) → sales_current_month (本月)
+   - "2025年1月销售额" (无累计关键词) → sales_last_year_month (去年同期)
+   - "2026年1月销售额" (含累计) → sales_current_cumulative (本年累计，1月时等于当月)
+   - "2025年1月销售额" (含累计) → sales_last_year_cumulative (上年累计)
+
+### 处理边界情况
+
+1. **1月没有"本年累计到上月"**
+   - sales_prev_cumulative 字段留空或设为 0
+   - 解析器检测到 data_month=1 时自动跳过该字段
+
+2. **列名格式不统一**
+   - 支持多种格式: "2026年1月销售额" / "2026年01月销售额" / "销售额;2026年1月"
+   - 正则表达式灵活匹配
+
+3. **缺失字段**
+   - 如果 Excel 中缺少某个时间维度的列，对应字段设为 NULL 或 0
+   - 记录到日志中供用户确认
+
+4. **多Sheet 自动识别当前月份**
+   - 优先从主表 Sheet (批发/零售/住宿/餐饮) 识别当前月份
+   - 历史快照 Sheet 自动识别各自的年月，导入到 snapshot 表
+
 
 ---
 

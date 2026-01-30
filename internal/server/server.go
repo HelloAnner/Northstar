@@ -3,15 +3,15 @@ package server
 import (
 	"embed"
 	"io/fs"
+	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 
+	"northstar/internal/api/v3"
 	"northstar/internal/config"
-	"northstar/internal/server/handlers"
-	"northstar/internal/service/calculator"
-	"northstar/internal/service/project"
-	"northstar/internal/service/store"
+	"northstar/internal/store"
 )
 
 //go:embed all:dist
@@ -19,12 +19,9 @@ var staticFiles embed.FS
 
 // Server HTTP服务器
 type Server struct {
-	router    *gin.Engine
-	store     *store.MemoryStore
-	engine    *calculator.Engine
-	optimizer *calculator.Optimizer
-	projects  *project.Manager
-	handlers  *handlers.Handlers
+	router *gin.Engine
+	store  *store.Store
+	v3     *v3.Handler
 }
 
 // NewServer 创建服务器
@@ -34,28 +31,25 @@ func NewServer(cfg *config.AppConfig) *Server {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	memStore := store.NewMemoryStore()
-	calcEngine := calculator.NewEngine(memStore)
-	opt := calculator.NewOptimizer(memStore, calcEngine)
-
+	// 初始化 SQLite Store
 	dataDir, err := config.EnsureDataDir(cfg)
 	if err != nil {
 		dataDir = cfg.Data.DataDir
 	}
-	projectManager, err := project.NewManager(dataDir, memStore, calcEngine)
+	dbPath := filepath.Join(dataDir, "northstar.db")
+
+	sqliteStore, err := store.New(dbPath)
 	if err != nil {
-		projectManager, _ = project.NewManager(cfg.Data.DataDir, memStore, calcEngine)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	h := handlers.NewHandlers(memStore, calcEngine, opt, projectManager, cfg.Excel.TemplatePath)
+	// 创建 V3 API 处理器
+	v3Handler := v3.NewHandler(sqliteStore)
 
 	s := &Server{
-		router:    gin.Default(),
-		store:     memStore,
-		engine:    calcEngine,
-		optimizer: opt,
-		projects:  projectManager,
-		handlers:  h,
+		router: gin.Default(),
+		store:  sqliteStore,
+		v3:     v3Handler,
 	}
 
 	s.setupRoutes(devMode)
@@ -77,49 +71,10 @@ func (s *Server) setupRoutes(devMode bool) {
 		c.Next()
 	})
 
-	// API路由
-	api := s.router.Group("/api/v1")
+	// V3 API 路由
+	api := s.router.Group("/api")
 	{
-		// 项目
-		api.GET("/projects", s.handlers.ListProjects)
-		api.POST("/projects", s.handlers.CreateProject)
-		api.GET("/projects/current", s.handlers.GetCurrentProject)
-		api.POST("/projects/current/save", s.handlers.SaveCurrentProject)
-		api.POST("/projects/current/undo", s.handlers.UndoCurrentProject)
-		api.POST("/projects/:projectId/select", s.handlers.SelectProject)
-		api.GET("/projects/:projectId", s.handlers.GetProjectDetail)
-		api.DELETE("/projects/:projectId", s.handlers.DeleteProject)
-
-		// 导入相关
-		api.POST("/import/upload", s.handlers.UploadFile)
-		api.GET("/import/:fileId/columns", s.handlers.GetColumns)
-		api.POST("/import/:fileId/mapping", s.handlers.SetMapping)
-		api.POST("/import/:fileId/resolve", s.handlers.ResolveImport)
-		api.POST("/import/:fileId/execute-report", s.handlers.ExecuteReportImport)
-		api.POST("/import/:fileId/execute", s.handlers.ExecuteImport)
-
-		// 企业数据
-		api.GET("/companies", s.handlers.ListCompanies)
-		api.GET("/companies/:id", s.handlers.GetCompany)
-		api.PATCH("/companies/:id", s.handlers.UpdateCompany)
-		api.PATCH("/companies/batch", s.handlers.BatchUpdateCompanies)
-		api.POST("/companies/reset", s.handlers.ResetCompanies)
-
-		// 指标
-		api.GET("/indicators", s.handlers.GetIndicators)
-		api.POST("/indicators/adjust", s.handlers.AdjustIndicator)
-
-		// 智能调整
-		api.POST("/optimize", s.handlers.Optimize)
-		api.POST("/optimize/preview", s.handlers.PreviewOptimize)
-
-		// 配置
-		api.GET("/config", s.handlers.GetConfig)
-		api.PATCH("/config", s.handlers.UpdateConfig)
-
-		// 导出
-		api.POST("/export", s.handlers.Export)
-		api.GET("/export/download/:exportId", s.handlers.Download)
+		s.v3.RegisterRoutes(api)
 	}
 
 	// 静态资源
@@ -165,20 +120,12 @@ func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-// SaveNow 立即持久化当前项目（用于退出前防止数据丢失）
+// SaveNow 立即持久化（V3 使用 SQLite，自动持久化）
 func (s *Server) SaveNow() error {
-	if s.projects == nil {
-		return nil
-	}
-	return s.projects.SaveNow()
+	return nil
 }
 
 // GetStore 获取存储（用于测试）
-func (s *Server) GetStore() *store.MemoryStore {
+func (s *Server) GetStore() *store.Store {
 	return s.store
-}
-
-// GetEngine 获取计算引擎（用于测试）
-func (s *Server) GetEngine() *calculator.Engine {
-	return s.engine
 }

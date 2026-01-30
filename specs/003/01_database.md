@@ -45,27 +45,31 @@ CREATE TABLE wholesale_retail (
     company_scale INTEGER,                       -- 单位规模 (1/2/3/4, 3/4为小微)
     row_no INTEGER,                              -- 原始行号
 
+    -- === 数据月份标识 ===
+    data_year INTEGER NOT NULL,                  -- 数据年份 (如 2025)
+    data_month INTEGER NOT NULL,                 -- 数据月份 (如 12)
+
     -- === 销售额 (商品销售额) ===
-    sales_prev_month REAL DEFAULT 0,             -- 上月销售额 (2025年11月销售额)
-    sales_current_month REAL DEFAULT 0,          -- 本月销售额 (2025年12月销售额) ★可调整
-    sales_last_year_month REAL DEFAULT 0,        -- 上年同期 (2024年12月商品销售额)
-    sales_month_rate REAL,                       -- 12月销售额增速 (计算)
-    sales_prev_cumulative REAL DEFAULT 0,        -- 本年1-11月销售额
-    sales_last_year_prev_cumulative REAL DEFAULT 0, -- 上年1-11月销售额
-    sales_current_cumulative REAL DEFAULT 0,     -- 本年1-12月销售额
-    sales_last_year_cumulative REAL DEFAULT 0,   -- 上年1-12月商品销售额
-    sales_cumulative_rate REAL,                  -- 1-12月增速 (计算)
+    sales_prev_month REAL DEFAULT 0,             -- 上月销售额 (如2025年11月)
+    sales_current_month REAL DEFAULT 0,          -- 本月销售额 (如2025年12月) ★可调整
+    sales_last_year_month REAL DEFAULT 0,        -- 上年同期 (如2024年12月)
+    sales_month_rate REAL,                       -- 当月销售额增速 (计算)
+    sales_prev_cumulative REAL DEFAULT 0,        -- 本年累计到上月 (如2025年1-11月)
+    sales_last_year_prev_cumulative REAL DEFAULT 0, -- 上年累计到上月 (如2024年1-11月)
+    sales_current_cumulative REAL DEFAULT 0,     -- 本年累计 (如2025年1-12月)
+    sales_last_year_cumulative REAL DEFAULT 0,   -- 上年累计 (如2024年1-12月)
+    sales_cumulative_rate REAL,                  -- 累计增速 (计算)
 
     -- === 零售额 ===
-    retail_prev_month REAL DEFAULT 0,            -- 上月零售额 (2025年11月零售额)
-    retail_current_month REAL DEFAULT 0,         -- 本月零售额 (2025年12月零售额) ★可调整
-    retail_last_year_month REAL DEFAULT 0,       -- 上年同期 (2024年12月商品零售额)
-    retail_month_rate REAL,                      -- 12月零售额增速 (计算)
-    retail_prev_cumulative REAL DEFAULT 0,       -- 本年1-11月零售额
-    retail_last_year_prev_cumulative REAL DEFAULT 0, -- 上年1-11月零售额
-    retail_current_cumulative REAL DEFAULT 0,    -- 本年1-12月零售额
-    retail_last_year_cumulative REAL DEFAULT 0,  -- 上年1-12月商品零售额
-    retail_cumulative_rate REAL,                 -- 1-12月增速 (计算)
+    retail_prev_month REAL DEFAULT 0,            -- 上月零售额 (如2025年11月)
+    retail_current_month REAL DEFAULT 0,         -- 本月零售额 (如2025年12月) ★可调整
+    retail_last_year_month REAL DEFAULT 0,       -- 上年同期 (如2024年12月)
+    retail_month_rate REAL,                      -- 当月零售额增速 (计算)
+    retail_prev_cumulative REAL DEFAULT 0,       -- 本年累计到上月 (如2025年1-11月)
+    retail_last_year_prev_cumulative REAL DEFAULT 0, -- 上年累计到上月 (如2024年1-11月)
+    retail_current_cumulative REAL DEFAULT 0,    -- 本年累计 (如2025年1-12月)
+    retail_last_year_cumulative REAL DEFAULT 0,  -- 上年累计 (如2024年1-12月)
+    retail_cumulative_rate REAL,                 -- 累计增速 (计算)
     retail_ratio REAL,                           -- 零售额占比 (零销比)
 
     -- === 商品分类销售额 ===
@@ -80,6 +84,13 @@ CREATE TABLE wholesale_retail (
     is_small_micro INTEGER DEFAULT 0,            -- 小微企业标记 (计算: scale=3/4)
     is_eat_wear_use INTEGER DEFAULT 0,           -- 吃穿用标记
 
+    -- === 补充字段 (输出定稿需要) ===
+    first_report_ip TEXT,                        -- 第一次上报的IP
+    fill_ip TEXT,                                -- 填报IP
+    network_sales REAL DEFAULT 0,                -- 网络销售额
+    opening_year INTEGER,                        -- 开业年份
+    opening_month INTEGER,                       -- 开业月份
+
     -- === 原始值备份 (用于重置) ===
     original_sales_current_month REAL,
     original_retail_current_month REAL,
@@ -92,6 +103,7 @@ CREATE TABLE wholesale_retail (
 );
 
 -- 索引
+CREATE INDEX idx_wr_data_month ON wholesale_retail(data_year, data_month);
 CREATE INDEX idx_wr_credit_code ON wholesale_retail(credit_code);
 CREATE INDEX idx_wr_industry_type ON wholesale_retail(industry_type);
 CREATE INDEX idx_wr_company_scale ON wholesale_retail(company_scale);
@@ -117,39 +129,43 @@ CREATE TABLE accommodation_catering (
     company_scale INTEGER,                       -- 单位规模
     row_no INTEGER,                              -- 原始行号
 
+    -- === 数据月份标识 ===
+    data_year INTEGER NOT NULL,                  -- 数据年份 (如 2025)
+    data_month INTEGER NOT NULL,                 -- 数据月份 (如 12)
+
     -- === 营业额 ===
-    revenue_prev_month REAL DEFAULT 0,           -- 上月营业额 (2025年11月营业额)
-    revenue_current_month REAL DEFAULT 0,        -- 本月营业额 (2025年12月营业额) ★可调整
-    revenue_last_year_month REAL DEFAULT 0,      -- 上年同期 (2024年12月营业额)
-    revenue_month_rate REAL,                     -- 12月增速 (计算)
-    revenue_prev_cumulative REAL DEFAULT 0,      -- 本年1-11月营业额
-    revenue_current_cumulative REAL DEFAULT 0,   -- 本年1-12月营业额
-    revenue_last_year_cumulative REAL DEFAULT 0, -- 上年1-12月营业额
-    revenue_cumulative_rate REAL,                -- 1-12月增速 (计算)
+    revenue_prev_month REAL DEFAULT 0,           -- 上月营业额 (如2025年11月)
+    revenue_current_month REAL DEFAULT 0,        -- 本月营业额 (如2025年12月) ★可调整
+    revenue_last_year_month REAL DEFAULT 0,      -- 上年同期 (如2024年12月)
+    revenue_month_rate REAL,                     -- 当月增速 (计算)
+    revenue_prev_cumulative REAL DEFAULT 0,      -- 本年累计到上月 (如2025年1-11月)
+    revenue_current_cumulative REAL DEFAULT 0,   -- 本年累计 (如2025年1-12月)
+    revenue_last_year_cumulative REAL DEFAULT 0, -- 上年累计 (如2024年1-12月)
+    revenue_cumulative_rate REAL,                -- 累计增速 (计算)
 
     -- === 客房收入 ===
-    room_prev_month REAL DEFAULT 0,              -- 11月客房收入
-    room_current_month REAL DEFAULT 0,           -- 本月客房收入 (2025年12月) ★可调整
-    room_last_year_month REAL DEFAULT 0,         -- 上年同期客房收入
-    room_prev_cumulative REAL DEFAULT 0,         -- 本年1-11月客房收入
-    room_current_cumulative REAL DEFAULT 0,      -- 本年1-12月客房收入
-    room_last_year_cumulative REAL DEFAULT 0,    -- 上年1-12月客房收入
+    room_prev_month REAL DEFAULT 0,              -- 上月客房收入 (如2025年11月)
+    room_current_month REAL DEFAULT 0,           -- 本月客房收入 (如2025年12月) ★可调整
+    room_last_year_month REAL DEFAULT 0,         -- 上年同期客房收入 (如2024年12月)
+    room_prev_cumulative REAL DEFAULT 0,         -- 本年累计到上月 (如2025年1-11月)
+    room_current_cumulative REAL DEFAULT 0,      -- 本年累计 (如2025年1-12月)
+    room_last_year_cumulative REAL DEFAULT 0,    -- 上年累计 (如2024年1-12月)
 
     -- === 餐费收入 ===
-    food_prev_month REAL DEFAULT 0,              -- 11月餐费收入
-    food_current_month REAL DEFAULT 0,           -- 本月餐费收入 (2025年12月) ★可调整
-    food_last_year_month REAL DEFAULT 0,         -- 上年同期餐费收入
-    food_prev_cumulative REAL DEFAULT 0,         -- 本年1-11月餐费收入
-    food_current_cumulative REAL DEFAULT 0,      -- 1-12月餐费收入
-    food_last_year_cumulative REAL DEFAULT 0,    -- 上年1-12月餐费收入
+    food_prev_month REAL DEFAULT 0,              -- 上月餐费收入 (如2025年11月)
+    food_current_month REAL DEFAULT 0,           -- 本月餐费收入 (如2025年12月) ★可调整
+    food_last_year_month REAL DEFAULT 0,         -- 上年同期餐费收入 (如2024年12月)
+    food_prev_cumulative REAL DEFAULT 0,         -- 本年累计到上月 (如2025年1-11月)
+    food_current_cumulative REAL DEFAULT 0,      -- 本年累计 (如2025年1-12月)
+    food_last_year_cumulative REAL DEFAULT 0,    -- 上年累计 (如2024年1-12月)
 
     -- === 商品销售额 ===
-    goods_prev_month REAL DEFAULT 0,             -- 11月销售额
-    goods_current_month REAL DEFAULT 0,          -- 本月销售额 (2025年12月) ★可调整
-    goods_last_year_month REAL DEFAULT 0,        -- 上年同期商品销售额
-    goods_prev_cumulative REAL DEFAULT 0,        -- 本年1-11月销售额
-    goods_current_cumulative REAL DEFAULT 0,     -- 1-12月销售额
-    goods_last_year_cumulative REAL DEFAULT 0,   -- 上年1-12月商品销售额
+    goods_prev_month REAL DEFAULT 0,             -- 上月销售额 (如2025年11月)
+    goods_current_month REAL DEFAULT 0,          -- 本月销售额 (如2025年12月) ★可调整
+    goods_last_year_month REAL DEFAULT 0,        -- 上年同期商品销售额 (如2024年12月)
+    goods_prev_cumulative REAL DEFAULT 0,        -- 本年累计到上月 (如2025年1-11月)
+    goods_current_cumulative REAL DEFAULT 0,     -- 本年累计 (如2025年1-12月)
+    goods_last_year_cumulative REAL DEFAULT 0,   -- 上年累计 (如2024年1-12月)
 
     -- === 零售额 (住餐也有) ===
     retail_current_month REAL DEFAULT 0,         -- 本月零售额
@@ -158,6 +174,13 @@ CREATE TABLE accommodation_catering (
     -- === 分类标记 ===
     is_small_micro INTEGER DEFAULT 0,            -- 小微企业标记
     is_eat_wear_use INTEGER DEFAULT 0,           -- 吃穿用标记
+
+    -- === 补充字段 (输出定稿需要) ===
+    first_report_ip TEXT,                        -- 第一次上报的IP
+    fill_ip TEXT,                                -- 填报IP
+    network_sales REAL DEFAULT 0,                -- 网络销售额
+    opening_year INTEGER,                        -- 开业年份
+    opening_month INTEGER,                       -- 开业月份
 
     -- === 原始值备份 ===
     original_revenue_current_month REAL,
@@ -173,6 +196,7 @@ CREATE TABLE accommodation_catering (
 );
 
 -- 索引
+CREATE INDEX idx_ac_data_month ON accommodation_catering(data_year, data_month);
 CREATE INDEX idx_ac_credit_code ON accommodation_catering(credit_code);
 CREATE INDEX idx_ac_industry_type ON accommodation_catering(industry_type);
 CREATE INDEX idx_ac_company_scale ON accommodation_catering(company_scale);
@@ -550,3 +574,212 @@ SELECT
 FROM wholesale_retail
 WHERE is_eat_wear_use = 1;
 ```
+
+---
+
+## 月份灵活性设计
+
+### 核心思路
+
+1. **主表存储"当前工作数据"**
+   - `wholesale_retail` 和 `accommodation_catering` 表存储当前正在处理的月份数据
+   - 通过 `data_year` 和 `data_month` 标识这批数据对应的年月
+   - 字段名使用相对时间概念（当月、上月、去年同期等），不硬编码具体月份
+
+2. **快照表存储历史数据**
+   - `wr_snapshot` 和 `ac_snapshot` 存储历史月份的快照数据
+   - 支持任意月份的历史数据查询和对比
+
+3. **配置表记录当前操作月份**
+   - `config` 表中 `current_year` 和 `current_month` 记录当前操作的年月
+   - 导入新月份数据时，自动更新配置
+
+### 导入数据流程
+
+```
+导入 Excel (如 1月月报.xlsx)
+  ↓
+1. 解析主表 Sheet (批发/零售/住宿/餐饮)
+   - 识别字段中的年月信息 (如 "2026年1月销售额")
+   - 提取 data_year=2026, data_month=1
+   ↓
+2. 清空主表旧数据
+   - DELETE FROM wholesale_retail WHERE data_year=2026 AND data_month=1
+   - (允许保留其他月份数据用于对比)
+   ↓
+3. 导入新数据到主表
+   - 设置 data_year=2026, data_month=1
+   ↓
+4. 解析历史快照 Sheet (如 "2025年12月批零")
+   - 导入到 wr_snapshot 表
+   - 设置 snapshot_year=2025, snapshot_month=12
+   ↓
+5. 更新配置
+   - UPDATE config SET value='2026' WHERE key='current_year'
+   - UPDATE config SET value='1' WHERE key='current_month'
+```
+
+### 字段语义说明
+
+| 字段名 | 语义 | 示例 (data_month=12) | 示例 (data_month=1) |
+|--------|------|---------------------|-------------------|
+| `sales_current_month` | 本月销售额 | 2025年12月 | 2026年1月 |
+| `sales_prev_month` | 上月销售额 | 2025年11月 | 2025年12月 |
+| `sales_last_year_month` | 去年同期 | 2024年12月 | 2025年1月 |
+| `sales_current_cumulative` | 本年累计 | 2025年1-12月 | 2026年1月 |
+| `sales_prev_cumulative` | 本年累计到上月 | 2025年1-11月 | (无,1月无上月累计) |
+| `sales_last_year_cumulative` | 上年累计 | 2024年1-12月 | 2025年1月 |
+
+### 查询当前月份数据
+
+```sql
+-- 获取当前操作的年月
+SELECT value FROM config WHERE key = 'current_year'; -- 2026
+SELECT value FROM config WHERE key = 'current_month'; -- 1
+
+-- 查询当前月份的企业数据
+SELECT * FROM wholesale_retail
+WHERE data_year = (SELECT value FROM config WHERE key = 'current_year')
+  AND data_month = (SELECT value FROM config WHERE key = 'current_month');
+```
+
+### 多月份数据对比
+
+```sql
+-- 对比 12月 和 1月 的数据
+SELECT
+    '12月' as month,
+    COUNT(*) as company_count,
+    SUM(retail_current_month) as total_retail
+FROM wholesale_retail
+WHERE data_year = 2025 AND data_month = 12
+
+UNION ALL
+
+SELECT
+    '1月' as month,
+    COUNT(*) as company_count,
+    SUM(retail_current_month) as total_retail
+FROM wholesale_retail
+WHERE data_year = 2026 AND data_month = 1;
+```
+
+### 处理特殊情况
+
+1. **1月数据导入**
+   - `sales_prev_month`: 上年12月销售额
+   - `sales_prev_cumulative`: 不适用（1月无"本年累计到上月"）
+   - `sales_current_cumulative`: 等于 `sales_current_month`（1月累计=1月当月）
+
+2. **跨年累计计算**
+   - 1月的 `sales_last_year_cumulative` 对应上年1月累计
+   - 累计增速计算需要注意分子分母对应同一时间段
+
+3. **Excel 字段动态识别**
+   - 解析器需要从列名中提取年月信息
+   - 根据年月判断字段映射到数据库的哪个字段
+   - 详见 `02_excel_parser.md` 的动态年月识别部分
+
+---
+
+## 补充字段说明
+
+### 输出定稿所需字段
+
+数据库表中包含 5 个补充字段，用于满足输出 "12月月报（定）.xlsx" 的需求：
+
+| 字段名 | 类型 | 用途 | 输出位置 |
+|-------|------|------|---------|
+| `first_report_ip` | TEXT | 第一次上报的IP | 批零总表、住餐总表 |
+| `fill_ip` | TEXT | 填报IP | 批零总表、住餐总表 |
+| `network_sales` | REAL | 网络销售额 | 吃穿用 Sheet |
+| `opening_year` | INTEGER | 开业年份 | 吃穿用 Sheet |
+| `opening_month` | INTEGER | 开业月份 | 吃穿用 Sheet |
+
+### 数据来源策略
+
+#### 方案 A: 从输入 Excel 解析（推荐）
+
+如果输入 Excel 中包含这些字段，解析器自动识别并导入：
+
+```go
+// 字段映射规则
+var additionalFieldMappings = []MappingRule{
+    {Pattern: regexp.MustCompile(`第一次上报.*IP|首次上报IP`), DBField: "first_report_ip"},
+    {Pattern: regexp.MustCompile(`填报IP`), DBField: "fill_ip"},
+    {Pattern: regexp.MustCompile(`网络销售额`), DBField: "network_sales"},
+    {Pattern: regexp.MustCompile(`开业时间.*年|开业年份`), DBField: "opening_year"},
+    {Pattern: regexp.MustCompile(`开业时间.*月|开业月份`), DBField: "opening_month"},
+}
+```
+
+#### 方案 B: 系统记录或用户补充（备选）
+
+如果输入 Excel 中**没有**这些字段：
+
+1. **IP 字段**: 导入时系统自动记录
+   ```go
+   company.FirstReportIP = ctx.ClientIP()  // 从导入请求获取
+   company.FillIP = ""  // 留空
+   ```
+
+2. **网络销售额**:
+   - 导出时留空或填 0
+   - 或提供界面让用户后续补充
+
+3. **开业时间**:
+   - 导出时留空
+   - 或提供界面让用户后续补充
+
+### 导出处理
+
+导出 "12月月报（定）.xlsx" 时：
+
+```go
+// 批零总表/住餐总表
+row := []interface{}{
+    company.CreditCode,
+    company.Name,
+    company.IndustryCode,
+    // ... 其他字段
+    company.FirstReportIP,  // 第16列
+    company.FillIP,         // 第17列
+}
+
+// 吃穿用 Sheet
+row := []interface{}{
+    // ... 基础字段
+    company.NetworkSales,   // 网络销售额列
+    company.OpeningYear,    // 开业年份��
+    company.OpeningMonth,   // 开业月份列
+}
+```
+
+### 字段验证规则
+
+```sql
+-- IP 字段格式验证（可选）
+CHECK (first_report_ip IS NULL OR first_report_ip LIKE '___.___.___.___')
+
+-- 开业年份范围验证
+CHECK (opening_year IS NULL OR (opening_year >= 1900 AND opening_year <= 2100))
+
+-- 开业月份范围验证
+CHECK (opening_month IS NULL OR (opening_month >= 1 AND opening_month <= 12))
+```
+
+### 实施建议
+
+1. **第一阶段**: 添加字段到表结构，允许 NULL
+2. **第二阶段**: 解析器尝试从 Excel 识别并导入
+3. **第三阶段**: 导出时处理（有值输出，无值留空）
+4. **第四阶段**: 提供数据补充界面（如需要）
+
+### 测试要点
+
+1. 检查输入 Excel 是否包含这 5 个字段
+2. 如果包含，验证解析器能否正确识别
+3. 如果不包含，验证导出时能否正确留空
+4. 验证导出的定稿 Excel 与模板格式完全一致
+
+
