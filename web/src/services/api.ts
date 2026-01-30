@@ -7,10 +7,6 @@ import type {
   ListResponse,
   OptimizeConstraints,
   OptimizeResult,
-  CurrentProject,
-  ProjectDetail,
-  ProjectsIndex,
-  ProjectSummary,
   SheetInfo,
   SheetRecognition,
   SheetType,
@@ -89,39 +85,6 @@ export const importApi = {
     request<ResolveResult>(`/import/${fileId}/resolve`, {
       method: 'POST',
       body: JSON.stringify({ month, overrides }),
-    }),
-}
-
-// 项目
-export const projectsApi = {
-  list: () => request<ProjectsIndex>('/projects'),
-
-  create: (name: string) =>
-    request<ProjectSummary>('/projects', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    }),
-
-  select: (projectId: string) =>
-    request<ProjectSummary>(`/projects/${encodeURIComponent(projectId)}/select`, {
-      method: 'POST',
-    }),
-
-  current: () => request<CurrentProject>('/projects/current'),
-
-  save: () =>
-    request<{ saved: boolean }>('/projects/current/save', {
-      method: 'POST',
-    }),
-
-  detail: (projectId: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`),
-
-  delete: (projectId: string) =>
-    request<{ deleted: boolean }>(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }),
-
-  undoCurrent: () =>
-    request<{ indicators: Indicators }>('/projects/current/undo', {
-      method: 'POST',
     }),
 }
 
