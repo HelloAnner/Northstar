@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	port    = flag.Int("port", 0, "服务端口 (覆盖配置文件)")
+	port    = flag.Int("port", 0, "服务端口 (config.toml 优先；仅当未显式配置 port 时生效)")
 	devMode = flag.Bool("dev", false, "开发模式")
 	dataDir = flag.String("dataDir", "", "数据目录 (覆盖配置文件)")
 )
@@ -27,14 +27,15 @@ func main() {
 	fmt.Println("==========================================")
 
 	// 加载配置
-	cfg, err := config.LoadConfig()
+	cfg, info, err := config.LoadConfigWithInfo()
 	if err != nil {
 		log.Printf("加载配置失败，使用默认配置: %v", err)
 		cfg = config.DefaultConfig()
+		info = config.LoadConfigInfo{}
 	}
 
 	// 命令行参数覆盖配置
-	if *port > 0 {
+	if *port > 0 && !info.PortSpecified {
 		cfg.Server.Port = *port
 	}
 	if *devMode {

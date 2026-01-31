@@ -9,12 +9,7 @@ import { Download, RefreshCw, Upload } from 'lucide-react'
 import ImportDialog from '@/components/ImportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 
-interface Indicator {
-  id: string
-  name: string
-  value: number
-  unit: string
-}
+type Indicator = IndicatorGroup['indicators'][number]
 
 interface SystemStatus {
   initialized: boolean
@@ -276,7 +271,6 @@ export default function DashboardV3() {
     )
   }
 
-  const index = buildIndicatorIndex(groups as any)
   const hasDraft = Object.keys(draftTargets).length > 0
   const applySingle = async (id: string, raw: string) => {
     try {
@@ -290,7 +284,7 @@ export default function DashboardV3() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
-      <div className="mx-auto max-w-[1440px] space-y-6 p-6">
+      <div className="mx-auto w-full max-w-none space-y-6 p-6">
         {/* 顶部栏 */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -355,7 +349,7 @@ export default function DashboardV3() {
               导入
             </Button>
 
-            <Button onClick={handleExport} variant="outline" className="gap-2">
+            <Button onClick={handleExport} variant="outline" className="gap-2" disabled={saving}>
               <Download className="h-4 w-4" />
               导出
             </Button>
@@ -385,63 +379,16 @@ export default function DashboardV3() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-            <MetricPanel
-              title="限上社零额"
-              rows={[
-                { label: '当期零售额（万元）', indicator: index['limitAbove_month_value'] },
-                { label: '当月增速（%）', indicator: index['limitAbove_month_rate'], type: 'rate' },
-                { label: '累计零售额（万元）', indicator: index['limitAbove_cumulative_value'] },
-                { label: '累计增速（%）', indicator: index['limitAbove_cumulative_rate'], type: 'rate' },
-              ]}
-              draftTargets={draftTargets}
-              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
-              onApplySingle={applySingle}
-              disabled={optimizing}
-            />
-
-            <MetricPanel
-              title="专项增速"
-              rows={[
-                { label: '吃穿用增速（%）', indicator: index['eatWearUse_month_rate'], type: 'rate' },
-                { label: '小微企业增速（%）', indicator: index['microSmall_month_rate'], type: 'rate' },
-              ]}
-              compact
-              draftTargets={draftTargets}
-              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
-              onApplySingle={applySingle}
-              disabled={optimizing}
-            />
-
-            <MetricPanel
-              title="四大行业增速"
-              rows={[
-                { label: '批发业（当月）', indicator: index['wholesale_month_rate'], type: 'rate' },
-                { label: '批发业（累计）', indicator: index['wholesale_cumulative_rate'], type: 'rate' },
-                { label: '零售业（当月）', indicator: index['retail_month_rate'], type: 'rate' },
-                { label: '零售业（累计）', indicator: index['retail_cumulative_rate'], type: 'rate' },
-                { label: '住宿业（当月）', indicator: index['accommodation_month_rate'], type: 'rate' },
-                { label: '住宿业（累计）', indicator: index['accommodation_cumulative_rate'], type: 'rate' },
-                { label: '餐饮业（当月）', indicator: index['catering_month_rate'], type: 'rate' },
-                { label: '餐饮业（累计）', indicator: index['catering_cumulative_rate'], type: 'rate' },
-              ]}
-              draftTargets={draftTargets}
-              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
-              onApplySingle={applySingle}
-              disabled={optimizing}
-            />
-
-            <MetricPanel
-              title="社零总额估算"
-              rows={[
-                { label: '社零总额（累计值）', indicator: index['totalSocial_cumulative_value'] },
-                { label: '累计增速（%）', indicator: index['totalSocial_cumulative_rate'], type: 'rate' },
-              ]}
-              compact
-              draftTargets={draftTargets}
-              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
-              onApplySingle={applySingle}
-              disabled={optimizing}
-            />
+            {groups.map((g) => (
+              <IndicatorGroupCard
+                key={g.name}
+                group={g}
+                draftTargets={draftTargets}
+                onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+                onApplySingle={applySingle}
+                disabled={optimizing}
+              />
+            ))}
           </div>
         )}
 
@@ -487,10 +434,8 @@ export default function DashboardV3() {
   )
 }
 
-function MetricPanel(props: {
-  title: string
-  rows: { label: string; indicator?: Indicator; type?: 'rate' | 'value' }[]
-  compact?: boolean
+function IndicatorGroupCard(props: {
+  group: IndicatorGroup
   disabled?: boolean
   draftTargets: Record<string, string>
   onDraftChange: (id: string, value: string) => void
@@ -499,15 +444,15 @@ function MetricPanel(props: {
   return (
     <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{props.title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{props.group.name}</CardTitle>
       </CardHeader>
-      <CardContent className={props.compact ? 'space-y-2' : 'space-y-3'}>
-        {props.rows.map((r) => (
+      <CardContent className="space-y-2">
+        {props.group.indicators.map((it) => (
           <MetricRow
-            key={r.label}
-            label={r.label}
-            indicator={r.indicator}
-            type={r.type}
+            key={it.id}
+            label={it.name}
+            indicator={it}
+            type={String(it.unit).includes('%') ? 'rate' : 'value'}
             draftTargets={props.draftTargets}
             onDraftChange={props.onDraftChange}
             onApplySingle={props.onApplySingle}
@@ -533,10 +478,7 @@ function MetricRow(props: {
   const unit = props.indicator?.unit ?? (type === 'rate' ? '%' : '')
   const id = props.indicator?.id
 
-  const text =
-    type === 'rate'
-      ? `${value.toFixed(2)}`
-      : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const text = type === 'rate' ? `${Math.round(value)}` : Math.round(value).toLocaleString()
   const positive = value >= 0
   const tone = type === 'rate' ? (positive ? 'text-emerald-300' : 'text-rose-300') : 'text-foreground'
 
@@ -546,7 +488,7 @@ function MetricRow(props: {
 
   return (
     <div className="flex items-center gap-3">
-      <div className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">{props.label}</div>
+      <div className="min-w-0 flex-1 whitespace-normal break-words text-xs text-muted-foreground">{props.label}</div>
       <div className="flex shrink-0 items-center gap-2">
         <Input
           value={displayValue}
@@ -569,14 +511,4 @@ function MetricRow(props: {
       </div>
     </div>
   )
-}
-
-function buildIndicatorIndex(groups: { indicators: Indicator[] }[]) {
-  const map: Record<string, Indicator> = {}
-  for (const g of groups || []) {
-    for (const i of g.indicators || []) {
-      map[i.id] = i
-    }
-  }
-  return map
 }

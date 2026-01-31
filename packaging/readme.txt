@@ -7,8 +7,8 @@ Northstar 发布包
 
 2) 配置文件
 - 程序启动时会自动读取同目录下的 config.toml
-- 可通过命令行参数覆盖：
-  -port 8080 -dev -dataDir data
+- 可通过命令行参数覆盖（其中 port 以 config.toml 为准）：
+  -port 20261 -dev -dataDir data
 
 3) 数据目录
 - 默认会在同目录创建 data/（可通过 config.toml 或 -dataDir 覆盖）

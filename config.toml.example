@@ -3,7 +3,7 @@
 
 [server]
 # 服务端口
-port = 8080
+port = 20261
 # 开发模式 (true: 不自动打开浏览器)
 dev_mode = false
 

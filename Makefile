@@ -275,7 +275,7 @@ test-e2e-only:
 	@echo "=========================================="
 	@echo ""
 	@echo ">>> 执行 agent-browser 自动化脚本..."
-	@BASE_URL="$${BASE_URL:-http://localhost:8080}" \
+	@BASE_URL="$${BASE_URL:-http://localhost:20261}" \
 		INPUT_XLSX="$${INPUT_XLSX:-$(CURDIR)/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx}" \
 		RESULTS_ROOT="$(REPORTS_DIR)" \
 		bash $(E2E_DIR)/run_agent_browser_e2e.sh

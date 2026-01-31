@@ -623,7 +623,7 @@ interface Indicators {
 如果需要实时推送指标更新，可使用 WebSocket:
 
 ```
-ws://localhost:8080/api/v1/ws
+ws://localhost:20261/api/v1/ws
 ```
 
 **消息格式:**

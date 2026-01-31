@@ -75,6 +75,23 @@ def _field_eps(field: str) -> float:
     return 0.005
 
 
+def _normalize_rate_pair(field: str, a: Optional[float], b: Optional[float]) -> Tuple[Optional[float], Optional[float]]:
+    # Some sheets store rate as decimal (0.54) while UI/export shows percent (54).
+    # Normalize by scaling the smaller-magnitude side when it looks like a 100x difference.
+    if a is None or b is None:
+        return a, b
+    is_rate = "增速" in field or "零销比" in field or "rate" in field.lower() or "%" in field
+    if not is_rate:
+        return a, b
+    aa = abs(a)
+    bb = abs(b)
+    if aa <= 2 and bb > 2:
+        return a * 100.0, b
+    if bb <= 2 and aa > 2:
+        return a, b * 100.0
+    return a, b
+
+
 def _safe(s: str) -> str:
     return (
         s.replace("&", "&amp;")
@@ -167,14 +184,20 @@ UI_TO_EXCEL_FIELD = {
 DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
     # (ui_field, excel_header, nth_occurrence)
     "批发": [
-        ("商品销售额;本年-本月", "2025年12月销售额", 1),
-        ("商品销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
-        ("商品销售额;本年-1—本月", "2025年1-12月销售额", 1),
-        ("商品销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
-        ("商品销售额;增速(当月)", "12月销售额增速", 1),
-        ("商品销售额;累计增速", "1-12月增速", 1),
+        ("销售额;本年-上月", "2025年11月销售额", 1),
+        ("销售额;本年-本月", "2025年12月销售额", 1),
+        ("销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
+        ("销售额;本年-1—上月", "2025年1-11月销售额", 1),
+        ("销售额;上年-1—上月", "2024年1-11月销售额", 1),
+        ("销售额;本年-1—本月", "2025年1-12月销售额", 1),
+        ("销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
+        ("销售额;增速(当月)", "12月销售额增速", 1),
+        ("销售额;累计增速", "1-12月增速", 1),
+        ("零售额;本年-上月", "2025年11月零售额", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年;12月;商品零售额;千元", 1),
+        ("零售额;本年-1—上月", "2025年1-11月零售额", 1),
+        ("零售额;上年-1—上月", "2024年1-11月零售额", 1),
         ("零售额;本年-1—本月", "2025年1-12月零售额", 1),
         ("零售额;上年-1—本月", "2024年;1-12月;商品零售额;千元", 1),
         ("零售额;增速(当月)", "12月零售额增速", 1),
@@ -182,14 +205,20 @@ DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
         ("零销比(%)", "零售额占比", 1),
     ],
     "零售": [
-        ("商品销售额;本年-本月", "2025年12月销售额", 1),
-        ("商品销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
-        ("商品销售额;本年-1—本月", "2025年1-12月销售额", 1),
-        ("商品销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
-        ("商品销售额;增速(当月)", "12月销售额增速", 1),
-        ("商品销售额;累计增速", "1-12月增速", 1),
+        ("销售额;本年-上月", "2025年11月销售额", 1),
+        ("销售额;本年-本月", "2025年12月销售额", 1),
+        ("销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
+        ("销售额;本年-1—上月", "2025年1-11月销售额", 1),
+        ("销售额;上年-1—上月", "2024年1-11月销售额", 1),
+        ("销售额;本年-1—本月", "2025年1-12月销售额", 1),
+        ("销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
+        ("销售额;增速(当月)", "12月销售额增速", 1),
+        ("销售额;累计增速", "1-12月增速", 1),
+        ("零售额;本年-上月", "2025年11月零售额", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年;12月;商品零售额;千元", 1),
+        ("零售额;本年-1—上月", "2025年1-11月零售额", 1),
+        ("零售额;上年-1—上月", "2024年1-11月零售额", 1),
         ("零售额;本年-1—本月", "2025年1-12月零售额", 1),
         ("零售额;上年-1—本月", "2024年;1-12月;商品零售额;千元", 1),
         ("零售额;增速(当月)", "12月零售额增速", 1),
@@ -197,28 +226,63 @@ DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
         ("零销比(%)", "零售额占比", 1),
     ],
     "住宿": [
-        ("营业额;本年-本月", "2025年12月营业额", 1),
-        ("营业额;上年-本月", "2024年12月;营业额总计;千元", 1),
-        ("营业额;本年-1—本月", "2025年1-12月营业额", 1),
-        ("营业额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
-        ("营业额;增速(当月)", "12月增速", 1),
-        ("营业额;累计增速", "1-12月增速", 1),
-        ("本月客房收入", "2025年12月客房收入", 1),
-        ("本月餐费收入", "2025年12月餐费收入", 1),
-        ("本月商品销售额", "2025年12月销售额", 1),
+        # UI 住餐口径中，主指标列名仍沿用“销售额;*”
+        ("销售额;本年-上月", "2025年11月营业额", 1),
+        ("销售额;本年-本月", "2025年12月营业额", 1),
+        ("销售额;上年-本月", "2024年12月;营业额总计;千元", 1),
+        ("销售额;本年-1—上月", "2025年1-11月营业额", 1),
+        ("销售额;本年-1—本月", "2025年1-12月营业额", 1),
+        ("销售额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
+        ("销售额;增速(当月)", "12月增速", 1),
+        ("销售额;累计增速", "1-12月增速", 1),
+        ("客房收入;本年-上月", "11月客房收入", 1),
+        ("客房收入;本年-本月", "2025年12月客房收入", 1),
+        ("客房收入;上年-本月", "2024年12月;营业额总计;客房收入;千元", 1),
+        ("客房收入;本年-1—上月", "2025年1-11月客房收入", 1),
+        ("客房收入;本年-1—本月", "2025年1-12月客房收入", 1),
+        ("客房收入;上年-1—本月", "2024年1-12月;营业额总计;客房收入;千元", 1),
+        ("餐费收入;本年-上月", "11月餐费收入", 1),
+        ("餐费收入;本年-本月", "2025年12月餐费收入", 1),
+        ("餐费收入;上年-本月", "2024年12月;营业额总计;餐费收入;千元", 1),
+        ("餐费收入;本年-1—上月", "2025年1-11月餐费收入", 1),
+        ("餐费收入;本年-1—本月", "1-12月餐费收入", 1),
+        ("餐费收入;上年-1—本月", "2024年1-12月;营业额总计;餐费收入;千元", 1),
+        ("商品销售额;本年-上月", "11月销售额", 1),
+        ("商品销售额;本年-本月", "2025年12月销售额", 1),
+        ("商品销售额;上年-本月", "2024年12月;营业额总计;商品销售额;千元", 1),
+        ("商品销售额;本年-1—上月", "2025年1-11月销售额", 1),
+        ("商品销售额;本年-1—本月", "1-12月销售额", 1),
+        ("商品销售额;上年-1—本月", "2024年1-12月;营业额总计;商品销售额;千元", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年12月零售额", 1),
     ],
     "餐饮": [
-        ("营业额;本年-本月", "2025年12月营业额", 1),
-        ("营业额;上年-本月", "2024年12月;营业额总计;千元", 1),
-        ("营业额;本年-1—本月", "2025年1-12月营业额", 1),
-        ("营业额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
-        ("营业额;增速(当月)", "12月增速", 1),
-        ("营业额;累计增速", "1-12月增速", 1),
-        ("本月客房收入", "2025年12月客房收入", 1),
-        ("本月餐费收入", "2025年12月餐费收入", 1),
-        ("本月商品销售额", "2025年12月销售额", 1),
+        ("销售额;本年-上月", "2025年11月营业额", 1),
+        ("销售额;本年-本月", "2025年12月营业额", 1),
+        ("销售额;上年-本月", "2024年12月;营业额总计;千元", 1),
+        ("销售额;本年-1—上月", "2025年1-11月营业额", 1),
+        ("销售额;本年-1—本月", "2025年1-12月营业额", 1),
+        ("销售额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
+        ("销售额;增速(当月)", "12月增速", 1),
+        ("销售额;累计增速", "1-12月增速", 1),
+        ("客房收入;本年-上月", "11月客房收入", 1),
+        ("客房收入;本年-本月", "2025年12月客房收入", 1),
+        ("客房收入;上年-本月", "2024年12月;营业额总计;客房收入;千元", 1),
+        ("客房收入;本年-1—上月", "2025年1-11月客房收入", 1),
+        ("客房收入;本年-1—本月", "2025年1-12月客房收入", 1),
+        ("客房收入;上年-1—本月", "2024年1-12月;营业额总计;客房收入;千元", 1),
+        ("餐费收入;本年-上月", "11月餐费收入", 1),
+        ("餐费收入;本年-本月", "2025年12月餐费收入", 1),
+        ("餐费收入;上年-本月", "2024年12月;营业额总计;餐费收入;千元", 1),
+        ("餐费收入;本年-1—上月", "2025年1-11月餐费收入", 1),
+        ("餐费收入;本年-1—本月", "1-12月餐费收入", 1),
+        ("餐费收入;上年-1—本月", "2024年1-12月;营业额总计;餐费收入;千元", 1),
+        ("商品销售额;本年-上月", "11月销售额", 1),
+        ("商品销售额;本年-本月", "2025年12月销售额", 1),
+        ("商品销售额;上年-本月", "2024年12月;营业额总计;商品销售额;千元", 1),
+        ("商品销售额;本年-1—上月", "2025年1-11月销售额", 1),
+        ("商品销售额;本年-1—本月", "1-12月销售额", 1),
+        ("商品销售额;上年-1—本月", "2024年1-12月;营业额总计;商品销售额;千元", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年12月零售额", 1),
     ],
@@ -303,6 +367,7 @@ def _compare_ui_vs_excel(
 
                 # Prefer numeric compare when both parse.
                 if ui_num is not None or ex_num is not None:
+                    ui_num, ex_num = _normalize_rate_pair(field, ui_num, ex_num)
                     if not _close(ui_num, ex_num, eps=_field_eps(field)):
                         mismatches.append(
                             Mismatch(
@@ -393,6 +458,7 @@ def _compare_ui_vs_export(ui_rows: List[Dict[str, Any]], export_wb) -> Tuple[Lis
             ui_num = _parse_number(ui_val)
             ex_num = _parse_number(excel_val)
             if ui_num is not None or ex_num is not None:
+                ui_num, ex_num = _normalize_rate_pair(field, ui_num, ex_num)
                 if not _close(ui_num, ex_num, eps=_field_eps(field)):
                     mismatches.append(
                         Mismatch(
@@ -532,6 +598,7 @@ def _build_completeness_cases(
                     exp_num = _parse_number(exp)
                     act_num = _parse_number(act)
                     if exp_num is not None or act_num is not None:
+                        act_num, exp_num = _normalize_rate_pair(field, act_num, exp_num)
                         okv = _close(act_num, exp_num, eps=_field_eps(field))
                         reason = "" if okv else "数值不一致（允许少量格式化/四舍五入容差）"
                     else:
@@ -652,6 +719,7 @@ def _issues_summary(
     missing_export: List[str],
     mismatches_export: List[Mismatch],
     action_results: List[Dict[str, Any]],
+    action_persist: List[Dict[str, Any]],
     completeness_failed: int,
     completeness_total: int,
     derived_unmapped_cols: int,
@@ -659,6 +727,7 @@ def _issues_summary(
 ) -> str:
     issues: List[str] = []
     action_fail = sum(1 for r in action_results if r.get("ok") is False)
+    persist_fail = sum(1 for r in action_persist if r.get("ok") is False)
 
     if missing_before:
         issues.append(f"导入覆盖缺失：{len(missing_before)}（见“导入一致性/覆盖检查”）")
@@ -666,6 +735,8 @@ def _issues_summary(
         issues.append(f"导入字段不一致：{len(mismatches_before)}（见“导入一致性/字段一致性”）")
     if action_fail:
         issues.append(f"修改动作失败：{action_fail}（见“修改动作覆盖”）")
+    if persist_fail:
+        issues.append(f"修改持久化失败：{persist_fail}（见“修改动作覆盖”的 UI(刷新后) 列）")
     if missing_export:
         issues.append(f"导出覆盖缺失：{len(missing_export)}（见“导出一致性/覆盖检查”）")
     if mismatches_export:
@@ -754,6 +825,9 @@ def _build_derived_column_coverage(input_wb, ui_headers: List[str]) -> Dict[str,
 
             ui_field = mapped.get((header, nth), "")
             ui_present = bool(ui_field and ui_field in ui_headers)
+            if not ui_field:
+                # Unmapped column: still mark if the header itself is present in UI (rare, but helps debugging).
+                ui_present = header in ui_headers
             if ui_field and not ui_present:
                 missing_ui_cols += 1
             if not ui_field:
@@ -852,6 +926,7 @@ def _action_export_checks(
         exp_num = _parse_number(exp)
         act_num = _parse_number(actual)
         if exp_num is not None or act_num is not None:
+            act_num, exp_num = _normalize_rate_pair(field, act_num, exp_num)
             okv = _close(act_num, exp_num, eps=_field_eps(field))
         else:
             okv = str(actual).strip() == str(exp).strip()
@@ -879,6 +954,7 @@ def main() -> None:
     ap.add_argument("--ui-before", required=True)
     ap.add_argument("--ui-after", required=True)
     ap.add_argument("--import-events", required=False, default="")
+    ap.add_argument("--tab-counts", required=False, default="")
     ap.add_argument("--steps", required=False, default="")
     ap.add_argument("--actions", required=False, default="")
     ap.add_argument("--console", required=False, default="")
@@ -944,6 +1020,13 @@ def main() -> None:
         except Exception:
             import_events = {}
 
+    tab_counts: Dict[str, Any] = {}
+    if args.tab_counts and Path(args.tab_counts).exists():
+        try:
+            tab_counts = _unwrap_agent_browser_json(_load_json(args.tab_counts))
+        except Exception:
+            tab_counts = {}
+
     screenshots = _list_screenshots(args.screenshots) if args.screenshots else []
 
     started_at = ui_before.get("extractedAt") or ""
@@ -958,11 +1041,15 @@ def main() -> None:
             steps = []
 
     action_results: List[Dict[str, Any]] = []
+    action_persist: List[Dict[str, Any]] = []
     if args.actions and Path(args.actions).exists():
         try:
-            action_results = (json.loads(Path(args.actions).read_text(encoding="utf-8")) or {}).get("results") or []
+            payload = json.loads(Path(args.actions).read_text(encoding="utf-8")) or {}
+            action_results = payload.get("results") or []
+            action_persist = payload.get("persist") or []
         except Exception:
             action_results = []
+            action_persist = []
 
     out_dir = Path(args.out).parent
     try:
@@ -1037,6 +1124,7 @@ def main() -> None:
         )
         and all(s.get("status") != "fail" for s in steps)
         and all(r.get("ok") is not False for r in action_results)
+        and all(r.get("ok") is not False for r in action_persist)
     )
     status = "PASS" if ok else "FAIL"
 
@@ -1048,9 +1136,16 @@ def main() -> None:
 
     shots_items: List[str] = []
     for p in screenshots[:30]:
-        ps = _safe(p)
+        ps = _safe(p).replace("\\", "/")
         cap = _safe(Path(p).name)
-        shots_items.append(f'<div class="shot"><a href="{ps}"><img src="{ps}" alt="shot"/></a><div class="cap mono">{cap}</div></div>')
+        shots_items.append(
+            "<div class=\"shot\">"
+            f"<a class=\"shot-link\" href=\"{ps}\" data-cap=\"{cap}\">"
+            f"<img class=\"thumb\" src=\"{ps}\" alt=\"shot\" loading=\"lazy\"/>"
+            "</a>"
+            f"<div class=\"cap mono\">{cap}</div>"
+            "</div>"
+        )
     shots_html = "".join(shots_items)
 
     conclusion = "✅ 全量校验通过（导入一致性 + 修改覆盖 + 导出一致性）" if ok else "❌ 存在不符合预期项：请优先查看【执行步骤与不符合预期项】与两段一致性差异表；所有改动建议也写在 report 内。"
@@ -1082,16 +1177,28 @@ def main() -> None:
     def _actions_html() -> str:
         if not action_results:
             return "<p class='warn'>未执行修改动作或未生成 actions_result.json</p>"
+        persist_map: Dict[str, Dict[str, Any]] = {}
+        for p in action_persist:
+            k = f"{p.get('creditCode')}|{p.get('field')}|{p.get('i')}"
+            persist_map[k] = p
         rows = []
         for r in action_results:
             okv = bool(r.get("ok"))
             klass = "ok" if okv else "bad"
+            k = f"{r.get('creditCode')}|{r.get('field')}|{r.get('i')}"
+            pv = persist_map.get(k) or {}
+            v = r.get("value")
+            v_s = "" if v is None else str(v)
+            ui_s = "" if r.get("uiValue") is None else str(r.get("uiValue"))
+            pv_s = "" if pv.get("uiValue") is None else str(pv.get("uiValue"))
             rows.append(
                 "<tr>"
                 f"<td class='mono'>{_safe(str(r.get('i') or ''))}</td>"
                 f"<td class='mono'>{_safe(str(r.get('creditCode') or ''))}</td>"
                 f"<td>{_safe(str(r.get('field') or ''))}</td>"
-                f"<td class='mono'>{_safe(str(r.get('value') or ''))}</td>"
+                f"<td class='mono'>{_safe(v_s)}</td>"
+                f"<td class='mono'>{_safe(ui_s)}</td>"
+                f"<td class='mono'>{_safe(pv_s)}</td>"
                 f"<td class='{klass}'>{'PASS' if okv else 'FAIL'}</td>"
                 f"<td>{_safe(str(r.get('reason') or ''))}</td>"
                 f"<td class='mono'>{_safe(str(r.get('error') or ''))}</td>"
@@ -1099,7 +1206,7 @@ def main() -> None:
             )
         return (
             "<div class='table-wrap'><table><thead><tr>"
-            "<th>#</th><th>统一社会信用代码</th><th>字段</th><th>新值</th><th>结果</th><th>覆盖场景</th><th>错误</th>"
+            "<th>#</th><th>统一社会信用代码</th><th>字段</th><th>新值</th><th>UI(立即)</th><th>UI(刷新后)</th><th>结果</th><th>覆盖场景</th><th>错误</th>"
             "</tr></thead><tbody>"
             + "".join(rows)
             + "</tbody></table></div>"
@@ -1113,8 +1220,8 @@ def main() -> None:
             return "<p class='warn'>未生成完整性数据（可能是衍生 Sheet 映射为空）</p>"
 
         pinned_cc = "914401007RDD76M0RF"
-        pinned_field = "商品销售额;上年-本月"
-        pinned = [c for c in completeness_cases if c.credit_code.upper() == pinned_cc and c.field == pinned_field]
+        pinned_fields = ["销售额;上年-本月", "商品销售额;上年-本月"]
+        pinned = [c for c in completeness_cases if c.credit_code.upper() == pinned_cc and c.field in pinned_fields]
         fail_cases = [c for c in completeness_cases if not c.ok]
         show_fails = fail_cases[:200]
 
@@ -1260,6 +1367,31 @@ def main() -> None:
             + "</tbody></table></div>"
         )
 
+    def _tab_counts_html() -> str:
+        items = tab_counts.get("items") if isinstance(tab_counts, dict) else None
+        if not isinstance(items, list) or not items:
+            return "<p class='warn'>未生成 tab 行数统计</p>"
+        rows = []
+        for it in items:
+            okv = bool(it.get("ok"))
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td class='mono'>{_safe(str(it.get('tab') or ''))}</td>"
+                f"<td class='{klass}'>{'PASS' if okv else 'FAIL'}</td>"
+                f"<td class='mono'>{_safe(str(it.get('rows') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('totalText') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('error') or ''))}</td>"
+                "</tr>"
+            )
+        return (
+            "<div class='table-wrap'><table><thead><tr>"
+            "<th>Tab</th><th>结果</th><th>表格行数</th><th>底部总数文案</th><th>错误</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
     html = f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -1307,11 +1439,27 @@ def main() -> None:
     table {{ border-collapse: collapse; width: 100%; min-width: 900px; font-size: 12px; }}
     th, td {{ border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }}
     th {{ position: sticky; top: 0; background: rgba(15,27,51,.95); backdrop-filter: blur(8px); }}
-    .shots {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }}
+    .shots {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }}
+    @media (max-width: 1100px) {{ .shots {{ grid-template-columns: repeat(3, 1fr); }} }}
+    @media (max-width: 820px) {{ .shots {{ grid-template-columns: repeat(2, 1fr); }} }}
+    @media (max-width: 520px) {{ .shots {{ grid-template-columns: 1fr; }} }}
     .shot {{ border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.02); }}
-    .shot img {{ width: 100%; display: block; }}
+    .shot img.thumb {{ width: 100%; height: 120px; object-fit: cover; display: block; }}
     .shot .cap {{ padding: 8px 10px; font-size: 12px; color: var(--muted); }}
     pre {{ background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; overflow: auto; }}
+
+    .lightbox {{ position: fixed; inset: 0; background: rgba(0,0,0,.76); display: none; z-index: 9999; }}
+    .lightbox.open {{ display: block; }}
+    .lightbox-inner {{ position: absolute; inset: 28px 20px; display: grid; grid-template-rows: auto 1fr auto; gap: 10px; }}
+    .lightbox-top {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; }}
+    .lightbox-title {{ color: var(--muted); font-size: 12px; font-family: var(--mono); }}
+    .lightbox-btn {{ border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: var(--text); border-radius: 10px; padding: 8px 10px; cursor: pointer; }}
+    .lightbox-btn:hover {{ background: rgba(255,255,255,.10); }}
+    .lightbox-body {{ position: relative; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; overflow: hidden; background: rgba(0,0,0,.20); }}
+    .lightbox-body img {{ width: 100%; height: 100%; object-fit: contain; display: block; }}
+    .lightbox-nav {{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }}
+    .lightbox-nav button {{ pointer-events: all; width: 44px; height: 44px; border-radius: 999px; }}
+    .lightbox-bottom {{ color: var(--muted); font-size: 12px; font-family: var(--mono); }}
   </style>
 </head>
 <body>
@@ -1338,6 +1486,7 @@ def main() -> None:
           <li><a class="mono" href="{_safe(args.ui_before)}">ui_companies_before.json</a></li>
           <li><a class="mono" href="{_safe(args.ui_after)}">ui_companies_after.json</a></li>
           <li><a class="mono" href="{_safe(args.import_events)}">import_events.json</a></li>
+          <li><a class="mono" href="{_safe(args.tab_counts)}">tab_counts.json</a></li>
           <li><a class="mono" href="{_safe(args.console)}">browser_console.txt</a></li>
           <li><a class="mono" href="{_safe(args.errors)}">browser_errors.txt</a></li>
           <li><a class="mono" href="{_safe(args.trace)}">trace.zip</a></li>
@@ -1354,13 +1503,18 @@ def main() -> None:
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>不符合预期项总览</h2>
-        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, completeness_failed, completeness_total, derived_unmapped_cols_total, derived_missing_ui_cols_total)}
+        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, completeness_failed, completeness_total, derived_unmapped_cols_total, derived_missing_ui_cols_total)}
         <p class="warn">复现入口：打开 <span class="mono">{_safe(args.base_url)}</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>修改动作覆盖</h2>
         <p class="warn">复现：在首页输入框按信用代码搜索，修改对应字段输入框，失焦（blur）触发自动保存，然后导出检查。</p>
         {_actions_html()}
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>Tab 行数与总数</h2>
+        <p class="warn">目的：覆盖“全部/批发/零售/住宿/餐饮”tab 切换与数据是否加载。</p>
+        {_tab_counts_html()}
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>UI 抽取状态</h2>
@@ -1472,6 +1626,89 @@ def main() -> None:
       </div>
     </div>
   </div>
+
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <div class="lightbox-inner">
+      <div class="lightbox-top">
+        <div id="lightbox-title" class="lightbox-title">screenshot</div>
+        <div style="display:flex; gap:8px;">
+          <button id="lightbox-open" class="lightbox-btn" type="button">在新标签页打开</button>
+          <button id="lightbox-close" class="lightbox-btn" type="button">关闭 (Esc)</button>
+        </div>
+      </div>
+      <div class="lightbox-body" id="lightbox-body">
+        <img id="lightbox-img" alt="preview" />
+        <div class="lightbox-nav">
+          <button id="lightbox-prev" class="lightbox-btn" type="button">‹</button>
+          <button id="lightbox-next" class="lightbox-btn" type="button">›</button>
+        </div>
+      </div>
+      <div id="lightbox-cap" class="lightbox-bottom"></div>
+    </div>
+  </div>
+
+  <script>
+    (() => {{
+      const links = Array.from(document.querySelectorAll('.shot-link'));
+      const lb = document.getElementById('lightbox');
+      const img = document.getElementById('lightbox-img');
+      const title = document.getElementById('lightbox-title');
+      const cap = document.getElementById('lightbox-cap');
+      const btnClose = document.getElementById('lightbox-close');
+      const btnOpen = document.getElementById('lightbox-open');
+      const btnPrev = document.getElementById('lightbox-prev');
+      const btnNext = document.getElementById('lightbox-next');
+      const body = document.getElementById('lightbox-body');
+      if (!lb || !img || links.length === 0) return;
+
+      let idx = 0;
+      function setIndex(i) {{
+        if (i < 0) i = links.length - 1;
+        if (i >= links.length) i = 0;
+        idx = i;
+        const a = links[idx];
+        const href = a.getAttribute('href') || '';
+        const c = a.getAttribute('data-cap') || '';
+        img.setAttribute('src', href);
+        title.textContent = c || href;
+        cap.textContent = href;
+        btnOpen.onclick = () => window.open(href, '_blank');
+      }}
+
+      function openAt(i) {{
+        setIndex(i);
+        lb.classList.add('open');
+        lb.setAttribute('aria-hidden', 'false');
+      }}
+      function close() {{
+        lb.classList.remove('open');
+        lb.setAttribute('aria-hidden', 'true');
+        img.setAttribute('src', '');
+      }}
+
+      links.forEach((a, i) => {{
+        a.addEventListener('click', (e) => {{
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          openAt(i);
+        }});
+      }});
+
+      btnClose && btnClose.addEventListener('click', close);
+      btnPrev && btnPrev.addEventListener('click', () => setIndex(idx - 1));
+      btnNext && btnNext.addEventListener('click', () => setIndex(idx + 1));
+      lb.addEventListener('click', (e) => {{
+        if (e.target === lb) close();
+      }});
+      body && body.addEventListener('dblclick', close);
+      document.addEventListener('keydown', (e) => {{
+        if (!lb.classList.contains('open')) return;
+        if (e.key === 'Escape') close();
+        if (e.key === 'ArrowLeft') setIndex(idx - 1);
+        if (e.key === 'ArrowRight') setIndex(idx + 1);
+      }});
+    }})();
+  </script>
 </body>
 </html>
 """

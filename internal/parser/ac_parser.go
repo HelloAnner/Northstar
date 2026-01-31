@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -85,8 +86,14 @@ func (p *ACParser) parseACRow(row []string, mappings map[int]FieldMapping, sheet
 		SourceSheet: sheetName,
 	}
 
-	// 遍历所有映射
-	for colIdx, mapping := range mappings {
+	// 遍历所有映射（按列序，避免 map 遍历顺序导致覆盖不稳定）
+	cols := make([]int, 0, len(mappings))
+	for colIdx := range mappings {
+		cols = append(cols, colIdx)
+	}
+	sort.Ints(cols)
+	for _, colIdx := range cols {
+		mapping := mappings[colIdx]
 		if colIdx >= len(row) {
 			continue
 		}

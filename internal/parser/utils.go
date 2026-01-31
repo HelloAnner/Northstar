@@ -191,7 +191,7 @@ func parseRatePercentPtr(s string) *float64 {
 		v = v * 100
 	}
 
-	val := v
+	val := math.Round(v)
 	return &val
 }
 

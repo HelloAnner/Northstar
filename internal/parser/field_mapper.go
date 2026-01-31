@@ -226,14 +226,6 @@ func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []stri
 		return mapping
 	}
 
-	// 营业额
-	if strings.Contains(col, "营业额") {
-		timeType := InferFieldTimeType(col, m.currentYear, m.currentMonth)
-		mapping.TimeType = timeType
-		mapping.DBField = m.mapRevenueField(timeType)
-		return mapping
-	}
-
 	// 客房收入
 	if strings.Contains(col, "客房收入") || strings.Contains(col, "客房") {
 		timeType := InferFieldTimeType(col, m.currentYear, m.currentMonth)
@@ -251,7 +243,7 @@ func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []stri
 	}
 
 	// 商品销售额
-	if strings.Contains(col, "商品销售额") || (strings.Contains(col, "销售额") && !strings.Contains(col, "网络")) {
+	if strings.Contains(col, "商品销售额") || (strings.Contains(col, "销售额") && !strings.Contains(col, "网络") && !strings.Contains(col, "零售额")) {
 		timeType := InferFieldTimeType(col, m.currentYear, m.currentMonth)
 		mapping.TimeType = timeType
 		mapping.DBField = m.mapGoodsField(timeType)
@@ -268,6 +260,14 @@ func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []stri
 		} else if timeType == LastYearMonth {
 			mapping.DBField = "retail_last_year_month"
 		}
+		return mapping
+	}
+
+	// 营业额（注意：列名可能包含“营业额总计;客房收入/餐费收入/商品销售额”，已在上面更具体字段优先匹配）
+	if strings.Contains(col, "营业额") {
+		timeType := InferFieldTimeType(col, m.currentYear, m.currentMonth)
+		mapping.TimeType = timeType
+		mapping.DBField = m.mapRevenueField(timeType)
 		return mapping
 	}
 

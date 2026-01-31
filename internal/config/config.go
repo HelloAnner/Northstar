@@ -39,11 +39,16 @@ type ExcelConfig struct {
 	TemplatePath string `toml:"template_path"`
 }
 
+// LoadConfigInfo 配置加载元信息
+type LoadConfigInfo struct {
+	PortSpecified bool
+}
+
 // DefaultConfig 默认配置
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
 		Server: ServerConfig{
-			Port:    8080,
+			Port:    20261,
 			DevMode: false,
 		},
 		Data: DataConfig{
@@ -61,6 +66,26 @@ func DefaultConfig() *AppConfig {
 	}
 }
 
+func isPortSpecifiedInToml(data []byte) bool {
+	var raw map[string]any
+	if err := toml.Unmarshal(data, &raw); err != nil {
+		return false
+	}
+
+	serverAny, ok := raw["server"]
+	if !ok {
+		return false
+	}
+
+	serverMap, ok := serverAny.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, ok = serverMap["port"]
+	return ok
+}
+
 // GetExeDir 获取可执行文件所在目录
 func GetExeDir() (string, error) {
 	exe, err := os.Executable()
@@ -70,9 +95,9 @@ func GetExeDir() (string, error) {
 	return filepath.Dir(exe), nil
 }
 
-// LoadConfig 从 config.toml 加载配置
-// 配置文件位于可执行文件同目录下
-func LoadConfig() (*AppConfig, error) {
+// LoadConfigWithInfo 从 config.toml 加载配置并返回元信息
+func LoadConfigWithInfo() (*AppConfig, LoadConfigInfo, error) {
+	info := LoadConfigInfo{}
 	config := DefaultConfig()
 
 	exeDir, err := GetExeDir()
@@ -87,13 +112,15 @@ func LoadConfig() (*AppConfig, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// 配置文件不存在，使用默认配置
-			return config, nil
+			return config, info, nil
 		}
-		return nil, err
+		return nil, info, err
 	}
 
+	info.PortSpecified = isPortSpecifiedInToml(data)
+
 	if err := toml.Unmarshal(data, config); err != nil {
-		return nil, err
+		return nil, info, err
 	}
 
 	// 环境变量覆盖（用于 E2E / 本地运行）
@@ -106,7 +133,14 @@ func LoadConfig() (*AppConfig, error) {
 		}
 	}
 
-	return config, nil
+	return config, info, nil
+}
+
+// LoadConfig 从 config.toml 加载配置
+// 配置文件位于可执行文件同目录下
+func LoadConfig() (*AppConfig, error) {
+	config, _, err := LoadConfigWithInfo()
+	return config, err
 }
 
 // SaveConfig 保存配置到 config.toml

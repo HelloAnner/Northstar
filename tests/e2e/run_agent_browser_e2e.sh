@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${BASE_URL:-http://localhost:20261}"
 SESSION="${AGENT_BROWSER_SESSION:-default}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -19,6 +19,7 @@ META="$RUN_DIR/meta.json"
 UI_BEFORE="$RUN_DIR/ui_companies_before.json"
 UI_AFTER="$RUN_DIR/ui_companies_after.json"
 IMPORT_EVENTS="$RUN_DIR/import_events.json"
+TAB_COUNTS="$RUN_DIR/tab_counts.json"
 EXPORT_XLSX="$RUN_DIR/export.xlsx"
 CONSOLE_LOG="$RUN_DIR/browser_console.txt"
 ERRORS_LOG="$RUN_DIR/browser_errors.txt"
@@ -126,7 +127,7 @@ echo ">>> Opening $BASE_URL ..." | tee -a "$LOG"
 if agent-browser open "$BASE_URL" | tee -a "$LOG"; then
   record_step "open_home" "pass" "" ""
 else
-  record_step "open_home" "fail" "failed to open BASE_URL" "确认服务可访问后重试：BASE_URL=http://localhost:8080 make test-e2e"
+  record_step "open_home" "fail" "failed to open BASE_URL" "确认服务可访问后重试：BASE_URL=http://localhost:20261 make test-e2e"
 fi
 agent-browser set viewport 1440 900 | tee -a "$LOG" || true
 agent-browser wait --load networkidle | tee -a "$LOG" || true
@@ -135,7 +136,7 @@ agent-browser trace start | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/00_home.png" | tee -a "$LOG" || true
 
 echo ">>> Preparing table columns (enable all)..." | tee -a "$LOG"
-if agent-browser eval "(() => { const keys = ['companyScale','flags','salesCurrentMonth','salesLastYearMonth','salesMonthRate','salesCurrentCumulative','salesLastYearCumulative','salesCumulativeRate','retailCurrentMonth','retailLastYearMonth','retailMonthRate','retailCurrentCumulative','retailLastYearCumulative','retailCumulativeRate','retailRatio','revenueCurrentMonth','revenueLastYearMonth','revenueMonthRate','revenueCurrentCumulative','revenueLastYearCumulative','revenueCumulativeRate','roomCurrentMonth','foodCurrentMonth','goodsCurrentMonth','sourceSheet']; localStorage.setItem('northstar.visibleColumns', JSON.stringify(keys)); return {visibleColumns: keys.length}; })()" | tee -a "$LOG"; then
+if agent-browser eval "(() => { const keys = ['companyScale','flags','salesPrevMonth','salesCurrentMonth','salesLastYearMonth','salesMonthRate','salesPrevCumulative','salesLastYearPrevCumulative','salesCurrentCumulative','salesLastYearCumulative','salesCumulativeRate','retailPrevMonth','retailCurrentMonth','retailLastYearMonth','retailMonthRate','retailPrevCumulative','retailLastYearPrevCumulative','retailCurrentCumulative','retailLastYearCumulative','retailCumulativeRate','retailRatio','roomPrevMonth','roomCurrentMonth','roomLastYearMonth','roomMonthRate','roomPrevCumulative','roomCurrentCumulative','roomLastYearCumulative','roomCumulativeRate','foodPrevMonth','foodCurrentMonth','foodLastYearMonth','foodMonthRate','foodPrevCumulative','foodCurrentCumulative','foodLastYearCumulative','foodCumulativeRate','goodsPrevMonth','goodsCurrentMonth','goodsLastYearMonth','goodsMonthRate','goodsPrevCumulative','goodsCurrentCumulative','goodsLastYearCumulative','goodsCumulativeRate','sourceSheet']; localStorage.setItem('northstar.visibleColumns', JSON.stringify(keys)); return {visibleColumns: keys.length}; })()" | tee -a "$LOG"; then
   record_step "prepare_columns" "pass" "" ""
 else
   record_step "prepare_columns" "fail" "failed to set visible columns in localStorage" "打开页面后 F12 Console 执行：localStorage.getItem('northstar.visibleColumns')"
@@ -170,6 +171,13 @@ agent-browser eval "(() => { const items = Array.from(document.querySelectorAll(
 agent-browser find role button click --name "完成" | tee -a "$LOG" || true
 agent-browser wait --load networkidle | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/03_after_import.png" | tee -a "$LOG" || true
+
+echo ">>> Collecting tab row counts..." | tee -a "$LOG"
+if agent-browser eval "(async () => { const tabs = ['全部','批发','零售','住宿','餐饮']; const out = []; for (const name of tabs) { const el = Array.from(document.querySelectorAll('[role=tab]')).find(x => (x.textContent||'').trim() === name); if (!el) { out.push({ tab: name, ok: false, error: 'tab not found' }); continue; } el.click(); await new Promise(r => setTimeout(r, 600)); const rows = document.querySelectorAll('tbody tr').length; const totalText = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(t => t.startsWith('共 ') && t.includes(' 家企业')) || ''; out.push({ tab: name, ok: true, rows, totalText }); } return { collectedAt: new Date().toISOString(), items: out }; })()" --json >"$TAB_COUNTS"; then
+  record_step "tab_counts" "pass" "" ""
+else
+  record_step "tab_counts" "fail" "采集 tab 行数失败（页面结构变化/脚本异常）" "导入后手动切换“全部/批发/零售/住宿/餐饮”并观察是否有数据"
+fi
 
 echo ">>> Extracting companies table (before modifications)..." | tee -a "$LOG"
 agent-browser find role tab click --name "全部" | tee -a "$LOG" || true
@@ -245,6 +253,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --ui-before "$UI_BEFORE" \
   --ui-after "$UI_AFTER" \
   --import-events "$IMPORT_EVENTS" \
+  --tab-counts "$TAB_COUNTS" \
   --steps "$STEPS_JSON" \
   --actions "$ACTION_RESULTS_JSON" \
   --console "$CONSOLE_LOG" \
@@ -256,24 +265,29 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
 REPORT_RC=$?
 set -e
 
-cp -f "$REPORT_HTML" "$RESULTS_ROOT/report.html"
 cp -f "$META" "$RESULTS_ROOT/meta.json"
-for f in \
-  missing_before.json \
-  mismatches_before.json \
-  missing_export.json \
-  mismatches_export.json \
-  completeness_cases.json \
-  completeness_summary.json \
-  missing_codes_by_sheet.json \
-  derived_column_coverage.json \
-  action_export_checks.json
-do
-  if [[ -f "$RUN_DIR/$f" ]]; then
-    cp -f "$RUN_DIR/$f" "$RESULTS_ROOT/$f"
-  fi
-done
 ln -snf "$(basename "$RUN_DIR")" "$RESULTS_ROOT/latest"
+ln -snf "$(basename "$RUN_DIR")/screenshots" "$RESULTS_ROOT/screenshots"
+
+echo ">>> Generating root report (tests/e2e-result/report.html) with stable latest links..." | tee -a "$LOG"
+pushd "$RESULTS_ROOT" >/dev/null
+python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
+  --base-url "$BASE_URL" \
+  --input-xlsx "$INPUT_XLSX" \
+  --export-xlsx "latest/export.xlsx" \
+  --ui-before "latest/ui_companies_before.json" \
+  --ui-after "latest/ui_companies_after.json" \
+  --import-events "latest/import_events.json" \
+  --tab-counts "latest/tab_counts.json" \
+  --steps "latest/steps.json" \
+  --actions "latest/actions_result.json" \
+  --console "latest/browser_console.txt" \
+  --errors "latest/browser_errors.txt" \
+  --trace "latest/trace.zip" \
+  --video "latest/run.webm" \
+  --screenshots "screenshots" \
+  --out "report.html" || true
+popd >/dev/null
 
 echo "" | tee -a "$LOG"
 echo "OK: Report: $RESULTS_ROOT/report.html" | tee -a "$LOG"

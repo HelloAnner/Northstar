@@ -29,6 +29,11 @@ func (h *Handler) Optimize(c *gin.Context) {
 		return
 	}
 
+	// 统一使用整数目标
+	for k, v := range req.Targets {
+		req.Targets[k] = math.Round(v)
+	}
+
 	year, month, err := h.store.GetCurrentYearMonth()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前年月失败"})
@@ -54,6 +59,7 @@ func (h *Handler) Optimize(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "计算指标失败"})
 		return
 	}
+	roundIndicatorGroupsInPlace(groups)
 
 	c.JSON(http.StatusOK, gin.H{
 		"year":   year,
@@ -469,7 +475,7 @@ func scaleAcrossWRAndAC(st *store.Store, year, month int, field string, wrSum fl
 	if totalSum == 0 {
 		perRow := 0.0
 		if target > 0 {
-			perRow = target / float64(totalCount)
+			perRow = math.Round(target / float64(totalCount))
 		}
 		if wrCount > 0 {
 			if err := st.Exec(
@@ -493,7 +499,7 @@ func scaleAcrossWRAndAC(st *store.Store, year, month int, field string, wrSum fl
 	factor := target / totalSum
 	if wrCount > 0 {
 		if err := st.Exec(
-			fmt.Sprintf("UPDATE wholesale_retail SET %s = %s * ? WHERE data_year = ? AND data_month = ?", field, field),
+			fmt.Sprintf("UPDATE wholesale_retail SET %s = ROUND(%s * ?, 0) WHERE data_year = ? AND data_month = ?", field, field),
 			factor, year, month,
 		); err != nil {
 			return err
@@ -501,7 +507,7 @@ func scaleAcrossWRAndAC(st *store.Store, year, month int, field string, wrSum fl
 	}
 	if acCount > 0 {
 		if err := st.Exec(
-			fmt.Sprintf("UPDATE accommodation_catering SET %s = %s * ? WHERE data_year = ? AND data_month = ?", field, field),
+			fmt.Sprintf("UPDATE accommodation_catering SET %s = ROUND(%s * ?, 0) WHERE data_year = ? AND data_month = ?", field, field),
 			factor, year, month,
 		); err != nil {
 			return err
@@ -521,7 +527,7 @@ func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField s
 	if totalSum == 0 {
 		perRow := 0.0
 		if target > 0 {
-			perRow = target / float64(totalCount)
+			perRow = math.Round(target / float64(totalCount))
 		}
 		if wrCount > 0 {
 			if err := st.Exec(
@@ -545,7 +551,7 @@ func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField s
 	factor := target / totalSum
 	if wrCount > 0 {
 		if err := st.Exec(
-			fmt.Sprintf("UPDATE wholesale_retail SET %s = %s * ? WHERE data_year = ? AND data_month = ?", wrField, wrField),
+			fmt.Sprintf("UPDATE wholesale_retail SET %s = ROUND(%s * ?, 0) WHERE data_year = ? AND data_month = ?", wrField, wrField),
 			factor, year, month,
 		); err != nil {
 			return err
@@ -554,7 +560,7 @@ func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField s
 	if acCount > 0 {
 		if err := st.Exec(
 			fmt.Sprintf(
-				"UPDATE accommodation_catering SET %s = %s * ?, %s = %s * ? WHERE data_year = ? AND data_month = ?",
+				"UPDATE accommodation_catering SET %s = ROUND(%s * ?, 0), %s = ROUND(%s * ?, 0) WHERE data_year = ? AND data_month = ?",
 				acFoodField, acFoodField, acGoodsField, acGoodsField,
 			),
 			factor, factor, year, month,
@@ -583,7 +589,7 @@ func scaleWRField(st *store.Store, year, month int, industryType string, flagFie
 	if currentSum == 0 {
 		perRow := 0.0
 		if target > 0 {
-			perRow = target / float64(count)
+			perRow = math.Round(target / float64(count))
 		}
 		argsWithValue := append([]interface{}{perRow}, args...)
 		return st.Exec(
@@ -595,7 +601,7 @@ func scaleWRField(st *store.Store, year, month int, industryType string, flagFie
 	factor := target / currentSum
 	argsWithFactor := append([]interface{}{factor}, args...)
 	return st.Exec(
-		fmt.Sprintf("UPDATE wholesale_retail SET %s = %s * ? WHERE %s", field, field, where),
+		fmt.Sprintf("UPDATE wholesale_retail SET %s = ROUND(%s * ?, 0) WHERE %s", field, field, where),
 		argsWithFactor...,
 	)
 }
@@ -616,7 +622,7 @@ func scaleACField(st *store.Store, year, month int, industryType string, field s
 	if currentSum == 0 {
 		perRow := 0.0
 		if target > 0 {
-			perRow = target / float64(count)
+			perRow = math.Round(target / float64(count))
 		}
 		argsWithValue := append([]interface{}{perRow}, args...)
 		return st.Exec(
@@ -628,7 +634,7 @@ func scaleACField(st *store.Store, year, month int, industryType string, field s
 	factor := target / currentSum
 	argsWithFactor := append([]interface{}{factor}, args...)
 	return st.Exec(
-		fmt.Sprintf("UPDATE accommodation_catering SET %s = %s * ? WHERE %s", field, field, where),
+		fmt.Sprintf("UPDATE accommodation_catering SET %s = ROUND(%s * ?, 0) WHERE %s", field, field, where),
 		argsWithFactor...,
 	)
 }

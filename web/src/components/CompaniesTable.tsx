@@ -3,18 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChevronDown, Loader2, Save, Search, SlidersHorizontal } from 'lucide-react'
+import { Loader2, Save, Search } from 'lucide-react'
 
 export interface IndicatorGroup {
   name: string
@@ -33,40 +25,54 @@ interface CompanyRow {
   isEatWearUse?: number
   sourceSheet?: string
 
+  salesPrevMonth?: number
   salesCurrentMonth?: number
   salesLastYearMonth?: number
+  salesPrevCumulative?: number
+  salesLastYearPrevCumulative?: number
   salesCurrentCumulative?: number
   salesLastYearCumulative?: number
   salesMonthRate?: number | null
   salesCumulativeRate?: number | null
 
+  retailPrevMonth?: number
   retailCurrentMonth?: number
   retailLastYearMonth?: number
+  retailPrevCumulative?: number
+  retailLastYearPrevCumulative?: number
   retailCurrentCumulative?: number
   retailLastYearCumulative?: number
   retailMonthRate?: number | null
   retailCumulativeRate?: number | null
   retailRatio?: number | null
 
+  revenuePrevMonth?: number
   revenueCurrentMonth?: number
   revenueLastYearMonth?: number
+  revenuePrevCumulative?: number
   revenueCurrentCumulative?: number
   revenueLastYearCumulative?: number
   revenueMonthRate?: number | null
   revenueCumulativeRate?: number | null
 
+  roomPrevMonth?: number
   roomCurrentMonth?: number
   roomLastYearMonth?: number
+  roomPrevCumulative?: number
   roomCurrentCumulative?: number
   roomLastYearCumulative?: number
 
+  foodPrevMonth?: number
   foodCurrentMonth?: number
   foodLastYearMonth?: number
+  foodPrevCumulative?: number
   foodCurrentCumulative?: number
   foodLastYearCumulative?: number
 
+  goodsPrevMonth?: number
   goodsCurrentMonth?: number
   goodsLastYearMonth?: number
+  goodsPrevCumulative?: number
   goodsCurrentCumulative?: number
   goodsLastYearCumulative?: number
 }
@@ -90,35 +96,37 @@ type EditableField =
   | 'revenueLastYearCumulative'
   | 'revenueMonthRate'
   | 'revenueCumulativeRate'
-  | 'roomCurrentMonth'
-  | 'foodCurrentMonth'
-  | 'goodsCurrentMonth'
 
 type ColumnKey =
   | 'companyScale'
   | 'flags'
+  | 'salesPrevMonth'
   | 'salesCurrentMonth'
   | 'salesLastYearMonth'
+  | 'salesYoYDiff'
+  | 'salesMoMDiff'
+  | 'salesMoMRate'
   | 'salesMonthRate'
+  | 'salesPrevCumulative'
+  | 'salesLastYearPrevCumulative'
   | 'salesCurrentCumulative'
   | 'salesLastYearCumulative'
+  | 'salesCumulativeYoYDiff'
   | 'salesCumulativeRate'
+  | 'retailPrevMonth'
   | 'retailCurrentMonth'
   | 'retailLastYearMonth'
+  | 'retailYoYDiff'
+  | 'retailMoMDiff'
+  | 'retailMoMRate'
   | 'retailMonthRate'
+  | 'retailPrevCumulative'
+  | 'retailLastYearPrevCumulative'
   | 'retailCurrentCumulative'
   | 'retailLastYearCumulative'
+  | 'retailCumulativeYoYDiff'
   | 'retailCumulativeRate'
   | 'retailRatio'
-  | 'revenueCurrentMonth'
-  | 'revenueLastYearMonth'
-  | 'revenueMonthRate'
-  | 'revenueCurrentCumulative'
-  | 'revenueLastYearCumulative'
-  | 'revenueCumulativeRate'
-  | 'roomCurrentMonth'
-  | 'foodCurrentMonth'
-  | 'goodsCurrentMonth'
   | 'sourceSheet'
 
 interface ColumnDef {
@@ -134,51 +142,36 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'companyScale', label: '规模', widthClass: 'w-[72px]', align: 'center' },
   { key: 'flags', label: '标记', widthClass: 'w-[120px]' },
 
-  { key: 'salesCurrentMonth', label: '商品销售额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesLastYearMonth', label: '商品销售额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesMonthRate', label: '商品销售额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesCurrentCumulative', label: '商品销售额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesLastYearCumulative', label: '商品销售额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesCumulativeRate', label: '商品销售额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesPrevMonth', label: '本年-上月', widthClass: 'w-[150px]', align: 'right', kind: 'both' },
+  { key: 'salesCurrentMonth', label: '本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
+  { key: 'salesLastYearMonth', label: '上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
+  { key: 'salesYoYDiff', label: '同比增量(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
+  { key: 'salesMoMDiff', label: '环比增量(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
+  { key: 'salesMoMRate', label: '环比增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
+  { key: 'salesMonthRate', label: '同比增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
+  { key: 'salesPrevCumulative', label: '本年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
+  { key: 'salesLastYearPrevCumulative', label: '上年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
+  { key: 'salesCurrentCumulative', label: '本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'both', editable: true },
+  { key: 'salesLastYearCumulative', label: '上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'both', editable: true },
+  { key: 'salesCumulativeYoYDiff', label: '累计同比增量', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
+  { key: 'salesCumulativeRate', label: '累计同比增速', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
 
+  { key: 'retailPrevMonth', label: '零售额;本年-上月', widthClass: 'w-[150px]', align: 'right', kind: 'wr' },
   { key: 'retailCurrentMonth', label: '零售额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
   { key: 'retailLastYearMonth', label: '零售额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
-  { key: 'retailMonthRate', label: '零售额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailYoYDiff', label: '零售额;同比增量(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'both' },
+  { key: 'retailMoMDiff', label: '零售额;环比增量(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'both' },
+  { key: 'retailMoMRate', label: '零售额;环比增速(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'both' },
+  { key: 'retailMonthRate', label: '零售额;同比增速(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailPrevCumulative', label: '零售额;本年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
+  { key: 'retailLastYearPrevCumulative', label: '零售额;上年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
   { key: 'retailCurrentCumulative', label: '零售额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
   { key: 'retailLastYearCumulative', label: '零售额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'retailCumulativeRate', label: '零售额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailCumulativeYoYDiff', label: '零售额;累计同比增量', widthClass: 'w-[170px]', align: 'right', kind: 'wr' },
+  { key: 'retailCumulativeRate', label: '零售额;累计同比增速', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
   { key: 'retailRatio', label: '零销比(%)', widthClass: 'w-[110px]', align: 'right', kind: 'wr' },
 
-  { key: 'revenueCurrentMonth', label: '营业额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueLastYearMonth', label: '营业额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueMonthRate', label: '营业额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueCurrentCumulative', label: '营业额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueLastYearCumulative', label: '营业额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueCumulativeRate', label: '营业额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
-
-  { key: 'roomCurrentMonth', label: '本月客房收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'foodCurrentMonth', label: '本月餐费收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'goodsCurrentMonth', label: '本月商品销售额', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
-
   { key: 'sourceSheet', label: '来源表', widthClass: 'w-[120px]' },
-]
-
-const DEFAULT_VISIBLE: ColumnKey[] = [
-  'companyScale',
-  'flags',
-  'salesCurrentMonth',
-  'retailCurrentMonth',
-  'revenueCurrentMonth',
-  'roomCurrentMonth',
-  'foodCurrentMonth',
-  'goodsCurrentMonth',
-  'retailMonthRate',
-  'salesMonthRate',
-  'revenueMonthRate',
-  'retailCurrentCumulative',
-  'salesCurrentCumulative',
-  'revenueCurrentCumulative',
-  'sourceSheet',
 ]
 
 export default function CompaniesTable(props: {
@@ -195,16 +188,6 @@ export default function CompaniesTable(props: {
     'all'
   )
   const [keyword, setKeyword] = useState('')
-  const [visible, setVisible] = useState<ColumnKey[]>(() => {
-    try {
-      const raw = localStorage.getItem('northstar.visibleColumns')
-      if (!raw) return DEFAULT_VISIBLE
-      const parsed = JSON.parse(raw) as ColumnKey[]
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_VISIBLE
-    } catch {
-      return DEFAULT_VISIBLE
-    }
-  })
 
   const searchTimer = useRef<number | null>(null)
   const [savingCount, setSavingCount] = useState(0)
@@ -213,10 +196,7 @@ export default function CompaniesTable(props: {
     props.onSavingChange(savingCount > 0)
   }, [savingCount, props])
 
-  const columns = useMemo(() => {
-    const selected = new Set(visible)
-    return ALL_COLUMNS.filter((c) => selected.has(c.key))
-  }, [visible])
+  const columns = useMemo(() => ALL_COLUMNS, [])
 
   const load = async (opts?: { keyword?: string; industryType?: string }) => {
     setLoading(true)
@@ -243,22 +223,6 @@ export default function CompaniesTable(props: {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [industryType, props.reloadToken])
-
-  const persistVisible = (next: ColumnKey[]) => {
-    setVisible(next)
-    try {
-      localStorage.setItem('northstar.visibleColumns', JSON.stringify(next))
-    } catch {
-      // ignore
-    }
-  }
-
-  const toggleColumn = (key: ColumnKey, checked: boolean) => {
-    const next = new Set(visible)
-    if (checked) next.add(key)
-    else next.delete(key)
-    persistVisible(Array.from(next))
-  }
 
   const handleKeywordChange = (v: string) => {
     setKeyword(v)
@@ -288,8 +252,6 @@ export default function CompaniesTable(props: {
       setSavingCount((c) => Math.max(0, c - 1))
     }
   }
-
-  const visibleSet = useMemo(() => new Set(visible), [visible])
 
   return (
     <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
@@ -331,39 +293,6 @@ export default function CompaniesTable(props: {
                 className="pl-9"
               />
             </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  列
-                  <ChevronDown className="h-4 w-4 opacity-70" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>显示字段</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <div className="max-h-72 overflow-auto">
-                  {ALL_COLUMNS.map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.key}
-                      checked={visibleSet.has(col.key)}
-                      onCheckedChange={(checked) => toggleColumn(col.key, Boolean(checked))}
-                    >
-                      {col.label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </div>
-                <DropdownMenuSeparator />
-                <Button
-                  variant="ghost"
-                  className="h-9 w-full justify-start px-2"
-                  onClick={() => persistVisible(DEFAULT_VISIBLE)}
-                >
-                  恢复默认
-                </Button>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </CardHeader>
@@ -379,9 +308,11 @@ export default function CompaniesTable(props: {
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
-                        className={`${col.widthClass ?? ''} whitespace-nowrap text-center`}
+                        className={`${col.widthClass ?? ''} whitespace-nowrap ${
+                          col.align === 'right' ? 'text-right' : col.align === 'left' ? 'text-left' : 'text-center'
+                        }`}
                         style={{
-                          textAlign: 'center',
+                          textAlign: col.align ?? 'center',
                         }}
                       >
                         {col.label}
@@ -424,8 +355,10 @@ export default function CompaniesTable(props: {
                         {columns.map((col) => (
                           <TableCell
                             key={col.key}
-                            className="align-middle whitespace-nowrap text-center"
-                            style={{ textAlign: 'center' }}
+                            className={`align-middle whitespace-nowrap ${
+                              col.align === 'right' ? 'text-right' : col.align === 'left' ? 'text-left' : 'text-center'
+                            }`}
+                            style={{ textAlign: col.align ?? 'center' }}
                           >
                             <Cell
                               row={row}
@@ -507,19 +440,90 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
 
   const editable = col.editable && isEditableForRow(row, key)
   if (editable) {
-    const field = key as EditableField
-    const current = (row as any)[key] as number | undefined
+    const field = resolveEditableField(row, key)
+    const current = (row as any)[field] as number | undefined
     return <EditableNumber value={current} onCommit={(v) => props.onUpdate(field, v)} />
+  }
+
+  const calcRatePercent = (cur?: number | null, last?: number | null) => {
+    if (cur === null || cur === undefined) return null
+    if (last === null || last === undefined) return null
+    if (last === 0) return -100
+    return (cur / last - 1) * 100
+  }
+
+  const calcDiff = (cur?: number | null, base?: number | null) => {
+    if (cur === null || cur === undefined) return null
+    if (base === null || base === undefined) return null
+    return cur - base
+  }
+
+  const salesPrev = row.kind === 'ac' ? row.revenuePrevMonth : row.salesPrevMonth
+  const salesCur = row.kind === 'ac' ? row.revenueCurrentMonth : row.salesCurrentMonth
+  const salesLast = row.kind === 'ac' ? row.revenueLastYearMonth : row.salesLastYearMonth
+  const salesCurCum = row.kind === 'ac' ? row.revenueCurrentCumulative : row.salesCurrentCumulative
+  const salesLastCum = row.kind === 'ac' ? row.revenueLastYearCumulative : row.salesLastYearCumulative
+
+  if (key === 'salesYoYDiff') {
+    const v = calcDiff(salesCur, salesLast)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
+  }
+  if (key === 'salesMoMDiff') {
+    const v = calcDiff(salesCur, salesPrev)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
+  }
+  if (key === 'salesMoMRate') {
+    const v = calcRatePercent(salesCur, salesPrev)
+    return v === null ? <span className="text-muted-foreground">-</span> : <RateValue value={v} />
+  }
+  if (key === 'salesCumulativeYoYDiff') {
+    const v = calcDiff(salesCurCum, salesLastCum)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
+  }
+
+  if (key === 'retailYoYDiff') {
+    const v = calcDiff(row.retailCurrentMonth, row.retailLastYearMonth)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
+  }
+  if (key === 'retailMoMDiff') {
+    const v = calcDiff(row.retailCurrentMonth, row.retailPrevMonth)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
+  }
+  if (key === 'retailMoMRate') {
+    const v = calcRatePercent(row.retailCurrentMonth, row.retailPrevMonth)
+    return v === null ? <span className="text-muted-foreground">-</span> : <RateValue value={v} />
+  }
+  if (key === 'retailCumulativeYoYDiff') {
+    const v = calcDiff(row.retailCurrentCumulative, row.retailLastYearCumulative)
+    return v === null ? <span className="text-muted-foreground">-</span> : <NumberValue value={v} />
   }
 
   let v = (row as any)[key] as number | null | undefined
   if ((v === null || v === undefined) && row.kind === 'ac') {
-    // 住餐表字段命名不同：goods* 对应 “商品销售额” 口径
+    // “销售额”列在住餐口径下对应 “营业额”
+    if (key === 'salesPrevMonth') {
+      v = row.revenuePrevMonth
+    }
+    if (key === 'salesCurrentMonth') {
+      v = row.revenueCurrentMonth
+    }
     if (key === 'salesLastYearMonth') {
-      v = row.goodsLastYearMonth
+      v = row.revenueLastYearMonth
+    }
+    if (key === 'salesPrevCumulative') {
+      v = row.revenuePrevCumulative
+    }
+    if (key === 'salesCurrentCumulative') {
+      v = row.revenueCurrentCumulative
     }
     if (key === 'salesLastYearCumulative') {
-      v = row.goodsLastYearCumulative
+      v = row.revenueLastYearCumulative
+    }
+    if (key === 'salesMonthRate') {
+      v = row.revenueMonthRate
+    }
+    if (key === 'salesCumulativeRate') {
+      v = row.revenueCumulativeRate
     }
   }
   if (v === null || v === undefined) {
@@ -533,12 +537,12 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
 
 function isEditableForRow(row: CompanyRow, key: ColumnKey) {
   const allowWR: Partial<Record<ColumnKey, boolean>> = {
-    salesCurrentMonth: row.kind === 'wr',
-    salesLastYearMonth: row.kind === 'wr',
-    salesCurrentCumulative: row.kind === 'wr',
-    salesLastYearCumulative: row.kind === 'wr',
-    salesMonthRate: row.kind === 'wr',
-    salesCumulativeRate: row.kind === 'wr',
+    salesCurrentMonth: true,
+    salesLastYearMonth: true,
+    salesCurrentCumulative: true,
+    salesLastYearCumulative: true,
+    salesMonthRate: true,
+    salesCumulativeRate: true,
     retailCurrentMonth: true,
     retailLastYearMonth: true,
     retailMonthRate: row.kind === 'wr',
@@ -547,19 +551,32 @@ function isEditableForRow(row: CompanyRow, key: ColumnKey) {
     retailCumulativeRate: row.kind === 'wr',
   }
   const allowAC: Partial<Record<ColumnKey, boolean>> = {
-    revenueCurrentMonth: row.kind === 'ac',
-    revenueLastYearMonth: row.kind === 'ac',
-    revenueCurrentCumulative: row.kind === 'ac',
-    revenueLastYearCumulative: row.kind === 'ac',
-    revenueMonthRate: row.kind === 'ac',
-    revenueCumulativeRate: row.kind === 'ac',
-    roomCurrentMonth: row.kind === 'ac',
-    foodCurrentMonth: row.kind === 'ac',
-    goodsCurrentMonth: row.kind === 'ac',
     retailCurrentMonth: true,
     retailLastYearMonth: true,
   }
   return Boolean(allowWR[key] || allowAC[key])
+}
+
+function resolveEditableField(row: CompanyRow, key: ColumnKey): EditableField {
+  if (row.kind !== 'ac') {
+    return key as EditableField
+  }
+  switch (key) {
+    case 'salesCurrentMonth':
+      return 'revenueCurrentMonth'
+    case 'salesLastYearMonth':
+      return 'revenueLastYearMonth'
+    case 'salesCurrentCumulative':
+      return 'revenueCurrentCumulative'
+    case 'salesLastYearCumulative':
+      return 'revenueLastYearCumulative'
+    case 'salesMonthRate':
+      return 'revenueMonthRate'
+    case 'salesCumulativeRate':
+      return 'revenueCumulativeRate'
+    default:
+      return key as EditableField
+  }
 }
 
 function EditableNumber(props: { value?: number; onCommit: (v: number) => void }) {
@@ -576,14 +593,21 @@ function EditableNumber(props: { value?: number; onCommit: (v: number) => void }
   }, [props.value, busy])
 
   const commit = async () => {
-    const v = Number(draft)
-    if (!Number.isFinite(v)) {
+    const parsed = Number(draft)
+    if (!Number.isFinite(parsed)) {
       setDraft((props.value ?? 0).toString())
       return
     }
-    if (props.value === v) return
+    const v = Math.round(parsed)
+    if (props.value === v) {
+      if (draft !== String(v)) {
+        setDraft(String(v))
+      }
+      return
+    }
     setBusy(true)
     try {
+      setDraft(String(v))
       await Promise.resolve(props.onCommit(v))
     } finally {
       setBusy(false)
@@ -609,13 +633,13 @@ function EditableNumber(props: { value?: number; onCommit: (v: number) => void }
 }
 
 function NumberValue({ value }: { value: number }) {
-  const s = value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const s = Math.round(value).toLocaleString()
   return <span className="font-mono text-sm tabular-nums">{s}</span>
 }
 
 function RateValue({ value }: { value: number }) {
   const positive = value >= 0
-  const s = `${value.toFixed(2)}%`
+  const s = `${Math.round(value)}%`
   return (
     <span className={`font-mono text-sm tabular-nums ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
       {s}

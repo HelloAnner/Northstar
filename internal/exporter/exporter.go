@@ -106,7 +106,31 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 		return err
 	}
 
-	if err := e.rewriteFixedTotals(f); err != nil {
+	if err := fillEatWearUseSheetByRowOrder(f, "吃穿用", wrRecords); err != nil {
+		return err
+	}
+	if err := fillMicroSmallSheetByRowOrder(f, "小微", wrRecords); err != nil {
+		return err
+	}
+	if err := fillEatWearUseExcludedSheetByRowOrder(f, "吃穿用（剔除）", wrRecords); err != nil {
+		return err
+	}
+
+	wh, re, acc, cat, err := e.rewriteFixedTotals(f)
+	if err != nil {
+		return err
+	}
+
+	indicatorIndex, err := calculateIndicatorIndex(e.store, opts.Year, opts.Month)
+	if err != nil {
+		return err
+	}
+
+	if err := fillSocialRetailSheetAndMaterialize(f, e.store, opts.Year, opts.Month, indicatorIndex); err != nil {
+		return err
+	}
+
+	if err := rewriteFixedSummarySheet(f, opts.Year, opts.Month, wh, re, acc, cat, indicatorIndex, wrRecords, acRecords); err != nil {
 		return err
 	}
 
@@ -179,45 +203,41 @@ type wrSums struct {
 	retailLastCum float64
 }
 
-func (e *Exporter) rewriteFixedTotals(f *excelize.File) error {
+func (e *Exporter) rewriteFixedTotals(f *excelize.File) (wrSums, wrSums, wrSums, wrSums, error) {
 	wh, err := sumWholesaleRetail(f, "批发")
 	if err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	re, err := sumWholesaleRetail(f, "零售")
 	if err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	acc, err := sumAccommodationCatering(f, "住宿")
 	if err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	cat, err := sumAccommodationCatering(f, "餐饮")
 	if err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 
 	if err := rewriteTotalsWholesaleRetail(f, "批发", wh); err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	if err := rewriteTotalsWholesaleRetail(f, "零售", re); err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	if err := rewriteTotalsAccommodationCatering(f, "住宿", acc); err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 	if err := rewriteTotalsAccommodationCatering(f, "餐饮", cat); err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
 
 	if err := rewriteOverallRetailAreaOnWholesale(f, wh, re, acc, cat); err != nil {
-		return err
+		return wrSums{}, wrSums{}, wrSums{}, wrSums{}, err
 	}
-	if err := rewriteFixedSummarySheet(f, wh, re, acc, cat); err != nil {
-		return err
-	}
-
-	return nil
+	return wh, re, acc, cat, nil
 }
 
 // ---------- 行写入：批零（批发/零售/批零总表） ----------
@@ -236,16 +256,28 @@ func writeWRRowAt(f *excelize.File, sheet string, row int, r *model.WholesaleRet
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), r.SalesCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), math.Round(r.SalesCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), r.SalesCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("E%d", row), math.Round(r.SalesLastYearMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), r.RetailCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), math.Round(r.SalesCurrentCumulative)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), r.RetailCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("H%d", row), math.Round(r.SalesLastYearCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), math.Round(r.RetailCurrentMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("K%d", row), math.Round(r.RetailLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), math.Round(r.RetailCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), math.Round(r.RetailLastYearCumulative)); err != nil {
 		return err
 	}
 
@@ -297,10 +329,16 @@ func writeACRowAt(
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), r.RevenueCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), math.Round(r.RevenueCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), r.RevenueCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("E%d", row), math.Round(r.RevenueLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), math.Round(r.RevenueCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("H%d", row), math.Round(r.RevenueLastYearCumulative)); err != nil {
 		return err
 	}
 	if err := setCellValue(f, sheet, fmt.Sprintf("F%d", row), ratePercent(r.RevenueCurrentMonth, r.RevenueLastYearMonth)); err != nil {
@@ -310,39 +348,56 @@ func writeACRowAt(
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), r.RoomCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), math.Round(r.RoomCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), r.RoomCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("K%d", row), math.Round(r.RoomLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), math.Round(r.RoomCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), math.Round(r.RoomLastYearCumulative)); err != nil {
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), r.FoodCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), math.Round(r.FoodCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), r.FoodCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("O%d", row), math.Round(r.FoodLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), math.Round(r.FoodCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("Q%d", row), math.Round(r.FoodLastYearCumulative)); err != nil {
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("R%d", row), r.GoodsCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("R%d", row), math.Round(r.GoodsCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("T%d", row), r.GoodsCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("S%d", row), math.Round(r.GoodsLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("T%d", row), math.Round(r.GoodsCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("U%d", row), math.Round(r.GoodsLastYearCumulative)); err != nil {
 		return err
 	}
 
 	// 模板右侧 V-Y：衍生“零售额”（餐费 + 商品销售）
-	if err := setCellValue(f, sheet, fmt.Sprintf("V%d", row), retailCur); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("V%d", row), math.Round(retailCur)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("X%d", row), retailCurCum); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("W%d", row), math.Round(retailLast)); err != nil {
 		return err
 	}
-	// W/Y（上年）模板中已有历史值；为保证一致性与稳定定位，这里也回写一次
-	if err := setCellValue(f, sheet, fmt.Sprintf("W%d", row), retailLast); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("X%d", row), math.Round(retailCurCum)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("Y%d", row), retailLastCum); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("Y%d", row), math.Round(retailLastCum)); err != nil {
 		return err
 	}
 
@@ -503,10 +558,16 @@ func writeACTotalRowAt(f *excelize.File, sheet string, row int, r *model.Accommo
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), r.RevenueCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), math.Round(r.RevenueCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), r.RevenueCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("E%d", row), math.Round(r.RevenueLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), math.Round(r.RevenueCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("H%d", row), math.Round(r.RevenueLastYearCumulative)); err != nil {
 		return err
 	}
 	if err := setCellValue(f, sheet, fmt.Sprintf("F%d", row), ratePercent(r.RevenueCurrentMonth, r.RevenueLastYearMonth)); err != nil {
@@ -516,24 +577,42 @@ func writeACTotalRowAt(f *excelize.File, sheet string, row int, r *model.Accommo
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), r.RoomCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), math.Round(r.RoomCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), r.RoomCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("K%d", row), math.Round(r.RoomLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), math.Round(r.RoomCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), math.Round(r.RoomLastYearCumulative)); err != nil {
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), r.FoodCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), math.Round(r.FoodCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), r.FoodCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("O%d", row), math.Round(r.FoodLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), math.Round(r.FoodCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("Q%d", row), math.Round(r.FoodLastYearCumulative)); err != nil {
 		return err
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("R%d", row), r.GoodsCurrentMonth); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("R%d", row), math.Round(r.GoodsCurrentMonth)); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("T%d", row), r.GoodsCurrentCumulative); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("S%d", row), math.Round(r.GoodsLastYearMonth)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("T%d", row), math.Round(r.GoodsCurrentCumulative)); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("U%d", row), math.Round(r.GoodsLastYearCumulative)); err != nil {
 		return err
 	}
 
@@ -779,83 +858,6 @@ func rewriteOverallRetailAreaOnWholesale(f *excelize.File, wh, re, acc, cat wrSu
 	return nil
 }
 
-func rewriteFixedSummarySheet(f *excelize.File, wh, re, acc, cat wrSums) error {
-	summary := "汇总表（定）"
-	ws := "批发"
-	whMax := wh.maxRow
-	overallRow := whMax + 5
-
-	overallCur, _ := getCellFloat(f, ws, fmt.Sprintf("J%d", overallRow))
-	overallLast, _ := getCellFloat(f, ws, fmt.Sprintf("K%d", overallRow))
-	overallCurCum, _ := getCellFloat(f, ws, fmt.Sprintf("M%d", overallRow))
-	overallLastCum, _ := getCellFloat(f, ws, fmt.Sprintf("N%d", overallRow))
-
-	if err := setCellValue(f, summary, "G4", overallCur/10.0); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "H4", overallLast/10.0); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "I4", overallCurCum/10.0); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "J4", overallLastCum/10.0); err != nil {
-		return err
-	}
-
-	whGrowthMonth, _ := getCellFloat(f, "批发", fmt.Sprintf("E%d", whMax+2))
-	whGrowthCum, _ := getCellFloat(f, "批发", fmt.Sprintf("H%d", whMax+2))
-	reGrowthMonth, _ := getCellFloat(f, "零售", fmt.Sprintf("E%d", re.maxRow+2))
-	reGrowthCum, _ := getCellFloat(f, "零售", fmt.Sprintf("H%d", re.maxRow+2))
-	accGrowthMonth, _ := getCellFloat(f, "住宿", fmt.Sprintf("E%d", acc.maxRow+2))
-	accGrowthCum, _ := getCellFloat(f, "住宿", fmt.Sprintf("H%d", acc.maxRow+2))
-	catGrowthMonth, _ := getCellFloat(f, "餐饮", fmt.Sprintf("E%d", cat.maxRow+2))
-	catGrowthCum, _ := getCellFloat(f, "餐饮", fmt.Sprintf("H%d", cat.maxRow+2))
-
-	if err := setCellValue(f, summary, "K4", roundHalfUp(whGrowthMonth, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "L4", roundHalfUp(whGrowthCum, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "M4", roundHalfUp(reGrowthMonth, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "N4", roundHalfUp(reGrowthCum, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "O4", roundHalfUp(accGrowthMonth, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "P4", roundHalfUp(accGrowthCum, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "Q4", roundHalfUp(catGrowthMonth, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "R4", roundHalfUp(catGrowthCum, 1)); err != nil {
-		return err
-	}
-
-	monthRate := -100.0
-	if overallLast != 0 {
-		monthRate = (overallCur/overallLast - 1) * 100.0
-	}
-	cumRate := -100.0
-	if overallLastCum != 0 {
-		cumRate = (overallCurCum/overallLastCum - 1) * 100.0
-	}
-
-	if err := setCellValue(f, summary, "S4", roundHalfUp(monthRate, 1)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, summary, "T4", roundHalfUp(cumRate, 1)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // ---------- 通用工具函数 ----------
 
 func findMaxDataRow(f *excelize.File, sheet, col string, startRow int) (int, error) {
@@ -900,7 +902,11 @@ func getCellFloat(f *excelize.File, sheet, cell string) (float64, error) {
 }
 
 func setCellValue(f *excelize.File, sheet, cell string, value interface{}) error {
-	return f.SetCellValue(sheet, cell, value)
+	if err := f.SetCellValue(sheet, cell, value); err != nil {
+		return err
+	}
+	_ = f.SetCellFormula(sheet, cell, "")
+	return nil
 }
 
 func roundHalfUp(v float64, digits int) float64 {
@@ -919,5 +925,5 @@ func ratePercent(cur, last float64) float64 {
 	if last == 0 {
 		return -100.0
 	}
-	return roundHalfUp((cur/last-1.0)*100.0, 2)
+	return math.Round((cur/last-1.0)*100.0)
 }

@@ -107,3 +107,4 @@ bower_components
 tests/e2e-result/
 **/fixtures
 northstar
+**/*.zip

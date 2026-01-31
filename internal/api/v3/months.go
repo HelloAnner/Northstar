@@ -91,6 +91,7 @@ func (h *Handler) SelectMonth(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "计算指标失败"})
 		return
 	}
+	roundIndicatorGroupsInPlace(groups)
 	c.JSON(http.StatusOK, gin.H{
 		"status": StatusResponse{
 			Initialized:    wrCount+acCount > 0,

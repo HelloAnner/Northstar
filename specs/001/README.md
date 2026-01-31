@@ -44,7 +44,7 @@ Northstar 是一个经济数据统计分析工具，用于解决社零额增长�
 | macOS | `northstar` binary |
 | Linux | `northstar` binary |
 
-启动后自动打开浏览器，访问 `http://localhost:8080`
+启动后自动打开浏览器，访问 `http://localhost:20261`
 
 ## 页面结构
 

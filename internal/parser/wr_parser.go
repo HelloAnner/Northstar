@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -99,8 +101,14 @@ func (p *WRParser) parseWRRow(row []string, mappings map[int]FieldMapping, sheet
 		SourceSheet: sheetName,
 	}
 
-	// 遍历所有映射
-	for colIdx, mapping := range mappings {
+	// 遍历所有映射（按列序，避免 map 遍历顺序导致覆盖不稳定）
+	cols := make([]int, 0, len(mappings))
+	for colIdx := range mappings {
+		cols = append(cols, colIdx)
+	}
+	sort.Ints(cols)
+	for _, colIdx := range cols {
+		mapping := mappings[colIdx]
 		if colIdx >= len(row) {
 			continue
 		}
@@ -241,5 +249,5 @@ func parseFloat(s string) float64 {
 	s = strings.ReplaceAll(s, "％", "%")
 	s = strings.ReplaceAll(s, "%", "")
 	f, _ := strconv.ParseFloat(s, 64)
-	return f
+	return math.Round(f)
 }

@@ -21,7 +21,7 @@
 northstar.exe
 ```
 
-启动后会自动在浏览器打开 `http://localhost:8080`
+启动后会自动在浏览器打开 `http://localhost:20261`
 
 ### 自定义配置
 
@@ -29,7 +29,7 @@ northstar.exe
 
 ```toml
 [server]
-port = 8080
+port = 20261
 dev_mode = false
 
 [data]
@@ -45,7 +45,7 @@ min_growth = -0.3
 ### 命令行参数
 
 ```bash
-./northstar -port 9000    # 指定端口
+./northstar -port 9000    # 指定端口（仅当 config.toml 未显式配置 port 时生效）
 ./northstar -dev          # 开发模式（不自动打开浏览器）
 ```
 
