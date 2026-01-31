@@ -31,23 +31,27 @@ func NewExporter(store *store.Store, templatePath string) *Exporter {
 
 // ExportOptions 导出选项
 type ExportOptions struct {
-	Year  int
-	Month int
+	Year     int
+	Month    int
+	Progress func(ProgressEvent)
 }
 
 // Export 导出 Excel
 func (e *Exporter) Export(opts ExportOptions) (*excelize.File, error) {
+	reportProgress(opts.Progress, 2, "打开导出模板")
 	f, err := e.openTemplateWorkbook()
 	if err != nil {
 		return nil, err
 	}
 
+	reportProgress(opts.Progress, 12, "填充导出数据")
 	if err := e.fillTemplateWorkbook(f, opts); err != nil {
 		_ = f.Close()
 		return nil, err
 	}
 
 	f.SetActiveSheet(0)
+	reportProgress(opts.Progress, 98, "导出内容已生成")
 	return f, nil
 }
 
@@ -83,6 +87,7 @@ func (e *Exporter) openTemplateWorkbook() (*excelize.File, error) {
 }
 
 func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) error {
+	reportProgress(opts.Progress, 18, "读取批零数据")
 	wrRecords, err := e.store.GetWRByYearMonth(store.WRQueryOptions{
 		DataYear:  &opts.Year,
 		DataMonth: &opts.Month,
@@ -91,6 +96,7 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 		return fmt.Errorf("读取批零数据失败: %w", err)
 	}
 
+	reportProgress(opts.Progress, 26, "读取住餐数据")
 	acRecords, err := e.store.GetACByYearMonth(store.ACQueryOptions{
 		DataYear:  &opts.Year,
 		DataMonth: &opts.Month,
@@ -99,6 +105,7 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 		return fmt.Errorf("读取住餐数据失败: %w", err)
 	}
 
+	reportProgress(opts.Progress, 40, "写入批零/住餐/总表")
 	if err := e.fillWholesaleRetailSheets(f, wrRecords); err != nil {
 		return err
 	}
@@ -106,6 +113,7 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 		return err
 	}
 
+	reportProgress(opts.Progress, 60, "写入分类明细表")
 	if err := fillEatWearUseSheetByRowOrder(f, "吃穿用", wrRecords); err != nil {
 		return err
 	}
@@ -116,20 +124,24 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 		return err
 	}
 
+	reportProgress(opts.Progress, 74, "重算固定汇总区")
 	wh, re, acc, cat, err := e.rewriteFixedTotals(f)
 	if err != nil {
 		return err
 	}
 
+	reportProgress(opts.Progress, 82, "计算指标索引")
 	indicatorIndex, err := calculateIndicatorIndex(e.store, opts.Year, opts.Month)
 	if err != nil {
 		return err
 	}
 
+	reportProgress(opts.Progress, 90, "写入社会消费品零售")
 	if err := fillSocialRetailSheetAndMaterialize(f, e.store, opts.Year, opts.Month, indicatorIndex); err != nil {
 		return err
 	}
 
+	reportProgress(opts.Progress, 96, "写入汇总页")
 	if err := rewriteFixedSummarySheet(f, opts.Year, opts.Month, wh, re, acc, cat, indicatorIndex, wrRecords, acRecords); err != nil {
 		return err
 	}
@@ -925,5 +937,5 @@ func ratePercent(cur, last float64) float64 {
 	if last == 0 {
 		return -100.0
 	}
-	return math.Round((cur/last-1.0)*100.0)
+	return math.Round((cur/last - 1.0) * 100.0)
 }

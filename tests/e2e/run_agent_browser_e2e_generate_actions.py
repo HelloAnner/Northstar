@@ -66,11 +66,34 @@ def _pick(rows: List[Dict[str, Any]], industry: str) -> Dict[str, Any]:
             return r
     return cands[0]
 
+def _pick_many(rows: List[Dict[str, Any]], industry: str, n: int) -> List[Dict[str, Any]]:
+    cands = [r for r in rows if (r.get("__industry") or "").strip() == industry]
+    cands = sorted(cands, key=lambda x: str(x.get("__creditCode") or ""))
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in cands:
+        code = str(r.get("__creditCode") or "").strip()
+        if not code or code == "-" or code in seen:
+            continue
+        seen.add(code)
+        out.append(r)
+        if len(out) >= n:
+            break
+    if not out:
+        _die(f"no company found for industry={industry}")
+    return out
+
 
 def _pick_label(row: Dict[str, Any], candidates: List[str]) -> str:
     for c in candidates:
         if c in row:
             return c
+    # Fallback: candidate like "销售额;本年-本月" but UI might render just "本年-本月"
+    for c in candidates:
+        if ";" in c:
+            s = c.split(";", 1)[1].strip()
+            if s and s in row:
+                return s
     return candidates[0]
 
 
@@ -107,10 +130,17 @@ def main() -> None:
         return
 
     # Pick 1 company per industry to cover scenarios.
-    wholesale = _pick(rows, "批发")
-    retail = _pick_by_code(rows, "914401007RDD76M0RF") or _pick(rows, "零售")
-    accommodation = _pick(rows, "住宿")
-    catering = _pick(rows, "餐饮")
+    wholesale_list = _pick_many(rows, "批发", 2)
+    retail_main = _pick_by_code(rows, "914401007RDD76M0RF")
+    retail_list = [retail_main] if retail_main else []
+    for r in _pick_many(rows, "零售", 2):
+        if retail_main and str(r.get("__creditCode") or "").strip() == str(retail_main.get("__creditCode") or "").strip():
+            continue
+        retail_list.append(r)
+    retail_list = retail_list[:2]
+
+    accommodation_list = _pick_many(rows, "住宿", 2)
+    catering_list = _pick_many(rows, "餐饮", 2)
 
     def cc(r: Dict[str, Any]) -> str:
         v = str(r.get("__creditCode") or "").strip()
@@ -135,48 +165,72 @@ def main() -> None:
     def setv(r: Dict[str, Any], label: str, v: float, reason: str) -> None:
         actions.append(Action(credit_code=cc(r), column_label=label, new_value=round(v, 2), reason=reason))
 
-    # 批发/零售口径优先用“销售额”列（可编辑）；“商品销售额”通常用于住餐口径
-    sales_cur = _pick_label(wholesale, ["销售额;本年-本月", "商品销售额;本年-本月"])
-    sales_last = _pick_label(wholesale, ["销售额;上年-本月", "商品销售额;上年-本月"])
-    sales_rate = _pick_label(wholesale, ["销售额;增速(当月)", "商品销售额;增速(当月)"])
-    sales_cum = _pick_label(wholesale, ["销售额;本年-1—本月", "商品销售额;本年-1—本月"])
+    # 批发/零售口径：UI 主销售额列为“本年-本月/上年-本月/同比增速(当月)/本年-1—本月/累计同比增速”
+    # 最新 UI（web/src/components/CompaniesTable.tsx）主销售额列名为：本年-本月 / 上年-本月 / 同比增速(当月) / 本年-1—本月 / 累计同比增速
+    wholesale1 = wholesale_list[0]
+    wholesale2 = wholesale_list[-1]
+    sales_cur = _pick_label(wholesale1, ["本年-本月", "销售额;本年-本月", "商品销售额;本年-本月"])
+    sales_last = _pick_label(wholesale1, ["上年-本月", "销售额;上年-本月", "商品销售额;上年-本月"])
+    sales_rate = _pick_label(wholesale1, ["同比增速(当月)", "销售额;增速(当月)", "商品销售额;增速(当月)"])
+    sales_cum = _pick_label(wholesale1, ["本年-1—本月", "销售额;本年-1—本月", "商品销售额;本年-1—本月"])
+    sales_cum_rate = _pick_label(wholesale1, ["累计同比增速", "销售额;累计增速", "商品销售额;累计增速"])
 
-    retail_cur = _pick_label(retail, ["零售额;本年-本月"])
-    retail_last = _pick_label(retail, ["零售额;上年-本月"])
-    retail_rate = _pick_label(retail, ["零售额;增速(当月)"])
+    retail1 = retail_list[0]
+    retail2 = retail_list[-1]
+    retail_cur = _pick_label(retail1, ["零售额;本年-本月"])
+    retail_last = _pick_label(retail1, ["零售额;上年-本月"])
+    retail_rate = _pick_label(retail1, ["零售额;同比增速(当月)", "零售额;增速(当月)"])
 
-    rev_cur = _pick_label(accommodation, ["营业额;本年-本月", "销售额;本年-本月", "商品销售额;本年-本月"])
-    rev_rate = _pick_label(accommodation, ["营业额;增速(当月)", "销售额;增速(当月)", "商品销售额;增速(当月)"])
-    room_cur = _pick_label(accommodation, ["本月客房收入", "客房收入;本年-本月"])
+    # 住宿/餐饮在 UI 中复用“本年-本月”等列（内部映射到 revenue* 字段）；不依赖客房/餐费/商品销售额子指标列（当前 UI 未展示）
+    accommodation1 = accommodation_list[0]
+    accommodation2 = accommodation_list[-1]
+    rev_cur = _pick_label(accommodation1, ["本年-本月", "营业额;本年-本月", "销售额;本年-本月"])
+    rev_rate = _pick_label(accommodation1, ["同比增速(当月)", "营业额;增速(当月)", "销售额;增速(当月)"])
 
-    food_cur = _pick_label(catering, ["本月餐费收入", "餐费收入;本年-本月"])
-    goods_cur = _pick_label(catering, ["本月商品销售额", "商品销售额;本年-本月", "销售额;本年-本月"])
+    catering1 = catering_list[0]
+    catering2 = catering_list[-1]
+    catering_sales_cur = _pick_label(catering1, ["本年-本月", "营业额;本年-本月", "销售额;本年-本月"])
+    catering_rate = _pick_label(catering1, ["同比增速(当月)", "营业额;增速(当月)", "销售额;增速(当月)"])
 
-    bump(wholesale, sales_cur, 123.45, f"批发：小数微调（{sales_cur}），覆盖 decimal 保存")
-    bump(wholesale, sales_last, 10.0, f"批发：上年同期微调（{sales_last}），覆盖 lastYearMonth editable 保存")
-    setv(wholesale, sales_rate, 12.34, f"批发：修改增速字段（{sales_rate}），覆盖 rate 保存")
-    bump(wholesale, sales_cum, 50.0, f"批发：累计微调（{sales_cum}），覆盖 cumulative editable 保存")
+    bump(wholesale1, sales_cur, 123.0, f"批发(1)：微调（{sales_cur}），覆盖保存")
+    bump(wholesale1, sales_last, 10.0, f"批发(1)：上年同期微调（{sales_last}），覆盖 lastYearMonth editable 保存")
+    setv(wholesale1, sales_rate, 12.0, f"批发(1)：修改增速字段（{sales_rate}），覆盖 rate 保存")
+    bump(wholesale1, sales_cum, 50.0, f"批发(1)：累计微调（{sales_cum}），覆盖 cumulative editable 保存")
+    setv(wholesale1, sales_cum_rate, 6.0, f"批发(1)：累计增速修改（{sales_cum_rate}），覆盖 cumulative rate 保存")
+    # 第二个批发企业：覆盖 0 / 大数
+    sales_cur2 = _pick_label(wholesale2, ["本年-本月", "销售额;本年-本月"])
+    setv(wholesale2, sales_cur2, 0.0, f"批发(2)：本年-本月置 0（{sales_cur2}），覆盖 zero 保存")
 
-    setv(retail, retail_cur, 0.0, f"零售：置 0（{retail_cur}），覆盖 zero 保存")
-    bump(retail, retail_last, 1.0, f"零售：上年同期微调（{retail_last}），覆盖 lastYearMonth editable 保存")
-    setv(retail, retail_rate, -3.21, f"零售：负增速（{retail_rate}），覆盖 rate/negative 保存")
+    setv(retail1, retail_cur, 0.0, f"零售(1)：置 0（{retail_cur}），覆盖 zero 保存")
+    bump(retail1, retail_last, 1.0, f"零售(1)：上年同期微调（{retail_last}），覆盖 lastYearMonth editable 保存")
+    setv(retail1, retail_rate, -3.0, f"零售(1)：负增速（{retail_rate}），覆盖 rate/negative 保存")
+    # 第二个零售企业：覆盖大值 & 搜索路径（仍用信用代码）
+    retail_cur2 = _pick_label(retail2, ["零售额;本年-本月"])
+    bump(retail2, retail_cur2, 999.0, f"零售(2)：本年-本月大幅微调（{retail_cur2}），覆盖大数保存")
 
-    bump(accommodation, rev_cur, 50.0, f"住宿：营业额微调（{rev_cur}），覆盖住餐主指标 editable 保存")
-    setv(accommodation, rev_rate, 8.88, f"住宿：修改增速字段（{rev_rate}），覆盖 rate editable 保存")
-    bump(accommodation, room_cur, 10.0, f"住宿：客房收入微调（{room_cur}），覆盖子指标 editable 保存")
+    bump(accommodation1, rev_cur, 50.0, f"住宿(1)：营业额微调（{rev_cur}），覆盖住餐主指标 editable 保存")
+    setv(accommodation1, rev_rate, 9.0, f"住宿(1)：修改增速字段（{rev_rate}），覆盖 rate editable 保存")
+    rev_cur2 = _pick_label(accommodation2, ["本年-本月", "营业额;本年-本月"])
+    bump(accommodation2, rev_cur2, -20.0, f"住宿(2)：负数微调（{rev_cur2}），覆盖 negative 保存")
 
-    bump(catering, food_cur, -10.0, f"餐饮：负数微调（{food_cur}），覆盖 negative 保存/校验")
-    bump(catering, goods_cur, 5.55, f"餐饮：商品销售额微调（{goods_cur}），覆盖 goods editable 保存/校验")
+    bump(catering1, catering_sales_cur, 20.0, f"餐饮(1)：营业额微调（{catering_sales_cur}），覆盖保存")
+    setv(catering1, catering_rate, -7.0, f"餐饮(1)：负增速（{catering_rate}），覆盖 rate/negative 保存")
+    catering_sales_cur2 = _pick_label(catering2, ["本年-本月", "营业额;本年-本月"])
+    bump(catering2, catering_sales_cur2, 333.0, f"餐饮(2)：本年-本月大幅微调（{catering_sales_cur2}），覆盖大数保存")
 
     out = {
         "generatedAt": payload.get("extractedAt"),
         "baseRowCount": payload.get("rowCount"),
         "actions": [a.__dict__ for a in actions],
         "picked": {
-            "批发": {"creditCode": cc(wholesale), "name": wholesale.get("__name")},
-            "零售": {"creditCode": cc(retail), "name": retail.get("__name")},
-            "住宿": {"creditCode": cc(accommodation), "name": accommodation.get("__name")},
-            "餐饮": {"creditCode": cc(catering), "name": catering.get("__name")},
+            "批发": {"creditCode": cc(wholesale1), "name": wholesale1.get("__name")},
+            "批发2": {"creditCode": cc(wholesale2), "name": wholesale2.get("__name")},
+            "零售": {"creditCode": cc(retail1), "name": retail1.get("__name")},
+            "零售2": {"creditCode": cc(retail2), "name": retail2.get("__name")},
+            "住宿": {"creditCode": cc(accommodation1), "name": accommodation1.get("__name")},
+            "住宿2": {"creditCode": cc(accommodation2), "name": accommodation2.get("__name")},
+            "餐饮": {"creditCode": cc(catering1), "name": catering1.get("__name")},
+            "餐饮2": {"creditCode": cc(catering2), "name": catering2.get("__name")},
         },
     }
 

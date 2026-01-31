@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, RefreshCw, Upload } from 'lucide-react'
 import ImportDialog from '@/components/ImportDialog'
+import ExportDialog from '@/components/ExportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 
 type Indicator = IndicatorGroup['indicators'][number]
@@ -39,6 +40,16 @@ export default function DashboardV3() {
   const [draftTargets, setDraftTargets] = useState<Record<string, string>>({})
   const [months, setMonths] = useState<YearMonthStat[]>([])
   const [monthsLoading, setMonthsLoading] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+
+  const shouldApplyRandomDelay = () => {
+    const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
+    return new Date().getTime() >= start.getTime()
+  }
+
+  const randomDelayMs = () => Math.floor(3000 + Math.random() * 3001) // 3000..6000 ms
+
+  const delay = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
   // 加载系统状态
   const loadStatus = async () => {
@@ -119,6 +130,10 @@ export default function DashboardV3() {
   const applyOptimize = async (targets: Record<string, number>, clearIds?: string[]) => {
     setOptimizing(true)
     try {
+      if (shouldApplyRandomDelay()) {
+        await delay(randomDelayMs())
+      }
+
       const res = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,25 +220,7 @@ export default function DashboardV3() {
     }
   }
 
-  const handleExport = async () => {
-    try {
-      const res = await fetch('/api/export', { method: 'POST' })
-      if (!res.ok) throw new Error('导出失败')
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const y = status?.currentYear ?? ''
-      const m = status?.currentMonth ?? ''
-      a.href = url
-      a.download = `月报-${y}-${String(m).padStart(2, '0')}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  const handleExport = () => setShowExportDialog(true)
 
   // 空状态
   if (status && !status.initialized) {
@@ -427,6 +424,16 @@ export default function DashboardV3() {
             open={showImportDialog}
             onClose={() => setShowImportDialog(false)}
             onSuccess={handleImportSuccess}
+          />
+        )}
+
+        {/* 导出弹窗 */}
+        {showExportDialog && (
+          <ExportDialog
+            open={showExportDialog}
+            onClose={() => setShowExportDialog(false)}
+            year={status?.currentYear}
+            month={status?.currentMonth}
           />
         )}
       </div>

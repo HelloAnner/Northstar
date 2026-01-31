@@ -9,6 +9,7 @@ import (
 type Handler struct {
 	store        *store.Store
 	templatePath string
+	downloads    *exportDownloadStore
 }
 
 // NewHandler 创建 V3 API 处理器
@@ -16,6 +17,7 @@ func NewHandler(store *store.Store, templatePath string) *Handler {
 	return &Handler{
 		store:        store,
 		templatePath: templatePath,
+		downloads:    newExportDownloadStore(),
 	}
 }
 
@@ -47,4 +49,6 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 
 	// 数据导出
 	router.POST("/export", h.Export)
+	router.POST("/export/stream", h.ExportStream)
+	router.GET("/export/download/:token", h.DownloadExport)
 }

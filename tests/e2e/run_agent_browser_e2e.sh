@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:20261}"
+E2E_PORT="${E2E_PORT:-20260}"
+BASE_URL="${BASE_URL:-http://localhost:${E2E_PORT}}"
 SESSION="${AGENT_BROWSER_SESSION:-default}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RESULTS_ROOT="${RESULTS_ROOT:-$REPO_ROOT/tests/e2e-result}"
+if [[ "$RESULTS_ROOT" != /* ]]; then
+  RESULTS_ROOT="$REPO_ROOT/$RESULTS_ROOT"
+fi
 
 INPUT_XLSX="${INPUT_XLSX:-$REPO_ROOT/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx}"
 
@@ -29,6 +33,11 @@ REPORT_HTML="$RUN_DIR/report.html"
 ACTION_RESULTS_JSON="$RUN_DIR/actions_result.json"
 STEPS_JSON="$RUN_DIR/steps.json"
 STEPS_JSONL="$RUN_DIR/steps.jsonl"
+SERVER_DIR="$RUN_DIR/server"
+SERVER_BIN="$SERVER_DIR/northstar"
+SERVER_PID="$RUN_DIR/server.pid"
+SERVER_LOG="$RUN_DIR/server.log"
+KEEP_E2E_SERVER="${KEEP_E2E_SERVER:-0}"
 
 if [[ ! -f "$INPUT_XLSX" ]]; then
   echo "ERROR: INPUT_XLSX not found: $INPUT_XLSX" | tee -a "$LOG" >&2
@@ -99,8 +108,112 @@ PY
 
 on_exit() {
   finalize_steps || true
+  if [[ "$KEEP_E2E_SERVER" != "1" ]]; then
+    if [[ -f "$SERVER_PID" ]]; then
+      pid="$(cat "$SERVER_PID" 2>/dev/null || true)"
+      if [[ -n "${pid:-}" ]]; then
+        kill "$pid" 2>/dev/null || true
+      fi
+    fi
+    if command -v lsof >/dev/null 2>&1; then
+      pids="$(lsof -ti tcp:${E2E_PORT} 2>/dev/null || true)"
+      if [[ -n "${pids:-}" ]]; then
+        kill ${pids} 2>/dev/null || true
+      fi
+    fi
+  fi
 }
 trap on_exit EXIT
+
+# -----------------------------
+# E2E server lifecycle (20260)
+# -----------------------------
+
+kill_e2e_port() {
+  if command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -ti tcp:${E2E_PORT} 2>/dev/null || true)"
+    if [[ -n "${pids:-}" ]]; then
+      echo ">>> Killing existing processes on port ${E2E_PORT}: ${pids}" | tee -a "$LOG"
+      kill ${pids} 2>/dev/null || true
+      sleep 0.3
+      pids2="$(lsof -ti tcp:${E2E_PORT} 2>/dev/null || true)"
+      if [[ -n "${pids2:-}" ]]; then
+        kill -9 ${pids2} 2>/dev/null || true
+      fi
+    fi
+  fi
+}
+
+write_e2e_config() {
+  mkdir -p "$SERVER_DIR/data"
+  cat >"$SERVER_DIR/config.toml" <<EOF
+[server]
+port = ${E2E_PORT}
+dev_mode = false
+
+[data]
+data_dir = "data"
+auto_backup = false
+
+[business]
+default_month = 1
+max_growth = 0.5
+min_growth = -0.3
+
+[excel]
+template_path = ""
+EOF
+}
+
+start_e2e_server() {
+  echo ">>> Restarting E2E server on port ${E2E_PORT} (stop -> build -> start)..." | tee -a "$LOG"
+
+  kill_e2e_port
+  record_step "server_stop_20260" "pass" "" "确认本机端口 ${E2E_PORT} 没有其他服务占用（仅杀 ${E2E_PORT}）"
+
+  echo ">>> Building web (latest)..." | tee -a "$LOG"
+  if (cd "$REPO_ROOT" && make build-web) | tee -a "$LOG"; then
+    record_step "build_web" "pass" "" ""
+  else
+    record_step "build_web" "fail" "web build failed" "在仓库根目录执行：make build-web"
+  fi
+
+  echo ">>> Building server binary (latest)..." | tee -a "$LOG"
+  mkdir -p "$SERVER_DIR"
+  if (cd "$REPO_ROOT" && go build -o "$SERVER_BIN" ./cmd/northstar) | tee -a "$LOG"; then
+    record_step "build_server" "pass" "" ""
+  else
+    record_step "build_server" "fail" "go build failed" "在仓库根目录执行：go build -o tests/e2e-result/tmp/northstar ./cmd/northstar"
+  fi
+
+  write_e2e_config
+
+  echo ">>> Starting server..." | tee -a "$LOG"
+  (
+    cd "$SERVER_DIR"
+    # Avoid opening the system browser during e2e (macOS: /usr/bin/open).
+    PATH="/bin:/usr/sbin:/sbin" NORTHSTAR_PORT="${E2E_PORT}" ./northstar >"$SERVER_LOG" 2>&1 &
+    echo $! >"$SERVER_PID"
+  )
+  record_step "server_start_20260" "pass" "pid=$(cat "$SERVER_PID" 2>/dev/null || true)" ""
+
+  echo ">>> Waiting for server ready: $BASE_URL ..." | tee -a "$LOG"
+  ok=0
+  for i in $(seq 1 120); do
+    if curl -fsS "$BASE_URL/" >/dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    sleep 0.5
+  done
+  if [[ "$ok" == "1" ]]; then
+    record_step "server_ready" "pass" "" ""
+  else
+    record_step "server_ready" "fail" "server not ready on ${BASE_URL}" "查看：${SERVER_LOG}，确认端口 ${E2E_PORT} 已启动并可访问 /"
+  fi
+}
+
+start_e2e_server
 
 # Ensure required browser is available for agent-browser (playwright-core@1.58.1 expects cft v1208).
 if [[ ! -d "$HOME/Library/Caches/ms-playwright/chromium_headless_shell-1208" ]]; then
@@ -222,15 +335,17 @@ else
 fi
 
 echo ">>> Exporting Excel via UI..." | tee -a "$LOG"
-if agent-browser download "text=导出" "$EXPORT_XLSX" 2>>"$LOG"; then
+agent-browser find role button click --name "导出" | tee -a "$LOG" || true
+agent-browser wait --fn "(() => { const btn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('下载 Excel')); return !!btn && !btn.disabled; })()" --timeout 60000 | tee -a "$LOG" || true
+if agent-browser download "text=下载 Excel" "$EXPORT_XLSX" 2>>"$LOG"; then
   record_step "export_download" "pass" "" ""
 else
   echo "WARN: download selector failed, fallback to click + wait --download" | tee -a "$LOG"
-  agent-browser find role button click --name "导出" | tee -a "$LOG" || true
+  agent-browser find role button click --name "下载 Excel" | tee -a "$LOG" || true
   if agent-browser wait --download "$EXPORT_XLSX" --timeout 60000 | tee -a "$LOG"; then
     record_step "export_download" "pass" "fallback via wait --download" ""
   else
-    record_step "export_download" "fail" "导出下载失败（浏览器未捕获下载）" "手动点击“导出”，观察是否下载 xlsx 文件"
+    record_step "export_download" "fail" "导出下载失败（浏览器未捕获下载）" "手动点击“导出”，等待进度完成后点击“下载 Excel”"
   fi
 fi
 agent-browser screenshot "$SCREENSHOTS_DIR/11_after_export.png" | tee -a "$LOG" || true

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"northstar/internal/config"
@@ -32,6 +33,14 @@ func main() {
 		log.Printf("加载配置失败，使用默认配置: %v", err)
 		cfg = config.DefaultConfig()
 		info = config.LoadConfigInfo{}
+	}
+
+	// 环境变量覆盖：用于 E2E 或多实例并行运行（优先级最高）
+	// 说明：默认端口为 20261；E2E 端口为 20260（见仓库 AGENTS.md）
+	if v := os.Getenv("NORTHSTAR_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			cfg.Server.Port = p
+		}
 	}
 
 	// 命令行参数覆盖配置

@@ -173,26 +173,61 @@ UI_TO_EXCEL_FIELD = {
     "本月餐费收入": "餐费收入;本年-本月",
     "本月商品销售额": "商品销售额;本年-本月",
     # UI 里的“增速”列名与导出表的衍生指标列名不同
+    "同比增速(当月)": "(衍生指标)销售额当月增速",
+    "累计同比增速": "(衍生指标)销售额累计增速",
     "商品销售额;增速(当月)": "(衍生指标)销售额当月增速",
     "商品销售额;累计增速": "(衍生指标)销售额累计增速",
+    "销售额;增速(当月)": "(衍生指标)销售额当月增速",
+    "销售额;累计增速": "(衍生指标)销售额累计增速",
+    "零售额;同比增速(当月)": "(衍生指标)零售额当月增速",
+    "零售额;累计同比增速": "(衍生指标)零售额累计增速",
     "零售额;增速(当月)": "(衍生指标)零售额当月增速",
     "零售额;累计增速": "(衍生指标)零售额累计增速",
     "营业额;增速(当月)": "(衍生指标)营业额当月增速",
     "营业额;累计增速": "(衍生指标)营业额累计增速",
 }
 
+
+def _map_ui_field_to_export_header(ui_field: str, export_sheet: str) -> str:
+    """
+    将明细表列名映射到导出 Excel 的列名。
+    - 批零导出表用「商品销售额;*」作为主销售额列
+    - 住餐导出表用「营业额;*」作为主营业额列
+    """
+    if ui_field in UI_TO_EXCEL_FIELD:
+        return UI_TO_EXCEL_FIELD[ui_field]
+
+    # 最新 UI 主销售额列名为“本年-本月/上年-本月/本年-1—本月/上年-1—本月”等（无“销售额;”前缀）
+    if ui_field in {"本年-本月", "上年-本月", "本年-1—本月", "上年-1—本月"}:
+        if export_sheet in {"住宿", "餐饮", "住餐总表"}:
+            return f"营业额;{ui_field}"
+        if export_sheet in {"批发", "零售", "批零总表"}:
+            return f"商品销售额;{ui_field}"
+
+    # 住餐：UI 里“销售额”列是营业额的口径映射
+    if export_sheet in {"住宿", "餐饮", "住餐总表"}:
+        if ui_field.startswith("销售额;"):
+            return ui_field.replace("销售额;", "营业额;", 1)
+
+    # 批零：UI 里“销售额”对应导出“商品销售额”
+    if export_sheet in {"批发", "零售", "批零总表"}:
+        if ui_field.startswith("销售额;"):
+            return ui_field.replace("销售额;", "商品销售额;", 1)
+
+    return ""
+
 DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
     # (ui_field, excel_header, nth_occurrence)
     "批发": [
-        ("销售额;本年-上月", "2025年11月销售额", 1),
-        ("销售额;本年-本月", "2025年12月销售额", 1),
-        ("销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
-        ("销售额;本年-1—上月", "2025年1-11月销售额", 1),
-        ("销售额;上年-1—上月", "2024年1-11月销售额", 1),
-        ("销售额;本年-1—本月", "2025年1-12月销售额", 1),
-        ("销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
-        ("销售额;增速(当月)", "12月销售额增速", 1),
-        ("销售额;累计增速", "1-12月增速", 1),
+        ("本年-上月", "2025年11月销售额", 1),
+        ("本年-本月", "2025年12月销售额", 1),
+        ("上年-本月", "2024年;12月;商品销售额;千元", 1),
+        ("本年-1—上月", "2025年1-11月销售额", 1),
+        ("上年-1—上月", "2024年1-11月销售额", 1),
+        ("本年-1—本月", "2025年1-12月销售额", 1),
+        ("上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
+        ("同比增速(当月)", "12月销售额增速", 1),
+        ("累计同比增速", "1-12月增速", 1),
         ("零售额;本年-上月", "2025年11月零售额", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年;12月;商品零售额;千元", 1),
@@ -200,20 +235,20 @@ DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
         ("零售额;上年-1—上月", "2024年1-11月零售额", 1),
         ("零售额;本年-1—本月", "2025年1-12月零售额", 1),
         ("零售额;上年-1—本月", "2024年;1-12月;商品零售额;千元", 1),
-        ("零售额;增速(当月)", "12月零售额增速", 1),
-        ("零售额;累计增速", "1-12月增速", 2),
+        ("零售额;同比增速(当月)", "12月零售额增速", 1),
+        ("零售额;累计同比增速", "1-12月增速", 2),
         ("零销比(%)", "零售额占比", 1),
     ],
     "零售": [
-        ("销售额;本年-上月", "2025年11月销售额", 1),
-        ("销售额;本年-本月", "2025年12月销售额", 1),
-        ("销售额;上年-本月", "2024年;12月;商品销售额;千元", 1),
-        ("销售额;本年-1—上月", "2025年1-11月销售额", 1),
-        ("销售额;上年-1—上月", "2024年1-11月销售额", 1),
-        ("销售额;本年-1—本月", "2025年1-12月销售额", 1),
-        ("销售额;上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
-        ("销售额;增速(当月)", "12月销售额增速", 1),
-        ("销售额;累计增速", "1-12月增速", 1),
+        ("本年-上月", "2025年11月销售额", 1),
+        ("本年-本月", "2025年12月销售额", 1),
+        ("上年-本月", "2024年;12月;商品销售额;千元", 1),
+        ("本年-1—上月", "2025年1-11月销售额", 1),
+        ("上年-1—上月", "2024年1-11月销售额", 1),
+        ("本年-1—本月", "2025年1-12月销售额", 1),
+        ("上年-1—本月", "2024年;1-12月;商品销售额;千元", 1),
+        ("同比增速(当月)", "12月销售额增速", 1),
+        ("累计同比增速", "1-12月增速", 1),
         ("零售额;本年-上月", "2025年11月零售额", 1),
         ("零售额;本年-本月", "2025年12月零售额", 1),
         ("零售额;上年-本月", "2024年;12月;商品零售额;千元", 1),
@@ -221,20 +256,20 @@ DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
         ("零售额;上年-1—上月", "2024年1-11月零售额", 1),
         ("零售额;本年-1—本月", "2025年1-12月零售额", 1),
         ("零售额;上年-1—本月", "2024年;1-12月;商品零售额;千元", 1),
-        ("零售额;增速(当月)", "12月零售额增速", 1),
-        ("零售额;累计增速", "1-12月增速", 2),
+        ("零售额;同比增速(当月)", "12月零售额增速", 1),
+        ("零售额;累计同比增速", "1-12月增速", 2),
         ("零销比(%)", "零售额占比", 1),
     ],
     "住宿": [
-        # UI 住餐口径中，主指标列名仍沿用“销售额;*”
-        ("销售额;本年-上月", "2025年11月营业额", 1),
-        ("销售额;本年-本月", "2025年12月营业额", 1),
-        ("销售额;上年-本月", "2024年12月;营业额总计;千元", 1),
-        ("销售额;本年-1—上月", "2025年1-11月营业额", 1),
-        ("销售额;本年-1—本月", "2025年1-12月营业额", 1),
-        ("销售额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
-        ("销售额;增速(当月)", "12月增速", 1),
-        ("销售额;累计增速", "1-12月增速", 1),
+        # 最新 UI：住餐口径复用“本年-本月”等列（内部映射到营业额字段）
+        ("本年-上月", "2025年11月营业额", 1),
+        ("本年-本月", "2025年12月营业额", 1),
+        ("上年-本月", "2024年12月;营业额总计;千元", 1),
+        ("本年-1—上月", "2025年1-11月营业额", 1),
+        ("本年-1—本月", "2025年1-12月营业额", 1),
+        ("上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
+        ("同比增速(当月)", "12月增速", 1),
+        ("累计同比增速", "1-12月增速", 1),
         ("客房收入;本年-上月", "11月客房收入", 1),
         ("客房收入;本年-本月", "2025年12月客房收入", 1),
         ("客房收入;上年-本月", "2024年12月;营业额总计;客房收入;千元", 1),
@@ -257,14 +292,14 @@ DERIVED_SHEET_MAPPINGS: Dict[str, List[Tuple[str, str, int]]] = {
         ("零售额;上年-本月", "2024年12月零售额", 1),
     ],
     "餐饮": [
-        ("销售额;本年-上月", "2025年11月营业额", 1),
-        ("销售额;本年-本月", "2025年12月营业额", 1),
-        ("销售额;上年-本月", "2024年12月;营业额总计;千元", 1),
-        ("销售额;本年-1—上月", "2025年1-11月营业额", 1),
-        ("销售额;本年-1—本月", "2025年1-12月营业额", 1),
-        ("销售额;上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
-        ("销售额;增速(当月)", "12月增速", 1),
-        ("销售额;累计增速", "1-12月增速", 1),
+        ("本年-上月", "2025年11月营业额", 1),
+        ("本年-本月", "2025年12月营业额", 1),
+        ("上年-本月", "2024年12月;营业额总计;千元", 1),
+        ("本年-1—上月", "2025年1-11月营业额", 1),
+        ("本年-1—本月", "2025年1-12月营业额", 1),
+        ("上年-1—本月", "2024年1-12月;营业额总计;千元", 1),
+        ("同比增速(当月)", "12月增速", 1),
+        ("累计同比增速", "1-12月增速", 1),
         ("客房收入;本年-上月", "11月客房收入", 1),
         ("客房收入;本年-本月", "2025年12月客房收入", 1),
         ("客房收入;上年-本月", "2024年12月;营业额总计;客房收入;千元", 1),
@@ -451,7 +486,7 @@ def _compare_ui_vs_export(ui_rows: List[Dict[str, Any]], export_wb) -> Tuple[Lis
                 continue
             if field in ("规模", "标记", "来源表"):
                 continue
-            excel_field = field if field in ex_headers else UI_TO_EXCEL_FIELD.get(field, "")
+            excel_field = field if field in ex_headers else _map_ui_field_to_export_header(field, found_sheet)
             if not excel_field or excel_field not in ex_headers:
                 continue
             excel_val = export_wb[found_sheet].cell(ex_r, ex_headers[excel_field]).value
@@ -724,6 +759,10 @@ def _issues_summary(
     completeness_total: int,
     derived_unmapped_cols: int,
     derived_missing_ui_cols: int,
+    tab_consistency_fail: int,
+    ui_derived_fail: int,
+    export_template_fail: int,
+    export_formula_fail: int,
 ) -> str:
     issues: List[str] = []
     action_fail = sum(1 for r in action_results if r.get("ok") is False)
@@ -747,6 +786,14 @@ def _issues_summary(
         issues.append(f"衍生 Sheet 有值列未映射：{derived_unmapped_cols}（见“衍生 Sheet 列覆盖”）")
     if derived_missing_ui_cols > 0:
         issues.append(f"衍生 Sheet 映射列在 UI 缺失：{derived_missing_ui_cols}（见“衍生 Sheet 列覆盖”）")
+    if tab_consistency_fail > 0:
+        issues.append(f"Tab 覆盖/计数不一致：{tab_consistency_fail}（见“Tab 覆盖与计数（Excel vs UI）”）")
+    if ui_derived_fail > 0:
+        issues.append(f"UI 派生字段自洽性失败：{ui_derived_fail}（见“UI 派生字段一致性检查”）")
+    if export_template_fail > 0:
+        issues.append(f"导出模板结构不一致：{export_template_fail}（见“导出模板结构对标 PRD”）")
+    if export_formula_fail > 0:
+        issues.append(f"导出模板公式不一致：{export_formula_fail}（见“导出模板公式对标 PRD”）")
 
     if not issues:
         return "<p class='ok'>✅ 未发现不符合预期项</p>"
@@ -854,13 +901,322 @@ def _build_derived_column_coverage(input_wb, ui_headers: List[str]) -> Dict[str,
     return out
 
 
+def _count_companies_in_sheet(input_wb, sheet_name: str) -> int:
+    if input_wb is None or sheet_name not in input_wb.sheetnames:
+        return 0
+    ws = input_wb[sheet_name]
+    headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+    code_col = _get_header_cols(headers, "统一社会信用代码", 1)
+    if not code_col:
+        return 0
+    codes: set[str] = set()
+    for r in range(2, ws.max_row + 1):
+        v = ws.cell(r, code_col).value
+        if not _is_credit_code(v):
+            continue
+        codes.add(str(v).strip().upper())
+    return len(codes)
+
+
+def _ui_company_counts(ui_rows: List[Dict[str, Any]]) -> Dict[str, int]:
+    out: Dict[str, int] = {"批发": 0, "零售": 0, "住宿": 0, "餐饮": 0}
+    for r in ui_rows:
+        code = r.get("__creditCode")
+        if not _is_credit_code(code):
+            continue
+        sheet = str(r.get("来源表") or "").strip()
+        if sheet in out:
+            out[sheet] += 1
+    return out
+
+
+def _tab_count_consistency(input_wb, ui_rows: List[Dict[str, Any]], tab_counts: Dict[str, Any]) -> Dict[str, Any]:
+    expected = {s: _count_companies_in_sheet(input_wb, s) for s in ["批发", "零售", "住宿", "餐饮"]}
+    actual = _ui_company_counts(ui_rows)
+    tab_items = (tab_counts.get("items") or []) if isinstance(tab_counts, dict) else []
+    tab_map = {str(x.get("tab") or "").strip(): x for x in tab_items if isinstance(x, dict)}
+
+    items: List[Dict[str, Any]] = []
+    for s in ["批发", "零售", "住宿", "餐饮"]:
+        it = tab_map.get(s) or {}
+        ui_rows_count = int(actual.get(s) or 0)
+        excel_count = int(expected.get(s) or 0)
+        tab_row_count = int(it.get("rows") or 0) if isinstance(it, dict) else 0
+        total_text = str(it.get("totalText") or "").strip() if isinstance(it, dict) else ""
+        ok = (ui_rows_count == excel_count) and (tab_row_count == ui_rows_count or tab_row_count == 0)
+        items.append(
+            {
+                "sheet": s,
+                "excelCompanies": excel_count,
+                "uiCompanies": ui_rows_count,
+                "uiTabRows": tab_row_count,
+                "uiTabTotalText": total_text,
+                "ok": ok,
+                "reason": "" if ok else "UI 企业覆盖/计数与输入 Excel 不一致（可能为解析遗漏、筛选口径差异或展示不完整）",
+                "reproduce": f"导入后切换到「{s}」Tab，对比：UI 企业数 vs 输入 Excel「{s}」Sheet 的企业行数",
+            }
+        )
+    return {"expected": expected, "actual": actual, "items": items}
+
+
+def _calc_rate_percent(cur: Optional[float], base: Optional[float]) -> Optional[float]:
+    if cur is None or base is None:
+        return None
+    if base == 0:
+        return -100.0
+    return (cur / base - 1.0) * 100.0
+
+
+def _ui_derived_checks(ui_rows: List[Dict[str, Any]], limit_rows: int = 2000) -> List[Dict[str, Any]]:
+    checks: List[Dict[str, Any]] = []
+
+    def num(v: Any) -> Optional[float]:
+        return _parse_number(v)
+
+    for r in ui_rows[:limit_rows]:
+        code = str(r.get("__creditCode") or "").strip()
+        if not _is_credit_code(code):
+            continue
+        name = str(r.get("__name") or "").strip()
+        industry = str(r.get("__industry") or "").strip()
+
+        cur = num(r.get("本年-本月"))
+        last = num(r.get("上年-本月"))
+        prev = num(r.get("本年-上月"))
+        diff_yoy = num(r.get("同比增量(当月)"))
+        diff_mom = num(r.get("环比增量(当月)"))
+        rate_mom = num(r.get("环比增速(当月)"))
+
+        exp_diff_yoy = None if (cur is None or last is None) else (cur - last)
+        exp_diff_mom = None if (cur is None or prev is None) else (cur - prev)
+        exp_rate_mom = _calc_rate_percent(cur, prev)
+
+        if exp_diff_yoy is not None and diff_yoy is not None and not _close(exp_diff_yoy, diff_yoy, eps=1.0):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "同比增量(当月)",
+                    "expected": exp_diff_yoy,
+                    "actual": diff_yoy,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致（可能为后端未重算/前端展示未刷新/舍入规则不一致）",
+                    "reproduce": f"首页搜索 {code} → 查看 本年-本月/上年-本月/同比增量(当月) 三列是否满足：同比增量=本年-本月-上年-本月",
+                }
+            )
+        if exp_diff_mom is not None and diff_mom is not None and not _close(exp_diff_mom, diff_mom, eps=1.0):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "环比增量(当月)",
+                    "expected": exp_diff_mom,
+                    "actual": diff_mom,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致",
+                    "reproduce": f"首页搜索 {code} → 查看 本年-本月/本年-上月/环比增量(当月) 三列是否满足：环比增量=本年-本月-本年-上月",
+                }
+            )
+        if exp_rate_mom is not None and rate_mom is not None and not _close(exp_rate_mom, rate_mom, eps=0.2):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "环比增速(当月)",
+                    "expected": exp_rate_mom,
+                    "actual": rate_mom,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致（可能是百分比/小数口径或舍入差异）",
+                    "reproduce": f"首页搜索 {code} → 查看 本年-本月/本年-上月/环比增速(当月) 三列是否满足：环比增速=(本年-本月/本年-上月-1)*100",
+                }
+            )
+
+        r_cur = num(r.get("零售额;本年-本月"))
+        r_last = num(r.get("零售额;上年-本月"))
+        r_prev = num(r.get("零售额;本年-上月"))
+        r_diff_yoy = num(r.get("零售额;同比增量(当月)"))
+        r_diff_mom = num(r.get("零售额;环比增量(当月)"))
+        r_rate_mom = num(r.get("零售额;环比增速(当月)"))
+        r_exp_diff_yoy = None if (r_cur is None or r_last is None) else (r_cur - r_last)
+        r_exp_diff_mom = None if (r_cur is None or r_prev is None) else (r_cur - r_prev)
+        r_exp_rate_mom = _calc_rate_percent(r_cur, r_prev)
+
+        if r_exp_diff_yoy is not None and r_diff_yoy is not None and not _close(r_exp_diff_yoy, r_diff_yoy, eps=1.0):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "零售额;同比增量(当月)",
+                    "expected": r_exp_diff_yoy,
+                    "actual": r_diff_yoy,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致",
+                    "reproduce": f"首页搜索 {code} → 查看 零售额;本年-本月/零售额;上年-本月/零售额;同比增量(当月) 是否一致",
+                }
+            )
+        if r_exp_diff_mom is not None and r_diff_mom is not None and not _close(r_exp_diff_mom, r_diff_mom, eps=1.0):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "零售额;环比增量(当月)",
+                    "expected": r_exp_diff_mom,
+                    "actual": r_diff_mom,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致",
+                    "reproduce": f"首页搜索 {code} → 查看 零售额;本年-本月/零售额;本年-上月/零售额;环比增量(当月) 是否一致",
+                }
+            )
+        if r_exp_rate_mom is not None and r_rate_mom is not None and not _close(r_exp_rate_mom, r_rate_mom, eps=0.2):
+            checks.append(
+                {
+                    "creditCode": code,
+                    "name": name,
+                    "industry": industry,
+                    "field": "零售额;环比增速(当月)",
+                    "expected": r_exp_rate_mom,
+                    "actual": r_rate_mom,
+                    "ok": False,
+                    "reason": "UI 计算字段与基础字段不一致",
+                    "reproduce": f"首页搜索 {code} → 查看 零售额;本年-本月/零售额;本年-上月/零售额;环比增速(当月) 是否一致",
+                }
+            )
+
+    return checks
+
+
+def _repo_root_from_this_file() -> Path:
+    # .../tests/e2e/run_agent_browser_e2e_report.py -> repo root
+    return Path(__file__).resolve().parents[2]
+
+
+def _normalize_cell(v: Any) -> str:
+    if v is None:
+        return ""
+    s = str(v)
+    s = re.sub(r"\\s+", "", s)
+    return s.strip()
+
+
+def _sheet_header_signature(ws, header_row: int, max_cols: int) -> List[str]:
+    out: List[str] = []
+    for c in range(1, max_cols + 1):
+        out.append(_normalize_cell(ws.cell(header_row, c).value))
+    while out and out[-1] == "":
+        out.pop()
+    return out
+
+
+def _export_template_checks(export_wb_raw, template_wb_raw) -> Dict[str, Any]:
+    expected_sheets = [
+        "批零总表",
+        "住餐总表",
+        "批发",
+        "零售",
+        "住宿",
+        "餐饮",
+        "吃穿用",
+        "小微",
+        "吃穿用（剔除）",
+        "社零额（定）",
+        "汇总表（定）",
+    ]
+    export_sheets = list(export_wb_raw.sheetnames) if export_wb_raw is not None else []
+    template_sheets = list(template_wb_raw.sheetnames) if template_wb_raw is not None else []
+
+    missing = [s for s in expected_sheets if s not in export_sheets]
+    extra = [s for s in export_sheets if s not in expected_sheets]
+
+    header_checks: List[Dict[str, Any]] = []
+    for s in [x for x in expected_sheets if x in export_sheets and x in template_sheets]:
+        exp_ws = export_wb_raw[s]
+        tpl_ws = template_wb_raw[s]
+
+        exp_hr = _find_header_row(exp_ws)
+        tpl_hr = _find_header_row(tpl_ws)
+        if not exp_hr or not tpl_hr:
+            continue
+
+        max_cols = max(tpl_ws.max_column, exp_ws.max_column, 1)
+        tpl_sig = _sheet_header_signature(tpl_ws, tpl_hr, max_cols)
+        exp_sig = _sheet_header_signature(exp_ws, exp_hr, max_cols)
+        ok = tpl_sig == exp_sig
+        header_checks.append(
+            {
+                "sheet": s,
+                "ok": ok,
+                "templateHeaderCols": len(tpl_sig),
+                "exportHeaderCols": len(exp_sig),
+                "reason": "" if ok else "导出表头结构与定稿模板不一致（可能导致模板公式引用错位或字段缺失）",
+                "reproduce": f"打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「{s}」，对比表头（含空白列）是否逐列一致",
+            }
+        )
+
+    return {
+        "expectedSheets": expected_sheets,
+        "exportSheets": export_sheets,
+        "missingSheets": missing,
+        "extraSheets": extra,
+        "headerChecks": header_checks,
+    }
+
+
+def _export_formula_checks(export_wb_raw, template_wb_raw) -> List[Dict[str, Any]]:
+    targets = [
+        ("社零额（定）", "K3"),
+        ("社零额（定）", "K7"),
+        ("社零额（定）", "K9"),
+        ("社零额（定）", "K15"),
+        ("社零额（定）", "K17"),
+        ("社零额（定）", "K19"),
+        ("社零额（定）", "K23"),
+        ("汇总表（定）", "D4"),
+        ("汇总表（定）", "F4"),
+        ("汇总表（定）", "D10"),
+        ("汇总表（定）", "A11"),
+    ]
+    out: List[Dict[str, Any]] = []
+    if export_wb_raw is None or template_wb_raw is None:
+        return out
+    for sheet, addr in targets:
+        if sheet not in export_wb_raw.sheetnames or sheet not in template_wb_raw.sheetnames:
+            continue
+        ev = export_wb_raw[sheet][addr].value
+        tv = template_wb_raw[sheet][addr].value
+        ok = isinstance(ev, str) and ev.startswith("=") and isinstance(tv, str) and tv.startswith("=")
+        if ok:
+            ok = str(ev).strip() == str(tv).strip()
+        out.append(
+            {
+                "sheet": sheet,
+                "cell": addr,
+                "ok": ok,
+                "template": tv,
+                "export": ev,
+                "reason": "" if ok else "导出模板公式未按定稿模板保留（可能导致定稿表计算错误）",
+                "reproduce": f"打开导出 Excel → Sheet「{sheet}」→ 单元格 {addr}，检查是否为公式且与定稿模板一致",
+            }
+        )
+    return out
+
+
 def _action_export_checks(
     action_results: List[Dict[str, Any]],
+    action_persist: List[Dict[str, Any]],
     ui_lookup_rows: List[Dict[str, Any]],
     export_wb,
 ) -> List[Dict[str, Any]]:
     if export_wb is None:
         return []
+    persist_map: Dict[str, Dict[str, Any]] = {}
+    for p in action_persist:
+        k = f"{p.get('creditCode')}|{p.get('field')}|{p.get('i')}"
+        persist_map[k] = p
     ui_by_code = {
         str(r.get("__creditCode") or "").strip().upper(): r
         for r in ui_lookup_rows
@@ -878,7 +1234,17 @@ def _action_export_checks(
     for a in action_results:
         cc = str(a.get("creditCode") or "").strip().upper()
         field = str(a.get("field") or "").strip()
-        exp = a.get("value")
+        desired = a.get("value")
+        k = f"{a.get('creditCode')}|{field}|{a.get('i')}"
+        pv = persist_map.get(k) or {}
+        persist_ok = pv.get("ok") is not False
+        persist_value_raw = pv.get("uiValue")
+        # If persistence doesn't match desired, use persisted UI value to validate export source-of-truth.
+        exp = desired
+        if persist_value_raw not in (None, "", "-"):
+            exp = _parse_number(persist_value_raw)
+            if exp is None:
+                exp = str(persist_value_raw)
 
         r = ui_by_code.get(cc)
         if not r:
@@ -907,7 +1273,7 @@ def _action_export_checks(
             )
             continue
 
-        excel_field = field if field in ex_headers else UI_TO_EXCEL_FIELD.get(field, "")
+        excel_field = field if field in ex_headers else _map_ui_field_to_export_header(field, found_sheet)
         if not excel_field or excel_field not in ex_headers:
             out.append(
                 {
@@ -931,6 +1297,21 @@ def _action_export_checks(
         else:
             okv = str(actual).strip() == str(exp).strip()
 
+        reason = "" if okv else "导出值与期望不一致"
+        if not persist_ok:
+            reason = "修改未通过持久化校验（UI 刷新后异常），本项导出对照仅供参考"
+        else:
+            # If persisted value differs from desired, surface as a persistence issue rather than export issue.
+            des_num = _parse_number(desired)
+            pv_num = _parse_number(persist_value_raw)
+            if des_num is not None or pv_num is not None:
+                pv_num, des_num = _normalize_rate_pair(field, pv_num, des_num)
+                if not _close(pv_num, des_num, eps=_field_eps(field)):
+                    reason = "UI 刷新后值与期望修改不一致（可能未保存），导出按刷新后值校验"
+            else:
+                if persist_value_raw not in (None, "", "-") and str(persist_value_raw).strip() != str(desired).strip():
+                    reason = "UI 刷新后值与期望修改不一致（可能未保存），导出按刷新后值校验"
+
         out.append(
             {
                 "creditCode": cc,
@@ -940,7 +1321,10 @@ def _action_export_checks(
                 "expected": exp,
                 "actual": actual,
                 "ok": okv,
-                "reason": "" if okv else "导出值与修改后预期不一致",
+                "reason": reason,
+                "desired": desired,
+                "persistOk": bool(persist_ok),
+                "persistValue": persist_value_raw,
             }
         )
     return out
@@ -977,6 +1361,11 @@ def main() -> None:
 
     input_wb_error = ""
     export_wb_error = ""
+    export_wb_raw = None
+    export_wb_raw_error = ""
+    template_wb_raw = None
+    template_wb_raw_error = ""
+    template_xlsx = ""
     try:
         input_wb = load_workbook(args.input_xlsx, data_only=True)
     except Exception as e:
@@ -987,6 +1376,21 @@ def main() -> None:
     except Exception as e:
         export_wb = None
         export_wb_error = str(e)
+    try:
+        export_wb_raw = load_workbook(args.export_xlsx, data_only=False)
+    except Exception as e:
+        export_wb_raw = None
+        export_wb_raw_error = str(e)
+
+    try:
+        repo_root = _repo_root_from_this_file()
+        cand = repo_root / "prd/12月月报（定）.xlsx"
+        if cand.exists():
+            template_xlsx = str(cand)
+            template_wb_raw = load_workbook(cand, data_only=False)
+    except Exception as e:
+        template_wb_raw = None
+        template_wb_raw_error = str(e)
 
     missing_before: List[str] = []
     mismatches_before: List[Mismatch] = []
@@ -1060,6 +1464,40 @@ def main() -> None:
     except Exception:
         pass
 
+    # 输入 Excel 结构对标 PRD（sheet 集合）
+    input_structure: Dict[str, Any] = {}
+    try:
+        expected_input_sheets = [
+            "2024年12月批零",
+            "2025年11月批零",
+            "2024年3月",
+            "2025年2月",
+            "批发",
+            "零售",
+            "2024年12月住餐",
+            "2025年11月住餐",
+            "2024年3月住",
+            "2025年2月住",
+            "餐饮",
+            "住宿",
+            "限上零售额",
+            "小微",
+            "吃穿用",
+        ]
+        actual_sheets = list(input_wb.sheetnames) if input_wb is not None else []
+        missing_sheets = [s for s in expected_input_sheets if s not in actual_sheets]
+        extra_sheets = [s for s in actual_sheets if s not in expected_input_sheets]
+        input_structure = {
+            "expectedSheets": expected_input_sheets,
+            "actualSheets": actual_sheets,
+            "missingSheets": missing_sheets,
+            "extraSheets": extra_sheets,
+            "ok": (input_wb is not None) and (not missing_sheets),
+        }
+        _write_json(out_dir / "input_structure.json", input_structure)
+    except Exception:
+        input_structure = {"ok": False, "error": "failed to build input_structure"}
+
     completeness_cases: List[CompletenessCase] = []
     completeness_summary: Dict[str, Any] = {}
     completeness_failed = 0
@@ -1098,11 +1536,53 @@ def main() -> None:
         lookup_rows.extend(before_rows)
     if isinstance(after_rows, list):
         lookup_rows.extend(after_rows)
-    action_export_checks = _action_export_checks(action_results, lookup_rows, export_wb)
+    action_export_checks = _action_export_checks(action_results, action_persist, lookup_rows, export_wb)
     try:
         _write_json(out_dir / "action_export_checks.json", action_export_checks)
     except Exception:
         pass
+
+    tab_consistency: Dict[str, Any] = {}
+    tab_consistency_fail = 0
+    if input_wb is not None and ui_before_ok:
+        try:
+            tab_consistency = _tab_count_consistency(input_wb, before_rows, tab_counts)
+            tab_consistency_fail = sum(
+                1 for x in (tab_consistency.get("items") or []) if isinstance(x, dict) and not x.get("ok")
+            )
+            _write_json(out_dir / "tab_consistency.json", tab_consistency)
+        except Exception:
+            tab_consistency = {"error": "failed to build tab_consistency"}
+            tab_consistency_fail = 1
+
+    ui_derived = []
+    ui_derived_fail = 0
+    try:
+        base_rows = after_rows if ui_after_ok else (before_rows if ui_before_ok else [])
+        ui_derived = _ui_derived_checks(base_rows if isinstance(base_rows, list) else [])
+        ui_derived_fail = len(ui_derived)
+        _write_json(out_dir / "ui_derived_checks.json", ui_derived)
+    except Exception:
+        ui_derived = []
+        ui_derived_fail = 0
+
+    export_template: Dict[str, Any] = {}
+    export_template_fail = 0
+    export_formula: List[Dict[str, Any]] = []
+    export_formula_fail = 0
+    try:
+        if export_wb_raw is not None and template_wb_raw is not None:
+            export_template = _export_template_checks(export_wb_raw, template_wb_raw)
+            export_template_fail = len(export_template.get("missingSheets") or []) + sum(
+                1 for x in (export_template.get("headerChecks") or []) if isinstance(x, dict) and not x.get("ok")
+            )
+            export_formula = _export_formula_checks(export_wb_raw, template_wb_raw)
+            export_formula_fail = sum(1 for x in export_formula if isinstance(x, dict) and not x.get("ok"))
+            _write_json(out_dir / "export_template_checks.json", export_template)
+            _write_json(out_dir / "export_formula_checks.json", export_formula)
+    except Exception:
+        export_template = {"error": "failed to build export_template_checks"}
+        export_template_fail = 1
 
     ok = (
         ui_before_ok
@@ -1114,6 +1594,10 @@ def main() -> None:
         and not missing_export
         and not mismatches_export
         and completeness_failed == 0
+        and tab_consistency_fail == 0
+        and ui_derived_fail == 0
+        and export_template_fail == 0
+        and export_formula_fail == 0
         and all(
             (derived_column_coverage.get("sheets") or {}).get(s, {}).get("unmappedColumnsWithValues", 0) == 0
             for s in ["批发", "零售", "住宿", "餐饮"]
@@ -1220,7 +1704,7 @@ def main() -> None:
             return "<p class='warn'>未生成完整性数据（可能是衍生 Sheet 映射为空）</p>"
 
         pinned_cc = "914401007RDD76M0RF"
-        pinned_fields = ["销售额;上年-本月", "商品销售额;上年-本月"]
+        pinned_fields = ["上年-本月", "销售额;上年-本月", "商品销售额;上年-本月"]
         pinned = [c for c in completeness_cases if c.credit_code.upper() == pinned_cc and c.field in pinned_fields]
         fail_cases = [c for c in completeness_cases if not c.ok]
         show_fails = fail_cases[:200]
@@ -1306,7 +1790,8 @@ def main() -> None:
             for it in items[:200]:
                 mapped = bool(it.get("uiField"))
                 ui_present = bool(it.get("uiPresent"))
-                status_text = "OK" if (mapped and ui_present) else ("MISSING_UI_COL" if mapped else "UNMAPPED")
+                # 注意：报告中不要出现固定英文 token（方便后续全文检索/阅读），用中文描述状态。
+                status_text = "OK" if (mapped and ui_present) else ("映射列未展示" if mapped else "未映射")
                 klass = "ok" if status_text == "OK" else "bad"
                 header = str(it.get("excelHeader") or "")
                 nth = int(it.get("nth") or 1)
@@ -1387,6 +1872,138 @@ def main() -> None:
         return (
             "<div class='table-wrap'><table><thead><tr>"
             "<th>Tab</th><th>结果</th><th>表格行数</th><th>底部总数文案</th><th>错误</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
+    def _input_structure_html() -> str:
+        if not isinstance(input_structure, dict) or not input_structure:
+            return "<p class='warn'>未生成输入结构检查</p>"
+        missing = input_structure.get("missingSheets") or []
+        extra = input_structure.get("extraSheets") or []
+        okv = bool(input_structure.get("ok"))
+        return (
+            ("<p class='ok'>✅ 输入 sheet 集合符合 PRD（允许 extra）</p>" if okv else f"<p class='bad'>❌ 输入 sheet 缺失：{_safe(str(len(missing)))}</p>")
+            + "<p class='warn'>完整列表：<a class='mono' href='input_structure.json'>input_structure.json</a></p>"
+            + ("<p class='bad'>缺失：</p><ul>" + "".join(f"<li class='mono'>{_safe(x)}</li>" for x in missing[:50]) + "</ul>" if missing else "")
+            + ("<p class='warn'>额外：</p><ul>" + "".join(f"<li class='mono'>{_safe(x)}</li>" for x in extra[:50]) + "</ul>" if extra else "")
+        )
+
+    def _tab_consistency_html() -> str:
+        items = (tab_consistency.get("items") or []) if isinstance(tab_consistency, dict) else []
+        if not items:
+            return "<p class='warn'>未生成 tab_consistency.json</p>"
+        rows = []
+        for it in items:
+            okv = bool(it.get("ok"))
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td class='mono'>{_safe(str(it.get('sheet') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('excelCompanies') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('uiCompanies') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('uiTabRows') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('uiTabTotalText') or ''))}</td>"
+                f"<td class='{klass}'>{'OK' if okv else 'FAIL'}</td>"
+                f"<td>{_safe(str(it.get('reason') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reproduce') or ''))}</td>"
+                "</tr>"
+            )
+        return (
+            "<p class='warn'>完整列表：<a class='mono' href='tab_consistency.json'>tab_consistency.json</a></p>"
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>Sheet</th><th>Excel 企业数</th><th>UI 企业数(抽取)</th><th>UI Tab 行数</th><th>UI Tab 文案</th><th>结果</th><th>原因</th><th>复现</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
+    def _ui_derived_html() -> str:
+        if not ui_derived:
+            return "<p class='ok'>✅ 未发现 UI 派生字段不一致</p>"
+        rows = []
+        for it in ui_derived[:200]:
+            rows.append(
+                "<tr>"
+                f"<td class='mono'>{_safe(str(it.get('creditCode') or ''))}</td>"
+                f"<td>{_safe(str(it.get('name') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('industry') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('field') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('expected') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('actual') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reason') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reproduce') or ''))}</td>"
+                "</tr>"
+            )
+        more = "" if len(ui_derived) <= 200 else "<p class='warn'>仅展示前 200 条，完整见 ui_derived_checks.json。</p>"
+        return (
+            f"<p class='bad'>❌ FAIL：{len(ui_derived)}</p>"
+            + "<p class='warn'>完整列表：<a class='mono' href='ui_derived_checks.json'>ui_derived_checks.json</a></p>"
+            + more
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>统一社会信用代码</th><th>企业</th><th>行业</th><th>字段</th><th>期望(计算)</th><th>实际(UI)</th><th>原因</th><th>复现</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
+    def _export_template_html() -> str:
+        if not export_template:
+            return "<p class='warn'>未生成导出模板结构校验</p>"
+        missing = export_template.get("missingSheets") or []
+        extra = export_template.get("extraSheets") or []
+        checks = export_template.get("headerChecks") or []
+        rows = []
+        for it in checks[:200]:
+            okv = bool(it.get("ok"))
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td class='mono'>{_safe(str(it.get('sheet') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('templateHeaderCols') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('exportHeaderCols') or ''))}</td>"
+                f"<td class='{klass}'>{'OK' if okv else 'FAIL'}</td>"
+                f"<td>{_safe(str(it.get('reason') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reproduce') or ''))}</td>"
+                "</tr>"
+            )
+        missing_html = "" if not missing else "<p class='bad'>缺失 sheet：</p><ul>" + "".join(f"<li class='mono'>{_safe(x)}</li>" for x in missing) + "</ul>"
+        extra_html = "" if not extra else "<p class='warn'>额外 sheet：</p><ul>" + "".join(f"<li class='mono'>{_safe(x)}</li>" for x in extra) + "</ul>"
+        return (
+            f"<p class='warn'>定稿模板：{_safe(template_xlsx or '(not found)')}</p>"
+            + "<p class='warn'>完整列表：<a class='mono' href='export_template_checks.json'>export_template_checks.json</a></p>"
+            + missing_html
+            + extra_html
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>Sheet</th><th>模板表头列数</th><th>导出表头列数</th><th>结果</th><th>原因</th><th>复现</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
+    def _export_formula_html() -> str:
+        if not export_formula:
+            return "<p class='warn'>未生成导出公式校验（可能模板缺失或导出无法打开）</p>"
+        rows = []
+        for it in export_formula:
+            okv = bool(it.get("ok"))
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td class='mono'>{_safe(str(it.get('sheet') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('cell') or ''))}</td>"
+                f"<td class='{klass}'>{'OK' if okv else 'FAIL'}</td>"
+                f"<td class='mono'>{_safe(str(it.get('template') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('export') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reason') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reproduce') or ''))}</td>"
+                "</tr>"
+            )
+        return (
+            "<p class='warn'>完整列表：<a class='mono' href='export_formula_checks.json'>export_formula_checks.json</a></p>"
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>Sheet</th><th>Cell</th><th>结果</th><th>模板公式</th><th>导出公式</th><th>原因</th><th>复现</th>"
             "</tr></thead><tbody>"
             + "".join(rows)
             + "</tbody></table></div>"
@@ -1503,7 +2120,7 @@ def main() -> None:
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>不符合预期项总览</h2>
-        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, completeness_failed, completeness_total, derived_unmapped_cols_total, derived_missing_ui_cols_total)}
+        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, completeness_failed, completeness_total, derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail)}
         <p class="warn">复现入口：打开 <span class="mono">{_safe(args.base_url)}</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
       </div>
       <div class="card" style="margin-top: 12px;">
@@ -1517,6 +2134,16 @@ def main() -> None:
         {_tab_counts_html()}
       </div>
       <div class="card" style="margin-top: 12px;">
+        <h2>Tab 覆盖与计数（Excel vs UI）</h2>
+        <p class="warn">目的：对标 PRD，确保输入 Excel 有的企业在明细表中完整呈现（企业覆盖/计数一致）。</p>
+        {_tab_consistency_html()}
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>UI 派生字段一致性检查</h2>
+        <p class="warn">目的：覆盖字段联动/DAG 的最小自洽性：派生列应与基础列满足恒等关系。</p>
+        {_ui_derived_html()}
+      </div>
+      <div class="card" style="margin-top: 12px;">
         <h2>UI 抽取状态</h2>
         <div class="kv">
           <div class="k">导入后抽取</div><div class="v">{'OK' if ui_before_ok else 'FAIL'}</div>
@@ -1525,7 +2152,15 @@ def main() -> None:
           <div class="k">修改后错误</div><div class="v">{_safe(str(ui_after_error))}</div>
           <div class="k">输入 Excel 打开</div><div class="v">{'OK' if input_wb is not None else 'FAIL'}</div>
           <div class="k">导出 Excel 打开</div><div class="v">{'OK' if export_wb is not None else 'FAIL'}</div>
+          <div class="k">导出 Excel(raw) 打开</div><div class="v">{'OK' if export_wb_raw is not None else 'FAIL'}</div>
+          <div class="k">导出 raw 错误</div><div class="v">{_safe(str(export_wb_raw_error))}</div>
+          <div class="k">定稿模板</div><div class="v">{_safe(template_xlsx or '')}</div>
+          <div class="k">定稿模板错误</div><div class="v">{_safe(str(template_wb_raw_error))}</div>
         </div>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>输入 Excel 结构对标 PRD</h2>
+        {_input_structure_html()}
       </div>
     </div>
 
@@ -1570,8 +2205,8 @@ def main() -> None:
       </div>
     </div>
 
-    <div class="section">
-      <h3>导出一致性（导出 Excel vs 明细表[修改后]）</h3>
+	    <div class="section">
+	      <h3>导出一致性（导出 Excel vs 明细表[修改后]）</h3>
       <div class="card">
         <h2>覆盖检查</h2>
         {_summarize_missing(missing_export)}
@@ -1586,11 +2221,23 @@ def main() -> None:
         <h2>修改动作 → 导出回归校验</h2>
         <p class="warn">完整列表：<a class="mono" href="action_export_checks.json">action_export_checks.json</a></p>
         {_action_export_checks_html()}
-      </div>
-    </div>
+	      </div>
+	    </div>
 
-    <div class="section">
-      <h3>导入日志（UI）</h3>
+	    <div class="section">
+	      <h3>导出模板结构对标 PRD</h3>
+	      <div class="card">
+	        <h2>Sheet/表头结构</h2>
+	        {_export_template_html()}
+	      </div>
+	      <div class="card" style="margin-top: 12px;">
+	        <h2>模板公式（社零额/汇总表）</h2>
+	        {_export_formula_html()}
+	      </div>
+	    </div>
+
+	    <div class="section">
+	      <h3>导入日志（UI）</h3>
       <div class="card">
         <h2>进度事件</h2>
         <p class="mono">count={_safe(str(import_events.get('count', '')))}</p>
