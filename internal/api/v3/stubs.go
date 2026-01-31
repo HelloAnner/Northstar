@@ -47,7 +47,7 @@ func (h *Handler) Export(c *gin.Context) {
 	}
 
 	// 创建导出器
-	exp := exporter.NewExporter(h.store)
+	exp := exporter.NewExporter(h.store, h.templatePath)
 
 	// 导出 Excel
 	file, err := exp.Export(exporter.ExportOptions{

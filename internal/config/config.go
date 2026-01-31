@@ -100,6 +100,11 @@ func LoadConfig() (*AppConfig, error) {
 	if v := os.Getenv("NORTHSTAR_EXCEL_TEMPLATE_PATH"); v != "" {
 		config.Excel.TemplatePath = v
 	}
+	if config.Excel.TemplatePath == "" {
+		if v := os.Getenv("NS_MONTH_REPORT_TEMPLATE_XLSX"); v != "" {
+			config.Excel.TemplatePath = v
+		}
+	}
 
 	return config, nil
 }

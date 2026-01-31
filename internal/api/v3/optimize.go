@@ -160,12 +160,12 @@ func adjustLimitAboveMonthValue(st *store.Store, year, month int, target float64
 	if err != nil {
 		return err
 	}
-	acSum, acCount, err := sumAndCountAC(st, year, month, "", "retail_current_month")
+	acSum, acCount, err := sumAndCountACDerivedRetailMonth(st, year, month, "", false)
 	if err != nil {
 		return err
 	}
 
-	return scaleAcrossWRAndAC(st, year, month, "retail_current_month", wrSum, wrCount, acSum, acCount, target)
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", wrSum, wrCount, acSum, acCount, target)
 }
 
 func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate float64) error {
@@ -173,7 +173,7 @@ func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate floa
 	if err != nil {
 		return err
 	}
-	lastYearSumAC, _, err := sumAndCountAC(st, year, month, "", "retail_last_year_month")
+	lastYearSumAC, _, err := sumAndCountACDerivedRetailMonth(st, year, month, "", true)
 	if err != nil {
 		return err
 	}
@@ -188,40 +188,54 @@ func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate floa
 	if err != nil {
 		return err
 	}
-	acSum, acCount, err := sumAndCountAC(st, year, month, "", "retail_current_month")
+	acSum, acCount, err := sumAndCountACDerivedRetailMonth(st, year, month, "", false)
 	if err != nil {
 		return err
 	}
 
-	return scaleAcrossWRAndAC(st, year, month, "retail_current_month", wrSum, wrCount, acSum, acCount, desired)
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", wrSum, wrCount, acSum, acCount, desired)
 }
 
 func adjustLimitAboveCumulativeValue(st *store.Store, year, month int, target float64) error {
 	if target < 0 {
 		target = 0
 	}
-	currentSum, count, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
+	wrSum, wrCount, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
 	if err != nil {
 		return err
 	}
-	return scaleWRField(st, year, month, "", "", "retail_current_cumulative", currentSum, count, target)
+	acSum, acCount, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", false)
+	if err != nil {
+		return err
+	}
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_cumulative", "food_current_cumulative", "goods_current_cumulative", wrSum, wrCount, acSum, acCount, target)
 }
 
 func adjustLimitAboveCumulativeRate(st *store.Store, year, month int, targetRate float64) error {
-	lastYearSum, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
+	lastYearSumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
 	if err != nil {
 		return err
 	}
+	lastYearSumAC, _, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", true)
+	if err != nil {
+		return err
+	}
+
+	lastYearSum := lastYearSumWR + lastYearSumAC
 	desired := lastYearSum * (1 + targetRate/100)
 	if desired < 0 {
 		desired = 0
 	}
 
-	currentSum, count, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
+	wrSum, wrCount, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
 	if err != nil {
 		return err
 	}
-	return scaleWRField(st, year, month, "", "", "retail_current_cumulative", currentSum, count, desired)
+	acSum, acCount, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", false)
+	if err != nil {
+		return err
+	}
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_cumulative", "food_current_cumulative", "goods_current_cumulative", wrSum, wrCount, acSum, acCount, desired)
 }
 
 func adjustWRSpecialRate(st *store.Store, year, month int, flagField string, targetRate float64) error {
@@ -300,11 +314,15 @@ func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target f
 		desiredLimitAbove = 0
 	}
 
-	currentSum, count, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
+	wrSum, wrCount, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
 	if err != nil {
 		return err
 	}
-	return scaleWRField(st, year, month, "", "", "retail_current_cumulative", currentSum, count, desiredLimitAbove)
+	acSum, acCount, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", false)
+	if err != nil {
+		return err
+	}
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_cumulative", "food_current_cumulative", "goods_current_cumulative", wrSum, wrCount, acSum, acCount, desiredLimitAbove)
 }
 
 func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRate float64) error {
@@ -318,10 +336,15 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 		return err
 	}
 
-	retailLastYearCumulativeSum, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
+	retailLastYearCumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
 	if err != nil {
 		return err
 	}
+	retailLastYearCumAC, _, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", true)
+	if err != nil {
+		return err
+	}
+	retailLastYearCumulativeSum := retailLastYearCumWR + retailLastYearCumAC
 
 	targetFraction := targetRate / 100
 	desiredLimitAbove := retailLastYearCumulativeSum*(1+targetFraction) + limitBelowLastYear*(targetFraction-microRate/100)
@@ -329,11 +352,15 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 		desiredLimitAbove = 0
 	}
 
-	currentSum, count, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
+	wrSum, wrCount, err := sumAndCountWR(st, year, month, "", "", "retail_current_cumulative")
 	if err != nil {
 		return err
 	}
-	return scaleWRField(st, year, month, "", "", "retail_current_cumulative", currentSum, count, desiredLimitAbove)
+	acSum, acCount, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", false)
+	if err != nil {
+		return err
+	}
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_cumulative", "food_current_cumulative", "goods_current_cumulative", wrSum, wrCount, acSum, acCount, desiredLimitAbove)
 }
 
 func computeMicroSmallRate(st *store.Store, year, month int) (float64, error) {
@@ -388,6 +415,50 @@ func sumAndCountAC(st *store.Store, year, month int, industryType string, field 
 	return sum, count, nil
 }
 
+func sumAndCountACDerivedRetailMonth(st *store.Store, year, month int, industryType string, lastYear bool) (float64, int, error) {
+	where := "data_year = ? AND data_month = ?"
+	args := []interface{}{year, month}
+	if industryType != "" {
+		where += " AND industry_type = ?"
+		args = append(args, industryType)
+	}
+
+	expr := "food_current_month + goods_current_month"
+	if lastYear {
+		expr = "food_last_year_month + goods_last_year_month"
+	}
+
+	query := fmt.Sprintf("SELECT COALESCE(SUM(%s), 0), COUNT(1) FROM accommodation_catering WHERE %s", expr, where)
+	var sum float64
+	var count int
+	if err := st.QueryRow(query, args...).Scan(&sum, &count); err != nil {
+		return 0, 0, err
+	}
+	return sum, count, nil
+}
+
+func sumAndCountACDerivedRetailCumulative(st *store.Store, year, month int, industryType string, lastYear bool) (float64, int, error) {
+	where := "data_year = ? AND data_month = ?"
+	args := []interface{}{year, month}
+	if industryType != "" {
+		where += " AND industry_type = ?"
+		args = append(args, industryType)
+	}
+
+	expr := "food_current_cumulative + goods_current_cumulative"
+	if lastYear {
+		expr = "food_last_year_cumulative + goods_last_year_cumulative"
+	}
+
+	query := fmt.Sprintf("SELECT COALESCE(SUM(%s), 0), COUNT(1) FROM accommodation_catering WHERE %s", expr, where)
+	var sum float64
+	var count int
+	if err := st.QueryRow(query, args...).Scan(&sum, &count); err != nil {
+		return 0, 0, err
+	}
+	return sum, count, nil
+}
+
 func scaleAcrossWRAndAC(st *store.Store, year, month int, field string, wrSum float64, wrCount int, acSum float64, acCount int, target float64) error {
 	totalSum := wrSum + acSum
 	totalCount := wrCount + acCount
@@ -432,6 +503,61 @@ func scaleAcrossWRAndAC(st *store.Store, year, month int, field string, wrSum fl
 		if err := st.Exec(
 			fmt.Sprintf("UPDATE accommodation_catering SET %s = %s * ? WHERE data_year = ? AND data_month = ?", field, field),
 			factor, year, month,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField string, acFoodField string, acGoodsField string, wrSum float64, wrCount int, acSum float64, acCount int, target float64) error {
+	totalSum := wrSum + acSum
+	totalCount := wrCount + acCount
+	if totalCount == 0 {
+		return fmt.Errorf("没有可调整数据")
+	}
+
+	// 全部为 0：按“人均”分摊到 WR 的目标字段，并把 AC 分配到 food 字段（goods 置 0）
+	if totalSum == 0 {
+		perRow := 0.0
+		if target > 0 {
+			perRow = target / float64(totalCount)
+		}
+		if wrCount > 0 {
+			if err := st.Exec(
+				fmt.Sprintf("UPDATE wholesale_retail SET %s = ? WHERE data_year = ? AND data_month = ?", wrField),
+				perRow, year, month,
+			); err != nil {
+				return err
+			}
+		}
+		if acCount > 0 {
+			if err := st.Exec(
+				fmt.Sprintf("UPDATE accommodation_catering SET %s = ?, %s = 0 WHERE data_year = ? AND data_month = ?", acFoodField, acGoodsField),
+				perRow, year, month,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	factor := target / totalSum
+	if wrCount > 0 {
+		if err := st.Exec(
+			fmt.Sprintf("UPDATE wholesale_retail SET %s = %s * ? WHERE data_year = ? AND data_month = ?", wrField, wrField),
+			factor, year, month,
+		); err != nil {
+			return err
+		}
+	}
+	if acCount > 0 {
+		if err := st.Exec(
+			fmt.Sprintf(
+				"UPDATE accommodation_catering SET %s = %s * ?, %s = %s * ? WHERE data_year = ? AND data_month = ?",
+				acFoodField, acFoodField, acGoodsField, acGoodsField,
+			),
+			factor, factor, year, month,
 		); err != nil {
 			return err
 		}
@@ -506,4 +632,3 @@ func scaleACField(st *store.Store, year, month int, industryType string, field s
 		argsWithFactor...,
 	)
 }
-

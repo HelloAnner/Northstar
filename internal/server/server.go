@@ -44,7 +44,7 @@ func NewServer(cfg *config.AppConfig) *Server {
 	}
 
 	// 创建 V3 API 处理器
-	v3Handler := v3.NewHandler(sqliteStore)
+	v3Handler := v3.NewHandler(sqliteStore, cfg.Excel.TemplatePath)
 
 	s := &Server{
 		router: gin.Default(),
@@ -71,10 +71,14 @@ func (s *Server) setupRoutes(devMode bool) {
 		c.Next()
 	})
 
-	// V3 API 路由
-	api := s.router.Group("/api")
+	// API 路由（前端与测试默认使用 /api/v1；同时保留 /api 兼容旧路径）
+	apiV1 := s.router.Group("/api/v1")
 	{
-		s.v3.RegisterRoutes(api)
+		s.v3.RegisterRoutes(apiV1)
+	}
+	apiCompat := s.router.Group("/api")
+	{
+		s.v3.RegisterRoutes(apiCompat)
 	}
 
 	// 静态资源

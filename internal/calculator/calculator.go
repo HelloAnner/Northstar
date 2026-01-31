@@ -120,9 +120,11 @@ func (c *Calculator) calculateLimitAbove(year, month int) ([]Indicator, error) {
 
 	// 住餐企业零售额
 	for _, record := range acRecords {
-		retailCurrentMonthSum += record.RetailCurrentMonth
-		retailLastYearMonthSum += record.RetailLastYearMonth
-		// 住餐没有累计零售额，不累加
+		// 住餐模板右侧“零售额”口径：餐费收入 + 商品销售额（与 12月月报（定）.xlsx 一致）
+		retailCurrentMonthSum += record.FoodCurrentMonth + record.GoodsCurrentMonth
+		retailLastYearMonthSum += record.FoodLastYearMonth + record.GoodsLastYearMonth
+		retailCurrentCumulativeSum += record.FoodCurrentCumulative + record.GoodsCurrentCumulative
+		retailLastYearCumulativeSum += record.FoodLastYearCumulative + record.GoodsLastYearCumulative
 	}
 
 	// 计算增速

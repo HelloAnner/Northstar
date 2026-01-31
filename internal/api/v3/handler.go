@@ -7,13 +7,15 @@ import (
 
 // Handler V3 API 处理器
 type Handler struct {
-	store *store.Store
+	store        *store.Store
+	templatePath string
 }
 
 // NewHandler 创建 V3 API 处理器
-func NewHandler(store *store.Store) *Handler {
+func NewHandler(store *store.Store, templatePath string) *Handler {
 	return &Handler{
-		store: store,
+		store:        store,
+		templatePath: templatePath,
 	}
 }
 
