@@ -1,11 +1,16 @@
 package importer
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/xuri/excelize/v2"
+	"northstar/internal/model"
 	"northstar/internal/parser"
 	"northstar/internal/store"
 )
@@ -27,6 +32,7 @@ func NewCoordinator(store *store.Store) *Coordinator {
 // ImportOptions 导入选项
 type ImportOptions struct {
 	FilePath        string
+	OriginalFilename string
 	ClearExisting   bool // 是否清空现有数据
 	UpdateConfigYM  bool // 是否更新配置中的当前年月
 	CalculateFields bool // 是否计算衍生字段
@@ -49,6 +55,12 @@ type ImportContext struct {
 	ProgressChan   chan ProgressEvent
 	CurrentYear    int // 从主表识别出的当前年份
 	CurrentMonth   int // 从主表识别出的当前月份
+	clearedWRYM    map[string]bool
+	clearedACYM    map[string]bool
+	clearedWRSYM   map[string]bool
+	clearedACSYM   map[string]bool
+	importLogID    *int64
+	currentMeta    *sheetMetaDraft
 }
 
 // Import 执行导入，返回进度通道
@@ -67,19 +79,39 @@ func (c *Coordinator) Import(opts ImportOptions) <-chan ProgressEvent {
 func (c *Coordinator) doImport(opts ImportOptions, progressChan chan ProgressEvent) {
 	startTime := time.Now()
 
+	originalName := opts.OriginalFilename
+	if originalName == "" {
+		originalName = filepath.Base(opts.FilePath)
+	}
+
 	// 发送开始事件
 	c.sendProgress(progressChan, ProgressEvent{
 		Type:    "start",
 		Message: "开始导入 Excel 文件",
 		Data: map[string]string{
-			"filename": filepath.Base(opts.FilePath),
+			"filename": originalName,
 		},
 		Timestamp: time.Now(),
 	})
 
+	var importLogID *int64
+	fileSize, fileHash := statAndHashFile(opts.FilePath)
+	if id, err := c.store.CreateImportLog(originalName, opts.FilePath, fileSize, fileHash); err == nil {
+		importLogID = &id
+	} else {
+		c.sendProgress(progressChan, ProgressEvent{
+			Type:      "warning",
+			Message:   fmt.Sprintf("创建导入日志失败: %v", err),
+			Timestamp: time.Now(),
+		})
+	}
+
 	// 打开 Excel 文件
 	file, err := excelize.OpenFile(opts.FilePath)
 	if err != nil {
+		if importLogID != nil {
+			_ = c.store.UpdateImportLog(*importLogID, 0, 0, 0, 0, 0, 0, "failed", fmt.Sprintf("打开文件失败: %v", err))
+		}
 		c.sendProgress(progressChan, ProgressEvent{
 			Type:      "error",
 			Message:   fmt.Sprintf("打开文件失败: %v", err),
@@ -95,8 +127,13 @@ func (c *Coordinator) doImport(opts ImportOptions, progressChan chan ProgressEve
 		File:         file,
 		StartTime:    startTime,
 		ProgressChan: progressChan,
+		clearedWRYM:  map[string]bool{},
+		clearedACYM:  map[string]bool{},
+		clearedWRSYM: map[string]bool{},
+		clearedACSYM: map[string]bool{},
+		importLogID:  importLogID,
 		Report: &parser.ImportReport{
-			Filename: filepath.Base(opts.FilePath),
+			Filename: originalName,
 			Sheets:   []parser.ParseResult{},
 		},
 	}
@@ -131,6 +168,26 @@ func (c *Coordinator) doImport(opts ImportOptions, progressChan chan ProgressEve
 
 	// 汇总统计
 	ctx.Report.Duration = time.Since(startTime)
+
+	if ctx.importLogID != nil {
+		status := "completed"
+		errMsg := ""
+		if ctx.Report.ErrorRows > 0 {
+			// 有错误行也视为完成，但保留错误信息
+			status = "completed"
+		}
+		_ = c.store.UpdateImportLog(
+			*ctx.importLogID,
+			ctx.Report.TotalSheets,
+			ctx.Report.ImportedSheets,
+			ctx.Report.SkippedSheets,
+			ctx.Report.TotalRows,
+			ctx.Report.ImportedRows,
+			ctx.Report.ErrorRows,
+			status,
+			errMsg,
+		)
+	}
 
 	// 发送完成事件
 	c.sendProgress(progressChan, ProgressEvent{
@@ -184,11 +241,23 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 	})
 
 	// 根据类型处理
+	ctx.currentMeta = &sheetMetaDraft{
+		SheetName:    sheetName,
+		SheetType:    recognition.SheetType,
+		Confidence:   recognition.Confidence,
+		TotalRows:    maxInt(0, len(rows)-1),
+		TotalColumns: len(headers),
+		Headers:      headers,
+	}
 	switch recognition.SheetType {
 	case parser.SheetTypeWholesale, parser.SheetTypeRetail:
 		c.processWholesaleRetail(ctx, sheetName, opts)
 	case parser.SheetTypeAccommodation, parser.SheetTypeCatering:
 		c.processAccommodationCatering(ctx, sheetName, opts)
+	case parser.SheetTypeWRSnapshot:
+		c.processWRSnapshot(ctx, sheetName, opts)
+	case parser.SheetTypeACSnapshot:
+		c.processACSnapshot(ctx, sheetName, opts)
 	case parser.SheetTypeSummary:
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -223,6 +292,7 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 			Duration:  time.Since(sheetStartTime),
 		})
 	}
+	ctx.currentMeta = nil
 }
 
 // processWholesaleRetail 处理批零主表
@@ -241,6 +311,10 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 			Duration:  time.Since(sheetStartTime),
 		})
 		return
+	}
+
+	for _, r := range records {
+		r.SourceFile = ctx.Report.Filename
 	}
 
 	// 识别当前年月（从第一条记录）
@@ -264,12 +338,16 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 	if opts.ClearExisting && len(records) > 0 {
 		year := records[0].DataYear
 		month := records[0].DataMonth
-		if err := c.store.DeleteWRByYearMonth(year, month); err != nil {
-			c.sendProgress(ctx.ProgressChan, ProgressEvent{
-				Type:    "warning",
-				Message: fmt.Sprintf("清空旧数据失败: %v", err),
-				Timestamp: time.Now(),
-			})
+		key := fmt.Sprintf("%d-%02d", year, month)
+		if !ctx.clearedWRYM[key] {
+			ctx.clearedWRYM[key] = true
+			if err := c.store.DeleteWRByYearMonth(year, month); err != nil {
+				c.sendProgress(ctx.ProgressChan, ProgressEvent{
+					Type:      "warning",
+					Message:   fmt.Sprintf("清空批零旧数据失败: %v", err),
+					Timestamp: time.Now(),
+				})
+			}
 		}
 	}
 
@@ -295,16 +373,6 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 		ImportedRows: len(records),
 		Duration:     time.Since(sheetStartTime),
 	})
-
-	c.sendProgress(ctx.ProgressChan, ProgressEvent{
-		Type:    "sheet_done",
-		Message: fmt.Sprintf("Sheet \"%s\" 导入成功: %d 行", sheetName, len(records)),
-		Data: map[string]interface{}{
-			"sheet_name":    sheetName,
-			"imported_rows": len(records),
-		},
-		Timestamp: time.Now(),
-	})
 }
 
 // processAccommodationCatering 处理住餐主表
@@ -323,6 +391,10 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 			Duration:  time.Since(sheetStartTime),
 		})
 		return
+	}
+
+	for _, r := range records {
+		r.SourceFile = ctx.Report.Filename
 	}
 
 	// 识别当前年月
@@ -346,12 +418,16 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 	if opts.ClearExisting && len(records) > 0 {
 		year := records[0].DataYear
 		month := records[0].DataMonth
-		if err := c.store.DeleteACByYearMonth(year, month); err != nil {
-			c.sendProgress(ctx.ProgressChan, ProgressEvent{
-				Type:    "warning",
-				Message: fmt.Sprintf("清空旧数据失败: %v", err),
-				Timestamp: time.Now(),
-			})
+		key := fmt.Sprintf("%d-%02d", year, month)
+		if !ctx.clearedACYM[key] {
+			ctx.clearedACYM[key] = true
+			if err := c.store.DeleteACByYearMonth(year, month); err != nil {
+				c.sendProgress(ctx.ProgressChan, ProgressEvent{
+					Type:      "warning",
+					Message:   fmt.Sprintf("清空住餐旧数据失败: %v", err),
+					Timestamp: time.Now(),
+				})
+			}
 		}
 	}
 
@@ -377,15 +453,115 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 		ImportedRows: len(records),
 		Duration:     time.Since(sheetStartTime),
 	})
+}
 
-	c.sendProgress(ctx.ProgressChan, ProgressEvent{
-		Type:    "sheet_done",
-		Message: fmt.Sprintf("Sheet \"%s\" 导入成功: %d 行", sheetName, len(records)),
-		Data: map[string]interface{}{
-			"sheet_name":    sheetName,
-			"imported_rows": len(records),
-		},
-		Timestamp: time.Now(),
+// processWRSnapshot 处理批零快照 Sheet
+func (c *Coordinator) processWRSnapshot(ctx *ImportContext, sheetName string, opts ImportOptions) {
+	sheetStartTime := time.Now()
+
+	parserImpl := parser.NewWRSnapshotParser(ctx.File)
+	records, err := parserImpl.ParseSheet(sheetName)
+	if err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeWRSnapshot,
+			Status:    "error",
+			Errors:    []string{err.Error()},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	if opts.ClearExisting && len(records) > 0 {
+		year := records[0].SnapshotYear
+		month := records[0].SnapshotMonth
+		key := fmt.Sprintf("%d-%02d", year, month)
+		if !ctx.clearedWRSYM[key] {
+			ctx.clearedWRSYM[key] = true
+			if err := c.store.DeleteWRSnapshotByYearMonth(year, month); err != nil {
+				c.sendProgress(ctx.ProgressChan, ProgressEvent{
+					Type:      "warning",
+					Message:   fmt.Sprintf("清空批零快照旧数据失败: %v", err),
+					Timestamp: time.Now(),
+				})
+			}
+		}
+	}
+
+	if err := c.store.BatchInsertWRSnapshot(records); err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName:    sheetName,
+			SheetType:    parser.SheetTypeWRSnapshot,
+			Status:       "error",
+			ImportedRows: 0,
+			ErrorRows:    len(records),
+			Errors:       []string{fmt.Sprintf("批量插入失败: %v", err)},
+			Duration:     time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	c.recordSheetResult(ctx, parser.ParseResult{
+		SheetName:    sheetName,
+		SheetType:    parser.SheetTypeWRSnapshot,
+		Status:       "imported",
+		ImportedRows: len(records),
+		Duration:     time.Since(sheetStartTime),
+	})
+}
+
+// processACSnapshot 处理住餐快照 Sheet
+func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, opts ImportOptions) {
+	sheetStartTime := time.Now()
+
+	parserImpl := parser.NewACSnapshotParser(ctx.File)
+	records, err := parserImpl.ParseSheet(sheetName)
+	if err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeACSnapshot,
+			Status:    "error",
+			Errors:    []string{err.Error()},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	if opts.ClearExisting && len(records) > 0 {
+		year := records[0].SnapshotYear
+		month := records[0].SnapshotMonth
+		key := fmt.Sprintf("%d-%02d", year, month)
+		if !ctx.clearedACSYM[key] {
+			ctx.clearedACSYM[key] = true
+			if err := c.store.DeleteACSnapshotByYearMonth(year, month); err != nil {
+				c.sendProgress(ctx.ProgressChan, ProgressEvent{
+					Type:      "warning",
+					Message:   fmt.Sprintf("清空住餐快照旧数据失败: %v", err),
+					Timestamp: time.Now(),
+				})
+			}
+		}
+	}
+
+	if err := c.store.BatchInsertACSnapshot(records); err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName:    sheetName,
+			SheetType:    parser.SheetTypeACSnapshot,
+			Status:       "error",
+			ImportedRows: 0,
+			ErrorRows:    len(records),
+			Errors:       []string{fmt.Sprintf("批量插入失败: %v", err)},
+			Duration:     time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	c.recordSheetResult(ctx, parser.ParseResult{
+		SheetName:    sheetName,
+		SheetType:    parser.SheetTypeACSnapshot,
+		Status:       "imported",
+		ImportedRows: len(records),
+		Duration:     time.Since(sheetStartTime),
 	})
 }
 
@@ -493,6 +669,62 @@ func (c *Coordinator) recordSheetResult(ctx *ImportContext, result parser.ParseR
 	}
 
 	ctx.Report.TotalRows += result.ImportedRows + result.ErrorRows
+
+	c.sendProgress(ctx.ProgressChan, ProgressEvent{
+		Type:    "sheet_done",
+		Message: fmt.Sprintf("Sheet \"%s\" %s", result.SheetName, sheetStatusText(result)),
+		Data: map[string]interface{}{
+			"sheetName":    result.SheetName,
+			"sheetType":    result.SheetType,
+			"status":       result.Status,
+			"importedRows": result.ImportedRows,
+			"errorRows":    result.ErrorRows,
+			"errors":       result.Errors,
+		},
+		Timestamp: time.Now(),
+	})
+
+	// 写入 sheets_meta（失败不影响导入流程）
+	if ctx.currentMeta != nil {
+		meta := model.SheetMeta{
+			SheetName:    ctx.currentMeta.SheetName,
+			SheetType:    string(ctx.currentMeta.SheetType),
+			Confidence:   ctx.currentMeta.Confidence,
+			TotalRows:    ctx.currentMeta.TotalRows,
+			TotalColumns: ctx.currentMeta.TotalColumns,
+			ImportedRows: result.ImportedRows,
+			ColumnsJSON:  store.BuildColumnsJSON(ctx.currentMeta.Headers),
+			Status:       result.Status,
+			ErrorMessage: joinErrors(result.Errors),
+			SourceFile:   ctx.Report.Filename,
+		}
+		if ctx.importLogID != nil {
+			meta.ImportLogID = ctx.importLogID
+		}
+		if err := c.store.InsertSheetMeta(meta); err != nil {
+			c.sendProgress(ctx.ProgressChan, ProgressEvent{
+				Type:      "warning",
+				Message:   fmt.Sprintf("写入 Sheet 元信息失败: %v", err),
+				Timestamp: time.Now(),
+			})
+		}
+	}
+}
+
+func sheetStatusText(r parser.ParseResult) string {
+	switch r.Status {
+	case "imported":
+		return fmt.Sprintf("导入成功: %d 行", r.ImportedRows)
+	case "skipped":
+		return "已跳过"
+	case "error":
+		if len(r.Errors) > 0 {
+			return fmt.Sprintf("失败: %s", r.Errors[0])
+		}
+		return "失败"
+	default:
+		return r.Status
+	}
 }
 
 // sendProgress 发送进度事件
@@ -502,4 +734,46 @@ func (c *Coordinator) sendProgress(ch chan ProgressEvent, event ProgressEvent) {
 	default:
 		// 通道已满，丢弃事件
 	}
+}
+
+type sheetMetaDraft struct {
+	SheetName    string
+	SheetType    parser.SheetType
+	Confidence   float64
+	TotalRows    int
+	TotalColumns int
+	Headers      []string
+}
+
+func statAndHashFile(path string) (int64, string) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0, ""
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return fi.Size(), ""
+	}
+	defer f.Close()
+
+	h := md5.New()
+	_, _ = io.Copy(h, f)
+	return fi.Size(), hex.EncodeToString(h.Sum(nil))
+}
+
+func joinErrors(errs []string) string {
+	if len(errs) == 0 {
+		return ""
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	return fmt.Sprintf("%s (and %d more)", errs[0], len(errs)-1)
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -9,27 +9,6 @@ import (
 	"northstar/internal/exporter"
 )
 
-// ListCompanies 查询企业列表
-// GET /api/companies
-func (h *Handler) ListCompanies(c *gin.Context) {
-	// TODO: 实现企业列表查询
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "功能尚未实现"})
-}
-
-// GetCompany 获取企业详情
-// GET /api/companies/:id
-func (h *Handler) GetCompany(c *gin.Context) {
-	// TODO: 实现企业详情查询
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "功能尚未实现"})
-}
-
-// UpdateCompany 更新企业数据（微调）
-// PATCH /api/companies/:id
-func (h *Handler) UpdateCompany(c *gin.Context) {
-	// TODO: 实现企业数据更新和 DAG 联动计算
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "功能尚未实现"})
-}
-
 // GetIndicators 获取16项指标
 // GET /api/indicators
 func (h *Handler) GetIndicators(c *gin.Context) {

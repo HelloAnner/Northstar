@@ -9,7 +9,8 @@ import (
 // ExtractYearMonth 从字符串中提取年月信息
 // 支持格式: "2025年12月销售额" / "2025年12月" / "销售额;2025年12月"
 func ExtractYearMonth(text string) (year, month int, found bool) {
-	re := regexp.MustCompile(`(\d{4})年0?(\d{1,2})月`)
+	// 允许 "2024年;12月" / "2024年12月;xxx" 等分隔符形式
+	re := regexp.MustCompile(`(\d{4})年[^0-9]{0,3}0?(\d{1,2})月`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) >= 3 {
 		year, _ = strconv.Atoi(matches[1])
@@ -19,10 +20,23 @@ func ExtractYearMonth(text string) (year, month int, found bool) {
 	return 0, 0, false
 }
 
+// ExtractMonthOnly 提取不带年份的月份
+// 支持格式: "11月客房收入" / "12月销售额增速"
+func ExtractMonthOnly(text string) (month int, found bool) {
+	re := regexp.MustCompile(`(^|[^0-9])0?(\d{1,2})月`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) >= 3 {
+		month, _ = strconv.Atoi(matches[2])
+		return month, true
+	}
+	return 0, false
+}
+
 // ExtractYearMonthRange 提取年月范围
 // 支持格式: "2025年1-12月" / "2025年1—12月"
 func ExtractYearMonthRange(text string) (year, startMonth, endMonth int, found bool) {
-	re := regexp.MustCompile(`(\d{4})年0?(\d{1,2})[-—]0?(\d{1,2})月`)
+	// 允许 "2024年;1-12月" / "2024年1-12月;xxx" 等分隔符形式
+	re := regexp.MustCompile(`(\d{4})年[^0-9]{0,3}0?(\d{1,2})[-—]0?(\d{1,2})月`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) >= 4 {
 		year, _ = strconv.Atoi(matches[1])
@@ -45,14 +59,17 @@ func InferFieldTimeType(columnName string, currentYear, currentMonth int) FieldT
 		// 累计字段
 		year, _, endMonth, found := ExtractYearMonthRange(columnName)
 		if found {
-			if year == currentYear {
-				if endMonth == currentMonth {
-					return CurrentCumulative
-				} else if endMonth == currentMonth-1 {
-					return PrevCumulative
-				}
-			} else if year == currentYear-1 {
+			if year == currentYear && endMonth == currentMonth {
+				return CurrentCumulative
+			}
+			if year == currentYear && endMonth == currentMonth-1 {
+				return PrevCumulative
+			}
+			if year == currentYear-1 && endMonth == currentMonth {
 				return LastYearCumulative
+			}
+			if year == currentYear-1 && endMonth == currentMonth-1 {
+				return LastYearPrevCumulative
 			}
 		}
 		// 无法提取范围，通过年份判断
@@ -82,6 +99,17 @@ func InferFieldTimeType(columnName string, currentYear, currentMonth int) FieldT
 			}
 		} else if year == currentYear-1 {
 			return LastYearMonth
+		}
+	}
+
+	// 兼容：不带年份的 "11月xxx"
+	month, found = ExtractMonthOnly(columnName)
+	if found {
+		if month == currentMonth {
+			return CurrentMonth
+		}
+		if month == currentMonth-1 {
+			return PrevMonth
 		}
 	}
 

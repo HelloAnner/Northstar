@@ -63,10 +63,11 @@ func (h *Handler) Import(c *gin.Context) {
 
 	// 开始导入
 	progressChan := coordinator.Import(importer.ImportOptions{
-		FilePath:        tempFilePath,
-		ClearExisting:   clearExisting,
-		UpdateConfigYM:  updateConfigYM,
-		CalculateFields: true,
+		FilePath:          tempFilePath,
+		OriginalFilename:  uploadedFile.Filename,
+		ClearExisting:     clearExisting,
+		UpdateConfigYM:    updateConfigYM,
+		CalculateFields:   true,
 	})
 
 	// 流式发送进度事件

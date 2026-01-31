@@ -23,35 +23,46 @@ func (r *SheetRecognizer) Recognize(sheetName string, columnNames []string) Shee
 	// 尝试从 Sheet 名提取年月
 	year, month, _ := ExtractYearMonth(sheetName)
 
-	// 依次尝试各种类型
-	if result := r.recognizeWholesaleRetail(sheetName, normalized); result.Confidence >= 0.5 {
-		result.DataYear = year
-		result.DataMonth = month
-		return result
+	// 快照表优先：一旦命中 “本年-本月/上年-本月” 口径，不允许被主表误判
+	if snap := r.recognizeSnapshot(sheetName, normalized); snap.Confidence >= 0.9 {
+		snap.DataYear = year
+		snap.DataMonth = month
+		return snap
 	}
 
-	if result := r.recognizeAccommodationCatering(sheetName, normalized); result.Confidence >= 0.5 {
-		result.DataYear = year
-		result.DataMonth = month
-		return result
+	// 评分后择优（避免主表/快照/住餐被“先匹配”误判）
+	candidates := []SheetRecognitionResult{
+		r.recognizeAccommodationCatering(sheetName, normalized),
+		r.recognizeWholesaleRetail(sheetName, normalized),
+		r.recognizeSummary(sheetName, normalized),
 	}
 
-	if result := r.recognizeSnapshot(sheetName, normalized); result.Confidence >= 0.5 {
-		result.DataYear = year
-		result.DataMonth = month
-		return result
-	}
-
-	if result := r.recognizeSummary(sheetName, normalized); result.Confidence >= 0.3 {
-		return result
-	}
-
-	// 无法识别
-	return SheetRecognitionResult{
+	best := SheetRecognitionResult{
 		SheetName:  sheetName,
 		SheetType:  SheetTypeUnknown,
 		Confidence: 0,
 	}
+	for _, c := range candidates {
+		if c.Confidence > best.Confidence {
+			best = c
+		}
+	}
+
+	// 置信度阈值（summary 允许更低一些）
+	if best.SheetType == SheetTypeSummary {
+		if best.Confidence < 0.3 {
+			return SheetRecognitionResult{SheetName: sheetName, SheetType: SheetTypeUnknown, Confidence: 0}
+		}
+		return best
+	}
+	if best.Confidence < 0.5 {
+		return SheetRecognitionResult{SheetName: sheetName, SheetType: SheetTypeUnknown, Confidence: 0}
+	}
+
+	// 主表/快照补充年月（对主表可能为 0；真正月份由列名推断）
+	best.DataYear = year
+	best.DataMonth = month
+	return best
 }
 
 // recognizeWholesaleRetail 识别批发零售主表
@@ -87,7 +98,7 @@ func (r *SheetRecognizer) recognizeWholesaleRetail(sheetName string, columns []s
 			return SheetRecognitionResult{
 				SheetName:  sheetName,
 				SheetType:  SheetTypeWholesale,
-				Confidence: confidence + nameBoost,
+				Confidence: clampConfidence(confidence + nameBoost),
 			}
 		}
 	}
@@ -97,7 +108,7 @@ func (r *SheetRecognizer) recognizeWholesaleRetail(sheetName string, columns []s
 			return SheetRecognitionResult{
 				SheetName:  sheetName,
 				SheetType:  SheetTypeRetail,
-				Confidence: confidence + nameBoost,
+				Confidence: clampConfidence(confidence + nameBoost),
 			}
 		}
 	}
@@ -115,7 +126,7 @@ func (r *SheetRecognizer) recognizeWholesaleRetail(sheetName string, columns []s
 		return SheetRecognitionResult{
 			SheetName:  sheetName,
 			SheetType:  sheetType,
-			Confidence: confidence + nameBoost,
+			Confidence: clampConfidence(confidence + nameBoost),
 		}
 	}
 
@@ -157,7 +168,7 @@ func (r *SheetRecognizer) recognizeAccommodationCatering(sheetName string, colum
 			return SheetRecognitionResult{
 				SheetName:  sheetName,
 				SheetType:  SheetTypeAccommodation,
-				Confidence: confidence + nameBoost,
+				Confidence: clampConfidence(confidence + nameBoost),
 			}
 		}
 	}
@@ -167,7 +178,7 @@ func (r *SheetRecognizer) recognizeAccommodationCatering(sheetName string, colum
 			return SheetRecognitionResult{
 				SheetName:  sheetName,
 				SheetType:  SheetTypeCatering,
-				Confidence: confidence + nameBoost,
+				Confidence: clampConfidence(confidence + nameBoost),
 			}
 		}
 	}
@@ -183,7 +194,7 @@ func (r *SheetRecognizer) recognizeAccommodationCatering(sheetName string, colum
 		return SheetRecognitionResult{
 			SheetName:  sheetName,
 			SheetType:  sheetType,
-			Confidence: confidence + nameBoost,
+			Confidence: clampConfidence(confidence + nameBoost),
 		}
 	}
 
@@ -233,18 +244,23 @@ func (r *SheetRecognizer) recognizeSnapshot(sheetName string, columns []string) 
 		}
 	}
 
-	confidence := 0.8
+	// 只要出现 “本年-本月/上年-本月” 口径，基本可判定为快照表
+	confidence := 0.95
 	if strings.Contains(sheetName, "批零") || strings.Contains(sheetName, "批发") || strings.Contains(sheetName, "零售") {
 		confidence += 0.2
 	}
 	if strings.Contains(sheetName, "住餐") || strings.Contains(sheetName, "住宿") || strings.Contains(sheetName, "餐饮") {
 		confidence += 0.2
 	}
+	confidence = clampConfidence(confidence)
 
 	// 判断类型
 	sheetType := SheetTypeWRSnapshot
-	if hasRevenue && !hasSales {
+	// 住餐快照也会包含“商品销售额”，所以只要命中营业额/客房/餐费，就判为 AC 快照
+	if hasRevenue {
 		sheetType = SheetTypeACSnapshot
+	} else if hasSales {
+		sheetType = SheetTypeWRSnapshot
 	}
 
 	// 从 Sheet 名提取年月
@@ -262,7 +278,7 @@ func (r *SheetRecognizer) recognizeSnapshot(sheetName string, columns []string) 
 	return SheetRecognitionResult{
 		SheetName:  sheetName,
 		SheetType:  sheetType,
-		Confidence: confidence * 0.8, // 没有年月信息，降低置信度
+		Confidence: clampConfidence(confidence * 0.8), // 没有年月信息，降低置信度
 	}
 }
 
@@ -321,4 +337,14 @@ func RecognizeIndustryType(industryCode string) string {
 	default:
 		return "unknown"
 	}
+}
+
+func clampConfidence(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }

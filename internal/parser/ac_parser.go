@@ -100,6 +100,11 @@ func (p *ACParser) parseACRow(row []string, mappings map[int]FieldMapping, sheet
 		return nil // 跳过无名称的行
 	}
 
+	// 补齐行业类型（用于指标计算与过滤）
+	if record.IndustryType == "" && record.IndustryCode != "" {
+		record.IndustryType = RecognizeIndustryType(record.IndustryCode)
+	}
+
 	// 备份原始值
 	if record.RevenueCurrentMonth != 0 {
 		val := record.RevenueCurrentMonth

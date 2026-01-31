@@ -101,6 +101,11 @@ func (p *WRParser) parseWRRow(row []string, mappings map[int]FieldMapping, sheet
 		return nil // 跳过无名称的行
 	}
 
+	// 补齐行业类型（用于指标计算与过滤）
+	if record.IndustryType == "" && record.IndustryCode != "" {
+		record.IndustryType = RecognizeIndustryType(record.IndustryCode)
+	}
+
 	// 备份原始值
 	if record.SalesCurrentMonth != 0 {
 		val := record.SalesCurrentMonth
@@ -125,6 +130,9 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 		record.IndustryCode = value
 	case "company_scale":
 		record.CompanyScale = parseInt(value)
+	case "retail_ratio":
+		val := parseFloat(value)
+		record.RetailRatio = &val
 
 	// 销售额
 	case "sales_prev_month":

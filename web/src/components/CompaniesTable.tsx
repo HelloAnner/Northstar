@@ -1,0 +1,590 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ChevronDown, Loader2, Save, Search, SlidersHorizontal } from 'lucide-react'
+
+export interface IndicatorGroup {
+  name: string
+  indicators: { id: string; name: string; value: number; unit: string }[]
+}
+
+interface CompanyRow {
+  id: string
+  kind: 'wr' | 'ac'
+  creditCode?: string
+  name: string
+  industryCode?: string
+  industryType?: string
+  companyScale?: number
+  isSmallMicro?: number
+  isEatWearUse?: number
+  sourceSheet?: string
+
+  salesCurrentMonth?: number
+  salesLastYearMonth?: number
+  salesCurrentCumulative?: number
+  salesLastYearCumulative?: number
+  salesMonthRate?: number | null
+  salesCumulativeRate?: number | null
+
+  retailCurrentMonth?: number
+  retailLastYearMonth?: number
+  retailCurrentCumulative?: number
+  retailLastYearCumulative?: number
+  retailMonthRate?: number | null
+  retailCumulativeRate?: number | null
+  retailRatio?: number | null
+
+  revenueCurrentMonth?: number
+  revenueLastYearMonth?: number
+  revenueCurrentCumulative?: number
+  revenueLastYearCumulative?: number
+  revenueMonthRate?: number | null
+  revenueCumulativeRate?: number | null
+
+  roomCurrentMonth?: number
+  roomLastYearMonth?: number
+  roomCurrentCumulative?: number
+  roomLastYearCumulative?: number
+
+  foodCurrentMonth?: number
+  foodLastYearMonth?: number
+  foodCurrentCumulative?: number
+  foodLastYearCumulative?: number
+
+  goodsCurrentMonth?: number
+  goodsLastYearMonth?: number
+  goodsCurrentCumulative?: number
+  goodsLastYearCumulative?: number
+}
+
+type EditableField =
+  | 'salesCurrentMonth'
+  | 'retailCurrentMonth'
+  | 'revenueCurrentMonth'
+  | 'roomCurrentMonth'
+  | 'foodCurrentMonth'
+  | 'goodsCurrentMonth'
+
+type ColumnKey =
+  | 'industryType'
+  | 'creditCode'
+  | 'companyScale'
+  | 'flags'
+  | 'salesCurrentMonth'
+  | 'salesLastYearMonth'
+  | 'salesMonthRate'
+  | 'salesCurrentCumulative'
+  | 'salesLastYearCumulative'
+  | 'salesCumulativeRate'
+  | 'retailCurrentMonth'
+  | 'retailLastYearMonth'
+  | 'retailMonthRate'
+  | 'retailCurrentCumulative'
+  | 'retailLastYearCumulative'
+  | 'retailCumulativeRate'
+  | 'retailRatio'
+  | 'revenueCurrentMonth'
+  | 'revenueLastYearMonth'
+  | 'revenueMonthRate'
+  | 'revenueCurrentCumulative'
+  | 'revenueLastYearCumulative'
+  | 'revenueCumulativeRate'
+  | 'roomCurrentMonth'
+  | 'foodCurrentMonth'
+  | 'goodsCurrentMonth'
+  | 'sourceSheet'
+
+interface ColumnDef {
+  key: ColumnKey
+  label: string
+  widthClass?: string
+  align?: 'left' | 'right' | 'center'
+  kind?: 'wr' | 'ac' | 'both'
+  editable?: boolean
+}
+
+const ALL_COLUMNS: ColumnDef[] = [
+  { key: 'industryType', label: '行业', widthClass: 'w-[88px]', align: 'center' },
+  { key: 'creditCode', label: '统一社会信用代码', widthClass: 'w-[220px]' },
+  { key: 'companyScale', label: '规模', widthClass: 'w-[72px]', align: 'center' },
+  { key: 'flags', label: '标记', widthClass: 'w-[120px]' },
+
+  { key: 'salesCurrentMonth', label: '本月销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesLastYearMonth', label: '去年同期销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'salesMonthRate', label: '销售额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'salesCurrentCumulative', label: '本年累计销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'salesLastYearCumulative', label: '上年累计销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'salesCumulativeRate', label: '销售额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+
+  { key: 'retailCurrentMonth', label: '本月零售额', widthClass: 'w-[140px]', align: 'right', kind: 'both', editable: true },
+  { key: 'retailLastYearMonth', label: '去年同期零售额', widthClass: 'w-[140px]', align: 'right', kind: 'both' },
+  { key: 'retailMonthRate', label: '零售额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'retailCurrentCumulative', label: '本年累计零售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'retailLastYearCumulative', label: '上年累计零售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'retailCumulativeRate', label: '零售额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'retailRatio', label: '零销比(%)', widthClass: 'w-[110px]', align: 'right', kind: 'wr' },
+
+  { key: 'revenueCurrentMonth', label: '本月营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueLastYearMonth', label: '去年同期营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+  { key: 'revenueMonthRate', label: '营业额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+  { key: 'revenueCurrentCumulative', label: '本年累计营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+  { key: 'revenueLastYearCumulative', label: '上年累计营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+  { key: 'revenueCumulativeRate', label: '营业额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+
+  { key: 'roomCurrentMonth', label: '本月客房收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'foodCurrentMonth', label: '本月餐费收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'goodsCurrentMonth', label: '本月商品销售额', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
+
+  { key: 'sourceSheet', label: '来源Sheet', widthClass: 'w-[120px]' },
+]
+
+const DEFAULT_VISIBLE: ColumnKey[] = [
+  'industryType',
+  'creditCode',
+  'companyScale',
+  'flags',
+  'salesCurrentMonth',
+  'retailCurrentMonth',
+  'revenueCurrentMonth',
+  'roomCurrentMonth',
+  'foodCurrentMonth',
+  'goodsCurrentMonth',
+  'retailMonthRate',
+  'salesMonthRate',
+  'revenueMonthRate',
+  'retailCurrentCumulative',
+  'salesCurrentCumulative',
+  'revenueCurrentCumulative',
+  'sourceSheet',
+]
+
+export default function CompaniesTable(props: {
+  onIndicatorsUpdate: (groups: IndicatorGroup[]) => void
+  onSavingChange: (saving: boolean) => void
+  reloadToken: number
+}) {
+  const [loading, setLoading] = useState(false)
+  const [items, setItems] = useState<CompanyRow[]>([])
+  const [total, setTotal] = useState(0)
+
+  const [industryType, setIndustryType] = useState<'all' | 'wholesale' | 'retail' | 'accommodation' | 'catering'>(
+    'all'
+  )
+  const [keyword, setKeyword] = useState('')
+  const [visible, setVisible] = useState<ColumnKey[]>(() => {
+    try {
+      const raw = localStorage.getItem('northstar.visibleColumns')
+      if (!raw) return DEFAULT_VISIBLE
+      const parsed = JSON.parse(raw) as ColumnKey[]
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_VISIBLE
+    } catch {
+      return DEFAULT_VISIBLE
+    }
+  })
+
+  const searchTimer = useRef<number | null>(null)
+  const [savingCount, setSavingCount] = useState(0)
+
+  useEffect(() => {
+    props.onSavingChange(savingCount > 0)
+  }, [savingCount, props])
+
+  const columns = useMemo(() => {
+    const selected = new Set(visible)
+    return ALL_COLUMNS.filter((c) => selected.has(c.key))
+  }, [visible])
+
+  const load = async (opts?: { keyword?: string; industryType?: string }) => {
+    setLoading(true)
+    try {
+      const q = new URLSearchParams()
+      q.set('page', '1')
+      q.set('pageSize', '2000')
+      const it = opts?.industryType ?? industryType
+      const kw = opts?.keyword ?? keyword
+      if (it && it !== 'all') q.set('industryType', it)
+      if (kw) q.set('keyword', kw)
+
+      const res = await fetch(`/api/companies?${q.toString()}`)
+      if (!res.ok) throw new Error('加载企业数据失败')
+      const data = (await res.json()) as { items: CompanyRow[]; total: number }
+      setItems(data.items || [])
+      setTotal(data.total || 0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [industryType, props.reloadToken])
+
+  const persistVisible = (next: ColumnKey[]) => {
+    setVisible(next)
+    try {
+      localStorage.setItem('northstar.visibleColumns', JSON.stringify(next))
+    } catch {
+      // ignore
+    }
+  }
+
+  const toggleColumn = (key: ColumnKey, checked: boolean) => {
+    const next = new Set(visible)
+    if (checked) next.add(key)
+    else next.delete(key)
+    persistVisible(Array.from(next))
+  }
+
+  const handleKeywordChange = (v: string) => {
+    setKeyword(v)
+    if (searchTimer.current) {
+      window.clearTimeout(searchTimer.current)
+    }
+    searchTimer.current = window.setTimeout(() => {
+      load({ keyword: v })
+    }, 250)
+  }
+
+  const updateCompany = async (id: string, patch: Partial<Record<EditableField, number>>) => {
+    setSavingCount((c) => c + 1)
+    try {
+      const res = await fetch(`/api/companies/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) throw new Error('保存失败')
+      const data = (await res.json()) as { company: CompanyRow; groups: IndicatorGroup[] }
+      setItems((prev) => prev.map((x) => (x.id === id ? data.company : x)))
+      if (Array.isArray(data.groups)) {
+        props.onIndicatorsUpdate(data.groups)
+      }
+    } finally {
+      setSavingCount((c) => Math.max(0, c - 1))
+    }
+  }
+
+  const visibleSet = useMemo(() => new Set(visible), [visible])
+
+  return (
+    <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <CardHeader className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">企业数据微调</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              支持搜索 / 筛选 / 排序；修改后自动保存并联动更新 16 项指标
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              <Save className="mr-1 h-3.5 w-3.5" />
+              {savingCount > 0 ? `自动保存中 · ${savingCount}` : '自动保存'}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <Tabs value={industryType} onValueChange={(v) => setIndustryType(v as any)}>
+            <TabsList className="w-full lg:w-auto">
+              <TabsTrigger value="all">全部</TabsTrigger>
+              <TabsTrigger value="wholesale">批发</TabsTrigger>
+              <TabsTrigger value="retail">零售</TabsTrigger>
+              <TabsTrigger value="accommodation">住宿</TabsTrigger>
+              <TabsTrigger value="catering">餐饮</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="flex flex-1 items-center gap-2 lg:justify-end">
+            <div className="relative w-full lg:max-w-[360px]">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={keyword}
+                onChange={(e) => handleKeywordChange(e.target.value)}
+                placeholder="按企业名称/信用代码搜索…"
+                className="pl-9"
+              />
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  列
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>显示字段</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="max-h-72 overflow-auto">
+                  {ALL_COLUMNS.map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={visibleSet.has(col.key)}
+                      onCheckedChange={(checked) => toggleColumn(col.key, Boolean(checked))}
+                    >
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </div>
+                <DropdownMenuSeparator />
+                <Button
+                  variant="ghost"
+                  className="h-9 w-full justify-start px-2"
+                  onClick={() => persistVisible(DEFAULT_VISIBLE)}
+                >
+                  恢复默认
+                </Button>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-0">
+        <div className="rounded-lg border border-border/60">
+          <ScrollArea className="h-[520px] w-full">
+            <div className="min-w-[1200px]">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card/90 backdrop-blur">
+                  <TableRow>
+                    <TableHead className="w-[260px]">企业名称</TableHead>
+                    {columns.map((col) => (
+                      <TableHead
+                        key={col.key}
+                        className={col.widthClass ?? ''}
+                        style={{
+                          textAlign: col.align ?? 'left',
+                        }}
+                      >
+                        {col.label}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {loading && (
+                    <TableRow>
+                      <TableCell colSpan={columns.length + 1} className="py-10 text-center text-muted-foreground">
+                        <Loader2 className="mr-2 inline-block h-4 w-4 animate-spin" />
+                        加载中…
+                      </TableCell>
+                    </TableRow>
+                  )}
+
+                  {!loading && items.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={columns.length + 1} className="py-10 text-center text-muted-foreground">
+                        暂无数据
+                      </TableCell>
+                    </TableRow>
+                  )}
+
+                  {!loading &&
+                    items.map((row) => (
+                      <TableRow key={row.id} className="hover:bg-muted/30">
+                        <TableCell className="w-[260px]">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate font-medium">{row.name}</div>
+                              <IndustryBadge type={row.industryType} />
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">{row.creditCode || '-'}</div>
+                          </div>
+                        </TableCell>
+
+                        {columns.map((col) => (
+                          <TableCell key={col.key} className="align-middle" style={{ textAlign: col.align ?? 'left' }}>
+                            <Cell
+                              row={row}
+                              col={col}
+                              onUpdate={(field, value) => updateCompany(row.id, { [field]: value } as any)}
+                            />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>共 {total} 家企业</span>
+          <Button variant="ghost" size="sm" onClick={() => load()} className="h-8 px-2">
+            刷新
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function IndustryBadge({ type }: { type?: string }) {
+  const label = (() => {
+    switch (type) {
+      case 'wholesale':
+        return '批发'
+      case 'retail':
+        return '零售'
+      case 'accommodation':
+        return '住宿'
+      case 'catering':
+        return '餐饮'
+      default:
+        return '未知'
+    }
+  })()
+
+  const variant = type === 'unknown' ? 'outline' : 'secondary'
+  return (
+    <Badge variant={variant} className="h-5 px-2 text-[11px] font-medium">
+      {label}
+    </Badge>
+  )
+}
+
+function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: EditableField, value: number) => void }) {
+  const { row, col } = props
+  const key = col.key
+
+  if (key === 'industryType') {
+    return <span className="text-sm">{row.industryType || '-'}</span>
+  }
+  if (key === 'creditCode') {
+    return <span className="font-mono text-xs">{row.creditCode || '-'}</span>
+  }
+  if (key === 'companyScale') {
+    return <span className="text-sm">{row.companyScale ?? '-'}</span>
+  }
+  if (key === 'flags') {
+    return (
+      <div className="flex flex-wrap justify-end gap-1">
+        {row.isSmallMicro === 1 && (
+          <Badge variant="secondary" className="h-5 px-2 text-[11px]">
+            小微
+          </Badge>
+        )}
+        {row.isEatWearUse === 1 && (
+          <Badge variant="secondary" className="h-5 px-2 text-[11px]">
+            吃穿用
+          </Badge>
+        )}
+        {row.isSmallMicro !== 1 && row.isEatWearUse !== 1 && <span className="text-muted-foreground">-</span>}
+      </div>
+    )
+  }
+  if (key === 'sourceSheet') {
+    return <span className="text-xs text-muted-foreground">{row.sourceSheet || '-'}</span>
+  }
+
+  const editable = col.editable && isEditableForRow(row, key)
+  if (editable) {
+    const field = key as EditableField
+    const current = (row as any)[key] as number | undefined
+    return <EditableNumber value={current} onCommit={(v) => props.onUpdate(field, v)} />
+  }
+
+  const v = (row as any)[key] as number | null | undefined
+  if (v === null || v === undefined) {
+    return <span className="text-muted-foreground">-</span>
+  }
+  if (String(key).toLowerCase().includes('rate') || key === 'retailRatio') {
+    return <RateValue value={v} />
+  }
+  return <NumberValue value={v} />
+}
+
+function isEditableForRow(row: CompanyRow, key: ColumnKey) {
+  const allowWR: Partial<Record<ColumnKey, boolean>> = {
+    salesCurrentMonth: row.kind === 'wr',
+    retailCurrentMonth: true,
+  }
+  const allowAC: Partial<Record<ColumnKey, boolean>> = {
+    revenueCurrentMonth: row.kind === 'ac',
+    roomCurrentMonth: row.kind === 'ac',
+    foodCurrentMonth: row.kind === 'ac',
+    goodsCurrentMonth: row.kind === 'ac',
+    retailCurrentMonth: true,
+  }
+  return Boolean(allowWR[key] || allowAC[key])
+}
+
+function EditableNumber(props: { value?: number; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState(() => (props.value ?? 0).toString())
+  const [busy, setBusy] = useState(false)
+  const lastValue = useRef<number | undefined>(props.value)
+
+  useEffect(() => {
+    if (busy) return
+    if (props.value !== lastValue.current) {
+      lastValue.current = props.value
+      setDraft((props.value ?? 0).toString())
+    }
+  }, [props.value, busy])
+
+  const commit = async () => {
+    const v = Number(draft)
+    if (!Number.isFinite(v)) {
+      setDraft((props.value ?? 0).toString())
+      return
+    }
+    if (props.value === v) return
+    setBusy(true)
+    try {
+      await Promise.resolve(props.onCommit(v))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur()
+          }
+        }}
+        className="h-8 w-[120px] bg-muted/20 text-right"
+      />
+      {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    </div>
+  )
+}
+
+function NumberValue({ value }: { value: number }) {
+  const s = value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return <span className="font-mono text-sm tabular-nums">{s}</span>
+}
+
+function RateValue({ value }: { value: number }) {
+  const positive = value >= 0
+  const s = `${value.toFixed(2)}%`
+  return (
+    <span className={`font-mono text-sm tabular-nums ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+      {s}
+    </span>
+  )
+}

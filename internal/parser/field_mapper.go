@@ -63,6 +63,11 @@ func (m *FieldMapper) mapWRColumn(col string, idx int) FieldMapping {
 		ColumnName:  col,
 	}
 
+	// 跳过增速列（避免覆盖金额字段；增速由系统计算）
+	if strings.Contains(col, "增速") {
+		return mapping
+	}
+
 	// 基础信息字段
 	if MatchPattern(col, `统一社会信用代码`) {
 		mapping.DBField = "credit_code"
@@ -78,6 +83,10 @@ func (m *FieldMapper) mapWRColumn(col string, idx int) FieldMapping {
 	}
 	if MatchPattern(col, `单位规模`) {
 		mapping.DBField = "company_scale"
+		return mapping
+	}
+	if MatchPattern(col, `零售额占比`) {
+		mapping.DBField = "retail_ratio"
 		return mapping
 	}
 
@@ -124,6 +133,14 @@ func (m *FieldMapper) mapWRColumn(col string, idx int) FieldMapping {
 	}
 
 	// 补充字段
+	if MatchPattern(col, `小微企业`) {
+		mapping.DBField = "is_small_micro"
+		return mapping
+	}
+	if MatchPattern(col, `吃穿用`) {
+		mapping.DBField = "is_eat_wear_use"
+		return mapping
+	}
 	if MatchPattern(col, `第一次上报的?IP|首次上报IP`) {
 		mapping.DBField = "first_report_ip"
 		return mapping
@@ -153,6 +170,11 @@ func (m *FieldMapper) mapACColumn(col string, idx int) FieldMapping {
 	mapping := FieldMapping{
 		ColumnIndex: idx,
 		ColumnName:  col,
+	}
+
+	// 跳过增速列（避免覆盖金额字段；增速由系统计算）
+	if strings.Contains(col, "增速") {
+		return mapping
 	}
 
 	// 基础信息字段
@@ -219,6 +241,14 @@ func (m *FieldMapper) mapACColumn(col string, idx int) FieldMapping {
 	}
 
 	// 补充字段
+	if MatchPattern(col, `小微企业`) {
+		mapping.DBField = "is_small_micro"
+		return mapping
+	}
+	if MatchPattern(col, `吃穿用`) {
+		mapping.DBField = "is_eat_wear_use"
+		return mapping
+	}
 	if MatchPattern(col, `第一次上报的?IP|首次上报IP`) {
 		mapping.DBField = "first_report_ip"
 		return mapping
@@ -256,6 +286,8 @@ func (m *FieldMapper) mapSalesField(timeType FieldTimeType) string {
 		return "sales_current_cumulative"
 	case PrevCumulative:
 		return "sales_prev_cumulative"
+	case LastYearPrevCumulative:
+		return "sales_last_year_prev_cumulative"
 	case LastYearCumulative:
 		return "sales_last_year_cumulative"
 	}
@@ -275,6 +307,8 @@ func (m *FieldMapper) mapRetailField(timeType FieldTimeType) string {
 		return "retail_current_cumulative"
 	case PrevCumulative:
 		return "retail_prev_cumulative"
+	case LastYearPrevCumulative:
+		return "retail_last_year_prev_cumulative"
 	case LastYearCumulative:
 		return "retail_last_year_cumulative"
 	}

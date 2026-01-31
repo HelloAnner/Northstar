@@ -26,6 +26,7 @@ const (
 	CurrentCumulative                       // 本年累计
 	PrevCumulative                          // 本年累计到上月
 	LastYearCumulative                      // 上年累计
+	LastYearPrevCumulative                  // 上年累计到上月（用于批零主表）
 )
 
 // SheetRecognitionResult Sheet 识别结果

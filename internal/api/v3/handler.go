@@ -33,9 +33,12 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/companies", h.ListCompanies)
 	router.GET("/companies/:id", h.GetCompany)
 	router.PATCH("/companies/:id", h.UpdateCompany)
+	router.POST("/companies/reset", h.ResetCompanies)
 
 	// 指标查询
 	router.GET("/indicators", h.GetIndicators)
+	// 智能调整
+	router.POST("/optimize", h.Optimize)
 
 	// 数据导出
 	router.POST("/export", h.Export)

@@ -2,19 +2,17 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Upload, Database } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Download, RefreshCw, Upload } from 'lucide-react'
 import ImportDialog from '@/components/ImportDialog'
+import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 
 interface Indicator {
   id: string
   name: string
   value: number
   unit: string
-}
-
-interface IndicatorGroup {
-  name: string
-  indicators: Indicator[]
 }
 
 interface SystemStatus {
@@ -31,6 +29,10 @@ export default function DashboardV3() {
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [tableSaving, setTableSaving] = useState(false)
+  const [optimizing, setOptimizing] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+  const [draftTargets, setDraftTargets] = useState<Record<string, string>>({})
 
   // 加载系统状态
   const loadStatus = async () => {
@@ -68,20 +70,136 @@ export default function DashboardV3() {
     setShowImportDialog(false)
     loadStatus()
     loadIndicators()
+    setReloadToken((x) => x + 1)
+  }
+
+  const handleResetAll = async () => {
+    try {
+      const res = await fetch('/api/companies/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) throw new Error('重置失败')
+      const data = await res.json()
+      if (data.groups) {
+        setGroups(data.groups)
+      }
+      setDraftTargets({})
+      setReloadToken((x) => x + 1)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const applyOptimize = async (targets: Record<string, number>, clearIds?: string[]) => {
+    setOptimizing(true)
+    try {
+      const res = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || '智能调整失败')
+      }
+      if (data.groups) {
+        setGroups(data.groups)
+      }
+      if (!clearIds || clearIds.length === 0) {
+        setDraftTargets({})
+      } else {
+        setDraftTargets((prev) => {
+          const next = { ...prev }
+          for (const id of clearIds) {
+            delete next[id]
+          }
+          return next
+        })
+      }
+      setReloadToken((x) => x + 1)
+    } finally {
+      setOptimizing(false)
+    }
+  }
+
+  const handleSmartAdjust = async () => {
+    const entries = Object.entries(draftTargets)
+    if (entries.length === 0) return
+
+    const targets: Record<string, number> = {}
+    for (const [id, raw] of entries) {
+      const v = Number(String(raw).replaceAll(',', '').trim())
+      if (Number.isFinite(v)) {
+        targets[id] = v
+      }
+    }
+    if (Object.keys(targets).length === 0) return
+
+    try {
+      await applyOptimize(targets)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const saving = tableSaving || optimizing
+  const saveText = optimizing ? '智能调整中…' : '自动保存中…'
+
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/export', { method: 'POST' })
+      if (!res.ok) throw new Error('导出失败')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const y = status?.currentYear ?? ''
+      const m = status?.currentMonth ?? ''
+      a.href = url
+      a.download = `月报-${y}-${String(m).padStart(2, '0')}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   // 空状态
   if (status && !status.initialized) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-b from-background via-background to-muted/20">
         <div className="text-center space-y-4">
-          <Database className="w-16 h-16 mx-auto text-gray-400" />
-          <h2 className="text-2xl font-bold text-gray-700">暂无数据</h2>
-          <p className="text-gray-500">请先导入 Excel 数据文件</p>
-          <Button onClick={() => setShowImportDialog(true)} size="lg">
-            <Upload className="w-4 h-4 mr-2" />
-            导入数据
-          </Button>
+          <div className="mx-auto w-[520px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/60 p-8 text-left shadow-2xl backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold">仪表盘</h2>
+                <p className="mt-1 text-sm text-muted-foreground">关键指标总览 + 企业数据微调</p>
+              </div>
+              <Badge variant="secondary" className="mt-1">
+                未导入
+              </Badge>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                请选择日常使用的预估表 Excel（例如：<span className="font-mono">12月月报（预估）_补全企业名称社会代码_20260129.xlsx</span>）。
+              </p>
+            </div>
+
+            <div className="mt-6 flex gap-2">
+              <Button onClick={() => setShowImportDialog(true)} size="lg" className="flex-1">
+                <Upload className="mr-2 h-4 w-4" />
+                导入数据
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => loadStatus()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                刷新
+              </Button>
+            </div>
+          </div>
         </div>
 
         {showImportDialog && (
@@ -95,111 +213,268 @@ export default function DashboardV3() {
     )
   }
 
+  const index = buildIndicatorIndex(groups as any)
+  const hasDraft = Object.keys(draftTargets).length > 0
+  const applySingle = async (id: string, raw: string) => {
+    try {
+      const v = Number(String(raw).replaceAll(',', '').trim())
+      if (!Number.isFinite(v)) return
+      await applyOptimize({ [id]: v }, [id])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      {/* 顶部状态栏 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">数据概览</h1>
-          {status && (
-            <p className="text-gray-500 mt-1">
-              {status.currentYear}年{status.currentMonth}月 · 共 {status.totalCompanies} 家企业
-              （批零 {status.wrCount} + 住餐 {status.acCount}）
-            </p>
-          )}
-        </div>
-        <Button onClick={() => setShowImportDialog(true)}>
-          <Upload className="w-4 h-4 mr-2" />
-          导入数据
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+      <div className="mx-auto max-w-[1440px] space-y-6 p-6">
+        {/* 顶部栏 */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">仪表盘</h1>
+            {status && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {status.currentYear}年{status.currentMonth}月 · 共 {status.totalCompanies} 家（批零 {status.wrCount} + 住餐{' '}
+                {status.acCount}）
+              </p>
+            )}
+          </div>
 
-      {/* 指标展示 */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(16)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-24 mb-2" />
-                <Skeleton className="h-3 w-16" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {groups.map((group, groupIndex) => (
-            <div key={groupIndex}>
-              <h2 className="text-xl font-semibold mb-4 text-gray-700">
-                {group.name}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {group.indicators.map((indicator) => (
-                  <IndicatorCard key={indicator.id} indicator={indicator} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <Badge variant="secondary" className="gap-2">
+              {saving ? (
+                <>
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                  {saveText}
+                </>
+              ) : (
+                <>
+                  <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60" />
+                  已保存
+                </>
+              )}
+            </Badge>
 
-      {/* 导入弹窗 */}
-      {showImportDialog && (
-        <ImportDialog
-          open={showImportDialog}
-          onClose={() => setShowImportDialog(false)}
-          onSuccess={handleImportSuccess}
+            <Button
+              disabled={!hasDraft || optimizing}
+              className="gap-2 bg-orange-500 text-black opacity-80 hover:bg-orange-400"
+              onClick={handleSmartAdjust}
+              title={hasDraft ? '按输入值反推并写回企业数据' : '先在指标输入框里填入目标值'}
+            >
+              智能调整
+            </Button>
+
+            <Button onClick={handleResetAll} variant="outline" className="gap-2">
+              重置
+            </Button>
+
+            <Button onClick={() => setShowImportDialog(true)} variant="outline" className="gap-2">
+              <Upload className="h-4 w-4" />
+              导入
+            </Button>
+
+            <Button onClick={handleExport} variant="outline" className="gap-2">
+              <Download className="h-4 w-4" />
+              导出
+            </Button>
+
+            <Button onClick={() => loadIndicators()} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              刷新
+            </Button>
+          </div>
+        </div>
+
+        {/* 指标面板 */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i} className="border-border/60 bg-card/60 backdrop-blur">
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {[...Array(4)].map((__, j) => (
+                    <Skeleton key={j} className="h-9 w-full" />
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <MetricPanel
+              title="限上社零额"
+              rows={[
+                { label: '当期零售额（万元）', indicator: index['limitAbove_month_value'] },
+                { label: '当月增速（%）', indicator: index['limitAbove_month_rate'], type: 'rate' },
+                { label: '累计零售额（万元）', indicator: index['limitAbove_cumulative_value'] },
+                { label: '累计增速（%）', indicator: index['limitAbove_cumulative_rate'], type: 'rate' },
+              ]}
+              draftTargets={draftTargets}
+              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+              onApplySingle={applySingle}
+              disabled={optimizing}
+            />
+
+            <MetricPanel
+              title="专项增速"
+              rows={[
+                { label: '吃穿用增速（%）', indicator: index['eatWearUse_month_rate'], type: 'rate' },
+                { label: '小微企业增速（%）', indicator: index['microSmall_month_rate'], type: 'rate' },
+              ]}
+              compact
+              draftTargets={draftTargets}
+              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+              onApplySingle={applySingle}
+              disabled={optimizing}
+            />
+
+            <MetricPanel
+              title="四大行业增速"
+              rows={[
+                { label: '批发业（当月）', indicator: index['wholesale_month_rate'], type: 'rate' },
+                { label: '批发业（累计）', indicator: index['wholesale_cumulative_rate'], type: 'rate' },
+                { label: '零售业（当月）', indicator: index['retail_month_rate'], type: 'rate' },
+                { label: '零售业（累计）', indicator: index['retail_cumulative_rate'], type: 'rate' },
+                { label: '住宿业（当月）', indicator: index['accommodation_month_rate'], type: 'rate' },
+                { label: '住宿业（累计）', indicator: index['accommodation_cumulative_rate'], type: 'rate' },
+                { label: '餐饮业（当月）', indicator: index['catering_month_rate'], type: 'rate' },
+                { label: '餐饮业（累计）', indicator: index['catering_cumulative_rate'], type: 'rate' },
+              ]}
+              draftTargets={draftTargets}
+              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+              onApplySingle={applySingle}
+              disabled={optimizing}
+            />
+
+            <MetricPanel
+              title="社零总额估算"
+              rows={[
+                { label: '社零总额（累计值）', indicator: index['totalSocial_cumulative_value'] },
+                { label: '累计增速（%）', indicator: index['totalSocial_cumulative_rate'], type: 'rate' },
+              ]}
+              compact
+              draftTargets={draftTargets}
+              onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+              onApplySingle={applySingle}
+              disabled={optimizing}
+            />
+          </div>
+        )}
+
+        {/* 明细表 */}
+        <CompaniesTable
+          onIndicatorsUpdate={(next) => setGroups(next)}
+          onSavingChange={(s) => {
+            setTableSaving(s)
+          }}
+          reloadToken={reloadToken}
         />
-      )}
+
+        {/* 导入弹窗 */}
+        {showImportDialog && (
+          <ImportDialog
+            open={showImportDialog}
+            onClose={() => setShowImportDialog(false)}
+            onSuccess={handleImportSuccess}
+          />
+        )}
+      </div>
     </div>
   )
 }
 
-// 指标卡片组件
-function IndicatorCard({ indicator }: { indicator: Indicator }) {
-  const isRate = indicator.unit === '%'
-  const isPositive = indicator.value >= 0
-
+function MetricPanel(props: {
+  title: string
+  rows: { label: string; indicator?: Indicator; type?: 'rate' | 'value' }[]
+  compact?: boolean
+  disabled?: boolean
+  draftTargets: Record<string, string>
+  onDraftChange: (id: string, value: string) => void
+  onApplySingle: (id: string, value: string) => Promise<void>
+}) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">
-          {indicator.name}
-        </CardTitle>
+    <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{props.title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-1">
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold">
-              {formatNumber(indicator.value)}
-            </span>
-            <span className="text-sm text-gray-500">{indicator.unit}</span>
-          </div>
-          {isRate && (
-            <div
-              className={`text-xs font-medium ${
-                isPositive ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {isPositive ? '↑' : '↓'} {Math.abs(indicator.value).toFixed(2)}%
-            </div>
-          )}
-        </div>
+      <CardContent className={props.compact ? 'space-y-2' : 'space-y-3'}>
+        {props.rows.map((r) => (
+          <MetricRow
+            key={r.label}
+            label={r.label}
+            indicator={r.indicator}
+            type={r.type}
+            draftTargets={props.draftTargets}
+            onDraftChange={props.onDraftChange}
+            onApplySingle={props.onApplySingle}
+            disabled={props.disabled}
+          />
+        ))}
       </CardContent>
     </Card>
   )
 }
 
-// 数字格式化
-function formatNumber(value: number): string {
-  if (Math.abs(value) >= 10000) {
-    return (value / 10000).toFixed(2) + '万'
-  } else if (Math.abs(value) >= 1000) {
-    return (value / 1000).toFixed(2) + 'k'
-  } else {
-    return value.toFixed(2)
+function MetricRow(props: {
+  label: string
+  indicator?: Indicator
+  type?: 'rate' | 'value'
+  disabled?: boolean
+  draftTargets: Record<string, string>
+  onDraftChange: (id: string, value: string) => void
+  onApplySingle: (id: string, value: string) => Promise<void>
+}) {
+  const value = props.indicator?.value ?? 0
+  const type = props.type ?? 'value'
+  const unit = props.indicator?.unit ?? (type === 'rate' ? '%' : '')
+  const id = props.indicator?.id
+
+  const text =
+    type === 'rate'
+      ? `${value.toFixed(2)}`
+      : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const positive = value >= 0
+  const tone = type === 'rate' ? (positive ? 'text-emerald-300' : 'text-rose-300') : 'text-foreground'
+
+  const draft = id ? props.draftTargets[id] : undefined
+  const displayValue = draft !== undefined ? draft : text
+  const dirty = draft !== undefined && draft !== text
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="text-xs text-muted-foreground">{props.label}</div>
+      <div className="flex items-center gap-2">
+        <Input
+          value={displayValue}
+          disabled={props.disabled || !id}
+          onChange={(e) => {
+            if (!id) return
+            props.onDraftChange(id, e.target.value)
+          }}
+          onKeyDown={async (e) => {
+            if (!id) return
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            await props.onApplySingle(id, displayValue)
+          }}
+          className={`h-9 w-[150px] rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${tone} ${
+            dirty ? 'border-orange-400/70 ring-1 ring-orange-400/40' : 'border-border/60'
+          }`}
+        />
+        <span className="w-10 text-right text-xs text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  )
+}
+
+function buildIndicatorIndex(groups: { indicators: Indicator[] }[]) {
+  const map: Record<string, Indicator> = {}
+  for (const g of groups || []) {
+    for (const i of g.indicators || []) {
+      map[i.id] = i
+    }
   }
+  return map
 }

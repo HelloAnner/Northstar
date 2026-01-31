@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Upload, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 interface ImportDialogProps {
@@ -25,24 +27,17 @@ interface ProgressEvent {
   timestamp: string
 }
 
-interface SheetResult {
-  sheetName: string
-  sheetType: string
-  status: string
-  importedRows: number
-  errorRows?: number
-  errors?: string[]
-}
-
 export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogProps) {
   const [file, setFile] = useState<File | null>(null)
   const [clearExisting, setClearExisting] = useState(true)
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState<ProgressEvent[]>([])
-  const [sheetResults, setSheetResults] = useState<SheetResult[]>([])
   const [completed, setCompleted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [totalSheets, setTotalSheets] = useState<number | null>(null)
+  const [doneSheets, setDoneSheets] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -52,6 +47,16 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
     }
   }
 
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [progress.length])
+
+  const percent = useMemo(() => {
+    if (!totalSheets || totalSheets <= 0) return 0
+    const pct = Math.round((doneSheets / totalSheets) * 100)
+    return Math.min(100, Math.max(0, pct))
+  }, [doneSheets, totalSheets])
+
   const handleImport = async () => {
     if (!file) {
       setError('请选择文件')
@@ -60,9 +65,10 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
 
     setImporting(true)
     setProgress([])
-    setSheetResults([])
     setCompleted(false)
     setError(null)
+    setTotalSheets(null)
+    setDoneSheets(0)
 
     try {
       const formData = new FormData()
@@ -88,6 +94,7 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
       }
 
       let buffer = ''
+      const doneSet = new Set<string>()
 
       while (true) {
         const { done, value } = await reader.read()
@@ -106,10 +113,19 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
               const event: ProgressEvent = JSON.parse(jsonStr)
               setProgress((prev) => [...prev, event])
 
-              // 更新 Sheet 结果
-              if (event.type === 'sheet_done') {
-                const sheetData = event.data as SheetResult
-                setSheetResults((prev) => [...prev, sheetData])
+              if (event.type === 'info' && event.data && typeof event.data === 'object') {
+                const ts = (event.data as any).total_sheets as number | undefined
+                if (typeof ts === 'number' && ts > 0) {
+                  setTotalSheets(ts)
+                }
+              }
+
+              if (event.type === 'sheet_done' && event.data && typeof event.data === 'object') {
+                const name = String((event.data as any).sheetName || '')
+                if (name && !doneSet.has(name)) {
+                  doneSet.add(name)
+                  setDoneSheets(doneSet.size)
+                }
               }
 
               // 完成
@@ -142,10 +158,11 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
   const handleReset = () => {
     setFile(null)
     setProgress([])
-    setSheetResults([])
     setCompleted(false)
     setError(null)
     setImporting(false)
+    setTotalSheets(null)
+    setDoneSheets(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -153,7 +170,7 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[84vh] overflow-y-auto border-border/60 bg-card/80 backdrop-blur">
         <DialogHeader>
           <DialogTitle>导入数据</DialogTitle>
           <DialogDescription>
@@ -175,26 +192,24 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
                   onChange={handleFileChange}
                 />
                 {file && (
-                  <p className="text-sm text-gray-500">
-                    已选择: {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                  <p className="text-sm text-muted-foreground">
+                    已选择: <span className="font-medium text-foreground">{file.name}</span> ·{' '}
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label htmlFor="clear" className="cursor-pointer">
-                  清空现有数据后导入
-                </Label>
-                <Switch
-                  id="clear"
-                  checked={clearExisting}
-                  onCheckedChange={setClearExisting}
-                />
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium">清空现有数据</p>
+                  <p className="text-xs text-muted-foreground">清空当前月份数据后重新导入</p>
+                </div>
+                <Switch checked={clearExisting} onCheckedChange={setClearExisting} />
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-md">
-                  <XCircle className="w-4 h-4" />
+                <div className="flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-red-200">
+                  <XCircle className="h-4 w-4" />
                   <span className="text-sm">{error}</span>
                 </div>
               )}
@@ -218,79 +233,35 @@ export default function ImportDialog({ open, onClose, onSuccess }: ImportDialogP
           {/* 导入进度 */}
           {(importing || completed) && (
             <div className="space-y-4">
-              {/* 进度日志 */}
-              <div className="bg-gray-50 rounded-md p-4 max-h-60 overflow-y-auto space-y-2">
-                {progress.map((event, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-2 text-sm"
-                  >
-                    {event.type === 'error' && (
-                      <XCircle className="w-4 h-4 text-red-500 mt-0.5" />
-                    )}
-                    {event.type === 'warning' && (
-                      <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
-                    )}
-                    {event.type === 'done' && (
-                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
-                    )}
-                    {event.type === 'info' && (
-                      <Loader2 className="w-4 h-4 text-blue-500 mt-0.5 animate-spin" />
-                    )}
-                    <span className="text-gray-700">{event.message}</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">导入进度</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {totalSheets ? `${doneSheets}/${totalSheets}` : `${doneSheets}/?`} · {percent}%
+                  </span>
+                </div>
+                <Progress value={percent} className="h-2" />
               </div>
 
-              {/* Sheet 结果列表 */}
-              {sheetResults.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm text-gray-700">
-                    Sheet 解析结果
-                  </h3>
-                  <div className="border rounded-md divide-y">
-                    {sheetResults.map((sheet, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          {sheet.status === 'imported' && (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                          )}
-                          {sheet.status === 'skipped' && (
-                            <AlertCircle className="w-4 h-4 text-yellow-500" />
-                          )}
-                          {sheet.status === 'error' && (
-                            <XCircle className="w-4 h-4 text-red-500" />
-                          )}
-                          <div>
-                            <p className="font-medium text-sm">
-                              {sheet.sheetName}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {sheet.sheetType}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {sheet.status === 'imported' && (
-                            <p className="text-sm text-green-600">
-                              ✓ {sheet.importedRows} 行
-                            </p>
-                          )}
-                          {sheet.status === 'skipped' && (
-                            <p className="text-sm text-yellow-600">跳过</p>
-                          )}
-                          {sheet.status === 'error' && (
-                            <p className="text-sm text-red-600">失败</p>
-                          )}
-                        </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20">
+                <ScrollArea className="h-60 w-full">
+                  <div className="space-y-2 p-4">
+                    {progress.map((event, index) => (
+                      <div key={index} className="flex items-start gap-2 text-sm">
+                        {(event.type === 'error') && <XCircle className="mt-0.5 h-4 w-4 text-red-300" />}
+                        {(event.type === 'warning') && <AlertCircle className="mt-0.5 h-4 w-4 text-amber-300" />}
+                        {(event.type === 'done') && <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-300" />}
+                        {(event.type === 'info' || event.type === 'sheet_start') && (
+                          <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-sky-300" />
+                        )}
+                        {(event.type === 'sheet_done') && <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-300" />}
+                        <span className="text-foreground/90">{event.message}</span>
                       </div>
                     ))}
+                    <div ref={logEndRef} />
                   </div>
-                </div>
-              )}
+                </ScrollArea>
+              </div>
 
               {/* 完成或重试 */}
               {completed && (
