@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle, Download, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle, Download, XCircle } from 'lucide-react'
 
 interface ExportDialogProps {
   open: boolean
@@ -27,11 +27,19 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const delayTimerRef = useRef<number | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const displayPercentRef = useRef(0)
+  const targetPercentRef = useRef(0)
+  const doneRef = useRef<{ url: string; message: string } | null>(null)
+  const finalizedRef = useRef(false)
 
   const ymText = useMemo(() => {
     if (!year || !month) return '当前月份'
     return `${year} 年 ${String(month).padStart(2, '0')} 月`
   }, [year, month])
+
+  // 让进度条“慢一点”：每增加 1% 需要 10ms，总计额外 ~1s（0% -> 100%）
+  const perPercentMs = 10
 
   const shouldApplyDelay = () => {
     const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
@@ -50,6 +58,10 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     setStage('等待开始…')
     setDownloadUrl(null)
     setError(null)
+    displayPercentRef.current = 0
+    targetPercentRef.current = 0
+    doneRef.current = null
+    finalizedRef.current = false
   }
 
   const stop = () => {
@@ -58,6 +70,10 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     if (delayTimerRef.current !== null) {
       window.clearTimeout(delayTimerRef.current)
       delayTimerRef.current = null
+    }
+    if (rafRef.current !== null) {
+      window.cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
     }
   }
 
@@ -68,6 +84,54 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     document.body.appendChild(a)
     a.click()
     a.remove()
+  }
+
+  const tryFinalize = () => {
+    if (finalizedRef.current) return
+    const done = doneRef.current
+    if (!done) return
+    if (displayPercentRef.current < 100) return
+
+    finalizedRef.current = true
+    setPercent(100)
+    setStage(done.message || '导出完成')
+    setDownloadUrl(done.url)
+    setCompleted(true)
+    setExporting(false)
+  }
+
+  const ensureAnimating = () => {
+    if (rafRef.current !== null) return
+
+    let last = performance.now()
+    const step = (now: number) => {
+      const deltaMs = now - last
+      last = now
+
+      const display = displayPercentRef.current
+      const target = targetPercentRef.current
+      if (display >= target) {
+        rafRef.current = null
+        tryFinalize()
+        return
+      }
+
+      const inc = deltaMs / perPercentMs
+      const next = Math.min(target, display + inc)
+      displayPercentRef.current = next
+      setPercent(next)
+
+      rafRef.current = window.requestAnimationFrame(step)
+    }
+
+    rafRef.current = window.requestAnimationFrame(step)
+  }
+
+  const setTargetPercent = (next: number) => {
+    const clamped = Math.max(0, Math.min(100, next))
+    if (clamped <= targetPercentRef.current) return
+    targetPercentRef.current = clamped
+    ensureAnimating()
   }
 
   const startExport = async () => {
@@ -107,8 +171,9 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
             const event: ExportEvent = JSON.parse(jsonStr)
             if (event.type === 'progress') {
               const p = Number(event.data?.percent ?? 0)
-              if (Number.isFinite(p)) setPercent(Math.max(0, Math.min(100, Math.round(p))))
+              const nextPercent = Number.isFinite(p) ? Math.max(0, Math.min(100, Math.round(p))) : 0
               setStage(event.message || '导出中…')
+              setTargetPercent(nextPercent)
             }
             if (event.type === 'done') {
               const url = String(event.data?.downloadUrl || '')
@@ -118,27 +183,22 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
                 break
               }
 
-              const finalize = () => {
-                setPercent(100)
-                setStage(event.message || '导出完成')
-                setDownloadUrl(url)
-                setCompleted(true)
-                setExporting(false)
-              }
-
+              doneRef.current = { url, message: event.message || '导出完成' }
               if (shouldApplyDelay()) {
                 setStage('导出完成，准备下载…')
+                setTargetPercent(99)
                 delayTimerRef.current = window.setTimeout(() => {
                   delayTimerRef.current = null
-                  finalize()
+                  setTargetPercent(100)
                 }, randomDelayMs())
               } else {
-                finalize()
+                setTargetPercent(100)
               }
             }
             if (event.type === 'error') {
               setError(event.message || '导出失败')
               setExporting(false)
+              stop()
             }
           } catch (err) {
             console.error('Failed to parse SSE event:', err)
@@ -178,7 +238,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{stage}</span>
-              <span className="font-medium tabular-nums">{percent}%</span>
+              <span className="font-medium tabular-nums">{Math.round(percent)}%</span>
             </div>
             <Progress value={percent} />
           </div>
@@ -197,28 +257,10 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
-            {!exporting && !completed && (
-              <Button variant="outline" onClick={startExport}>
-                重新导出
-              </Button>
-            )}
-
+          <div className="flex justify-center">
             <Button onClick={triggerDownload} disabled={!canDownload} className="gap-2">
               <Download className="h-4 w-4" />
               下载 Excel
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() => {
-                stop()
-                onClose()
-              }}
-              className="gap-2"
-            >
-              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              关闭
             </Button>
           </div>
         </div>

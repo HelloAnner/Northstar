@@ -260,64 +260,61 @@ func fillSocialRetailSheetAndMaterialize(
 		return v
 	}
 
-	if err := setCellValueAndClearFormula(f, sheet, "J2", month); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "J2", month); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "B4", indicators["microSmall_month_rate"].Value); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "B4", indicators["microSmall_month_rate"].Value); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "C4", indicators["eatWearUse_month_rate"].Value); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "C4", indicators["eatWearUse_month_rate"].Value); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "D4", getFloat("sample_rate_month")); err != nil {
-		return err
-	}
-
-	if err := setCellValueAndClearFormula(f, sheet, "B6", prevIndicators["microSmall_month_rate"].Value); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, sheet, "C6", prevIndicators["eatWearUse_month_rate"].Value); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, sheet, "D6", getFloat("sample_rate_prev")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "D4", getFloat("sample_rate_month")); err != nil {
 		return err
 	}
 
-	if err := setCellValueAndClearFormula(f, sheet, "B12", getFloat("weight_small_micro")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "B6", prevIndicators["microSmall_month_rate"].Value); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "C12", getFloat("weight_eat_wear_use")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "C6", prevIndicators["eatWearUse_month_rate"].Value); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "D12", getFloat("weight_sample")); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, sheet, "I3", getFloat("province_limit_below_rate_change")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "D6", getFloat("sample_rate_prev")); err != nil {
 		return err
 	}
 
-	if err := setCellValueAndClearFormula(f, sheet, "E18", getFloat("history_social_e18")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "B12", getFloat("weight_small_micro")); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "E19", getFloat("history_social_e19")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "C12", getFloat("weight_eat_wear_use")); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "E20", getFloat("history_social_e20")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "D12", getFloat("weight_sample")); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, sheet, "E21", getFloat("history_social_e21")); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, sheet, "E22", getFloat("history_social_e22")); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, sheet, "E23", getFloat("history_social_e23")); err != nil {
+	if err := setCellValueIfNoFormula(f, sheet, "I3", getFloat("province_limit_below_rate_change")); err != nil {
 		return err
 	}
 
-	if err := materializeFormulasInSheet(f, sheet); err != nil {
-		return fmt.Errorf("社零额（定）公式计算失败: %w", err)
+	if err := setCellValueIfNoFormula(f, sheet, "E18", getFloat("history_social_e18")); err != nil {
+		return err
 	}
+	if err := setCellValueIfNoFormula(f, sheet, "E19", getFloat("history_social_e19")); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, sheet, "E20", getFloat("history_social_e20")); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, sheet, "E21", getFloat("history_social_e21")); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, sheet, "E22", getFloat("history_social_e22")); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, sheet, "E23", getFloat("history_social_e23")); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -353,10 +350,6 @@ func rewriteFixedSummarySheet(
 	if totalCompanies > 0 {
 		reportRate = math.Round(float64(reportedCompanies) / float64(totalCompanies) * 100.0)
 	}
-	negativeRatio := 0.0
-	if reportedCompanies > 0 {
-		negativeRatio = math.Round(float64(negativeGrowthCount) / float64(reportedCompanies) * 100.0)
-	}
 
 	overallRetailCur := wh.retailCur + re.retailCur + acc.retailCur + cat.retailCur
 	overallRetailLast := wh.retailLast + re.retailLast + acc.retailLast + cat.retailLast
@@ -369,71 +362,65 @@ func rewriteFixedSummarySheet(
 	limitAboveCumulativeWan := math.Round(overallRetailCurCum / 10.0)
 	limitAboveLastYearCumulativeWan := math.Round(overallRetailLastCum / 10.0)
 
-	if err := setCellValueAndClearFormula(f, summary, "B4", totalCompanies); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "B4", totalCompanies); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "C4", reportedCompanies); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "C4", reportedCompanies); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "D4", reportRate); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "E4", negativeGrowthCount); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "F4", negativeRatio); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "E4", negativeGrowthCount); err != nil {
 		return err
 	}
 
-	if err := setCellValueAndClearFormula(f, summary, "G4", limitAboveMonthWan); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "G4", limitAboveMonthWan); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "H4", limitAboveLastYearMonthWan); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "H4", limitAboveLastYearMonthWan); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "I4", limitAboveCumulativeWan); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "I4", limitAboveCumulativeWan); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "J4", limitAboveLastYearCumulativeWan); err != nil {
-		return err
-	}
-
-	if err := setCellValueAndClearFormula(f, summary, "K4", ratePercent(wh.salesCur, wh.salesLast)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "L4", ratePercent(wh.salesCurCum, wh.salesLastCum)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "M4", ratePercent(re.salesCur, re.salesLast)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "N4", ratePercent(re.salesCurCum, re.salesLastCum)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "O4", ratePercent(acc.salesCur, acc.salesLast)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "P4", ratePercent(acc.salesCurCum, acc.salesLastCum)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "Q4", ratePercent(cat.salesCur, cat.salesLast)); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "R4", ratePercent(cat.salesCurCum, cat.salesLastCum)); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "J4", limitAboveLastYearCumulativeWan); err != nil {
 		return err
 	}
 
-	if err := setCellValueAndClearFormula(f, summary, "S4", ratePercent(overallRetailCur, overallRetailLast)); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "K4", ratePercent(wh.salesCur, wh.salesLast)); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "T4", ratePercent(overallRetailCurCum, overallRetailLastCum)); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "L4", ratePercent(wh.salesCurCum, wh.salesLastCum)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "M4", ratePercent(re.salesCur, re.salesLast)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "N4", ratePercent(re.salesCurCum, re.salesLastCum)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "O4", ratePercent(acc.salesCur, acc.salesLast)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "P4", ratePercent(acc.salesCurCum, acc.salesLastCum)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "Q4", ratePercent(cat.salesCur, cat.salesLast)); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "R4", ratePercent(cat.salesCurCum, cat.salesLastCum)); err != nil {
 		return err
 	}
 
-	if err := setCellValueAndClearFormula(f, summary, "U4", indicators["eatWearUse_month_rate"].Value); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "S4", ratePercent(overallRetailCur, overallRetailLast)); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "V4", indicators["microSmall_month_rate"].Value); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "T4", ratePercent(overallRetailCurCum, overallRetailLastCum)); err != nil {
+		return err
+	}
+
+	if err := setCellValueIfNoFormula(f, summary, "U4", indicators["eatWearUse_month_rate"].Value); err != nil {
+		return err
+	}
+	if err := setCellValueIfNoFormula(f, summary, "V4", indicators["microSmall_month_rate"].Value); err != nil {
 		return err
 	}
 
@@ -441,16 +428,13 @@ func rewriteFixedSummarySheet(
 	if totalCompanies != reportedCompanies {
 		statusText = fmt.Sprintf("已上报%d家，上报进度%d%%", reportedCompanies, int(reportRate))
 	}
-	if err := setCellValueAndClearFormula(f, summary, "D10", statusText); err != nil {
-		return err
-	}
 
 	totalSocialYi := roundHalfUp(indicators["totalSocial_cumulative_value"].Value/10000.0, 2)
 	totalSocialRate := indicators["totalSocial_cumulative_rate"].Value
-	if err := setCellValueAndClearFormula(f, summary, "N10", totalSocialYi); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "N10", totalSocialYi); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "S10", totalSocialRate); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "S10", totalSocialRate); err != nil {
 		return err
 	}
 
@@ -477,13 +461,10 @@ func rewriteFixedSummarySheet(
 		int(totalSocialRate),
 	)
 
-	if err := setCellValueAndClearFormula(f, summary, "A11", summaryText); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "X3", summaryText); err != nil {
 		return err
 	}
-	if err := setCellValueAndClearFormula(f, summary, "X3", summaryText); err != nil {
-		return err
-	}
-	if err := setCellValueAndClearFormula(f, summary, "W4", fmt.Sprintf("%d-%02d", year, month)); err != nil {
+	if err := setCellValueIfNoFormula(f, summary, "W4", fmt.Sprintf("%d-%02d", year, month)); err != nil {
 		return err
 	}
 	return nil
@@ -529,61 +510,16 @@ func clearSheetArea(f *excelize.File, sheet string, fromRow, toRow, fromCol, toC
 	return nil
 }
 
-func setCellValueAndClearFormula(f *excelize.File, sheet, cell string, value interface{}) error {
-	if err := f.SetCellValue(sheet, cell, value); err != nil {
-		return err
-	}
-	_ = f.SetCellFormula(sheet, cell, "")
-	return nil
-}
-
-func materializeFormulasInSheet(f *excelize.File, sheet string) error {
-	maxCol, maxRow, err := getSheetMaxColRow(f, sheet)
+func setCellValueIfNoFormula(f *excelize.File, sheet, cell string, value interface{}) error {
+	formula, err := f.GetCellFormula(sheet, cell)
 	if err != nil {
 		return err
 	}
-	for r := 1; r <= maxRow; r++ {
-		for c := 1; c <= maxCol; c++ {
-			cell, err := excelize.CoordinatesToCellName(c, r)
-			if err != nil {
-				return err
-			}
-			formula, err := f.GetCellFormula(sheet, cell)
-			if err != nil {
-				return err
-			}
-			if strings.TrimSpace(formula) == "" {
-				continue
-			}
-
-			val, err := f.CalcCellValue(sheet, cell)
-			if err != nil {
-				// 公式计算可能因缺少“社零额(定)”输入导致出现 #DIV/0! 等错误。
-				// 为保证导出稳定且“结果由代码写入”，这里将错误结果落为 0 并清除公式。
-				if err := f.SetCellValue(sheet, cell, 0); err != nil {
-					return err
-				}
-				if err := f.SetCellFormula(sheet, cell, ""); err != nil {
-					return err
-				}
-				continue
-			}
-			s := strings.TrimSpace(val)
-			if n, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", ""), 64); err == nil {
-				if err := f.SetCellValue(sheet, cell, n); err != nil {
-					return err
-				}
-			} else {
-				if err := f.SetCellValue(sheet, cell, s); err != nil {
-					return err
-				}
-			}
-			if err := f.SetCellFormula(sheet, cell, ""); err != nil {
-				return err
-			}
-		}
+	if strings.TrimSpace(formula) != "" {
+		// 目标 sheet 强约束：保留模板公式（社零额（定）/汇总表（定）依赖模板公式）。
+		return nil
 	}
-	return nil
+	return f.SetCellValue(sheet, cell, value)
 }
 
 func formatTrimFloat(v float64, digits int) string {

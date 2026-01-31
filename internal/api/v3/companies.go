@@ -31,8 +31,6 @@ type companyRow struct {
 	SalesPrevMonth              *float64 `json:"salesPrevMonth,omitempty"`
 	SalesCurrentMonth           *float64 `json:"salesCurrentMonth,omitempty"`
 	SalesLastYearMonth          *float64 `json:"salesLastYearMonth,omitempty"`
-	SalesPrevCumulative         *float64 `json:"salesPrevCumulative,omitempty"`
-	SalesLastYearPrevCumulative *float64 `json:"salesLastYearPrevCumulative,omitempty"`
 	SalesCurrentCumulative      *float64 `json:"salesCurrentCumulative,omitempty"`
 	SalesLastYearCumulative     *float64 `json:"salesLastYearCumulative,omitempty"`
 	SalesMonthRate              *float64 `json:"salesMonthRate,omitempty"`
@@ -41,8 +39,6 @@ type companyRow struct {
 	RetailCurrentMonth           *float64 `json:"retailCurrentMonth,omitempty"`
 	RetailLastYearMonth          *float64 `json:"retailLastYearMonth,omitempty"`
 	RetailPrevMonth              *float64 `json:"retailPrevMonth,omitempty"`
-	RetailPrevCumulative         *float64 `json:"retailPrevCumulative,omitempty"`
-	RetailLastYearPrevCumulative *float64 `json:"retailLastYearPrevCumulative,omitempty"`
 	RetailCurrentCumulative      *float64 `json:"retailCurrentCumulative,omitempty"`
 	RetailLastYearCumulative     *float64 `json:"retailLastYearCumulative,omitempty"`
 	RetailMonthRate              *float64 `json:"retailMonthRate,omitempty"`
@@ -53,7 +49,6 @@ type companyRow struct {
 	RevenuePrevMonth          *float64 `json:"revenuePrevMonth,omitempty"`
 	RevenueCurrentMonth       *float64 `json:"revenueCurrentMonth,omitempty"`
 	RevenueLastYearMonth      *float64 `json:"revenueLastYearMonth,omitempty"`
-	RevenuePrevCumulative     *float64 `json:"revenuePrevCumulative,omitempty"`
 	RevenueCurrentCumulative  *float64 `json:"revenueCurrentCumulative,omitempty"`
 	RevenueLastYearCumulative *float64 `json:"revenueLastYearCumulative,omitempty"`
 	RevenueMonthRate          *float64 `json:"revenueMonthRate,omitempty"`
@@ -62,21 +57,18 @@ type companyRow struct {
 	RoomPrevMonth          *float64 `json:"roomPrevMonth,omitempty"`
 	RoomCurrentMonth       *float64 `json:"roomCurrentMonth,omitempty"`
 	RoomLastYearMonth      *float64 `json:"roomLastYearMonth,omitempty"`
-	RoomPrevCumulative     *float64 `json:"roomPrevCumulative,omitempty"`
 	RoomCurrentCumulative  *float64 `json:"roomCurrentCumulative,omitempty"`
 	RoomLastYearCumulative *float64 `json:"roomLastYearCumulative,omitempty"`
 
 	FoodPrevMonth          *float64 `json:"foodPrevMonth,omitempty"`
 	FoodCurrentMonth       *float64 `json:"foodCurrentMonth,omitempty"`
 	FoodLastYearMonth      *float64 `json:"foodLastYearMonth,omitempty"`
-	FoodPrevCumulative     *float64 `json:"foodPrevCumulative,omitempty"`
 	FoodCurrentCumulative  *float64 `json:"foodCurrentCumulative,omitempty"`
 	FoodLastYearCumulative *float64 `json:"foodLastYearCumulative,omitempty"`
 
 	GoodsPrevMonth          *float64 `json:"goodsPrevMonth,omitempty"`
 	GoodsCurrentMonth       *float64 `json:"goodsCurrentMonth,omitempty"`
 	GoodsLastYearMonth      *float64 `json:"goodsLastYearMonth,omitempty"`
-	GoodsPrevCumulative     *float64 `json:"goodsPrevCumulative,omitempty"`
 	GoodsCurrentCumulative  *float64 `json:"goodsCurrentCumulative,omitempty"`
 	GoodsLastYearCumulative *float64 `json:"goodsLastYearCumulative,omitempty"`
 }
@@ -583,8 +575,6 @@ func toCompanyRowWR(r model.WholesaleRetail) companyRow {
 	out.SalesPrevMonth = floatPtr(r.SalesPrevMonth)
 	out.SalesCurrentMonth = floatPtr(r.SalesCurrentMonth)
 	out.SalesLastYearMonth = floatPtr(r.SalesLastYearMonth)
-	out.SalesPrevCumulative = floatPtr(r.SalesPrevCumulative)
-	out.SalesLastYearPrevCumulative = floatPtr(r.SalesLastYearPrevCumulative)
 	out.SalesCurrentCumulative = floatPtr(r.SalesCurrentCumulative)
 	out.SalesLastYearCumulative = floatPtr(r.SalesLastYearCumulative)
 	out.SalesMonthRate = floatPtrNullable(r.SalesMonthRate)
@@ -593,8 +583,6 @@ func toCompanyRowWR(r model.WholesaleRetail) companyRow {
 	out.RetailCurrentMonth = floatPtr(r.RetailCurrentMonth)
 	out.RetailLastYearMonth = floatPtr(r.RetailLastYearMonth)
 	out.RetailPrevMonth = floatPtr(r.RetailPrevMonth)
-	out.RetailPrevCumulative = floatPtr(r.RetailPrevCumulative)
-	out.RetailLastYearPrevCumulative = floatPtr(r.RetailLastYearPrevCumulative)
 	out.RetailCurrentCumulative = floatPtr(r.RetailCurrentCumulative)
 	out.RetailLastYearCumulative = floatPtr(r.RetailLastYearCumulative)
 	out.RetailMonthRate = floatPtrNullable(r.RetailMonthRate)
@@ -621,7 +609,6 @@ func toCompanyRowAC(r model.AccommodationCatering) companyRow {
 	out.RevenuePrevMonth = floatPtr(r.RevenuePrevMonth)
 	out.RevenueCurrentMonth = floatPtr(r.RevenueCurrentMonth)
 	out.RevenueLastYearMonth = floatPtr(r.RevenueLastYearMonth)
-	out.RevenuePrevCumulative = floatPtr(r.RevenuePrevCumulative)
 	out.RevenueCurrentCumulative = floatPtr(r.RevenueCurrentCumulative)
 	out.RevenueLastYearCumulative = floatPtr(r.RevenueLastYearCumulative)
 	out.RevenueMonthRate = floatPtrNullable(r.RevenueMonthRate)
@@ -630,21 +617,18 @@ func toCompanyRowAC(r model.AccommodationCatering) companyRow {
 	out.RoomPrevMonth = floatPtr(r.RoomPrevMonth)
 	out.RoomCurrentMonth = floatPtr(r.RoomCurrentMonth)
 	out.RoomLastYearMonth = floatPtr(r.RoomLastYearMonth)
-	out.RoomPrevCumulative = floatPtr(r.RoomPrevCumulative)
 	out.RoomCurrentCumulative = floatPtr(r.RoomCurrentCumulative)
 	out.RoomLastYearCumulative = floatPtr(r.RoomLastYearCumulative)
 
 	out.FoodPrevMonth = floatPtr(r.FoodPrevMonth)
 	out.FoodCurrentMonth = floatPtr(r.FoodCurrentMonth)
 	out.FoodLastYearMonth = floatPtr(r.FoodLastYearMonth)
-	out.FoodPrevCumulative = floatPtr(r.FoodPrevCumulative)
 	out.FoodCurrentCumulative = floatPtr(r.FoodCurrentCumulative)
 	out.FoodLastYearCumulative = floatPtr(r.FoodLastYearCumulative)
 
 	out.GoodsPrevMonth = floatPtr(r.GoodsPrevMonth)
 	out.GoodsCurrentMonth = floatPtr(r.GoodsCurrentMonth)
 	out.GoodsLastYearMonth = floatPtr(r.GoodsLastYearMonth)
-	out.GoodsPrevCumulative = floatPtr(r.GoodsPrevCumulative)
 	out.GoodsCurrentCumulative = floatPtr(r.GoodsCurrentCumulative)
 	out.GoodsLastYearCumulative = floatPtr(r.GoodsLastYearCumulative)
 
@@ -794,19 +778,19 @@ func recalcDerivedFields(st *store.Store, year, month int) error {
 	if err := st.Exec(`
 		UPDATE wholesale_retail SET
 			sales_month_rate = CASE
-				WHEN sales_last_year_month = 0 THEN NULL
+				WHEN sales_last_year_month = 0 THEN -100
 				ELSE (sales_current_month - sales_last_year_month) / sales_last_year_month * 100
 			END,
 			sales_cumulative_rate = CASE
-				WHEN sales_last_year_cumulative = 0 THEN NULL
+				WHEN sales_last_year_cumulative = 0 THEN -100
 				ELSE (sales_current_cumulative - sales_last_year_cumulative) / sales_last_year_cumulative * 100
 			END,
 			retail_month_rate = CASE
-				WHEN retail_last_year_month = 0 THEN NULL
+				WHEN retail_last_year_month = 0 THEN -100
 				ELSE (retail_current_month - retail_last_year_month) / retail_last_year_month * 100
 			END,
 			retail_cumulative_rate = CASE
-				WHEN retail_last_year_cumulative = 0 THEN NULL
+				WHEN retail_last_year_cumulative = 0 THEN -100
 				ELSE (retail_current_cumulative - retail_last_year_cumulative) / retail_last_year_cumulative * 100
 			END,
 			retail_ratio = CASE
@@ -821,11 +805,11 @@ func recalcDerivedFields(st *store.Store, year, month int) error {
 	if err := st.Exec(`
 		UPDATE accommodation_catering SET
 			revenue_month_rate = CASE
-				WHEN revenue_last_year_month = 0 THEN NULL
+				WHEN revenue_last_year_month = 0 THEN -100
 				ELSE (revenue_current_month - revenue_last_year_month) / revenue_last_year_month * 100
 			END,
 			revenue_cumulative_rate = CASE
-				WHEN revenue_last_year_cumulative = 0 THEN NULL
+				WHEN revenue_last_year_cumulative = 0 THEN -100
 				ELSE (revenue_current_cumulative - revenue_last_year_cumulative) / revenue_last_year_cumulative * 100
 			END
 		WHERE data_year = ? AND data_month = ?

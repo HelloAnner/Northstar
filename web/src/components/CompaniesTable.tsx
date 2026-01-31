@@ -28,8 +28,6 @@ interface CompanyRow {
   salesPrevMonth?: number
   salesCurrentMonth?: number
   salesLastYearMonth?: number
-  salesPrevCumulative?: number
-  salesLastYearPrevCumulative?: number
   salesCurrentCumulative?: number
   salesLastYearCumulative?: number
   salesMonthRate?: number | null
@@ -38,8 +36,6 @@ interface CompanyRow {
   retailPrevMonth?: number
   retailCurrentMonth?: number
   retailLastYearMonth?: number
-  retailPrevCumulative?: number
-  retailLastYearPrevCumulative?: number
   retailCurrentCumulative?: number
   retailLastYearCumulative?: number
   retailMonthRate?: number | null
@@ -49,7 +45,6 @@ interface CompanyRow {
   revenuePrevMonth?: number
   revenueCurrentMonth?: number
   revenueLastYearMonth?: number
-  revenuePrevCumulative?: number
   revenueCurrentCumulative?: number
   revenueLastYearCumulative?: number
   revenueMonthRate?: number | null
@@ -58,21 +53,18 @@ interface CompanyRow {
   roomPrevMonth?: number
   roomCurrentMonth?: number
   roomLastYearMonth?: number
-  roomPrevCumulative?: number
   roomCurrentCumulative?: number
   roomLastYearCumulative?: number
 
   foodPrevMonth?: number
   foodCurrentMonth?: number
   foodLastYearMonth?: number
-  foodPrevCumulative?: number
   foodCurrentCumulative?: number
   foodLastYearCumulative?: number
 
   goodsPrevMonth?: number
   goodsCurrentMonth?: number
   goodsLastYearMonth?: number
-  goodsPrevCumulative?: number
   goodsCurrentCumulative?: number
   goodsLastYearCumulative?: number
 }
@@ -107,8 +99,6 @@ type ColumnKey =
   | 'salesMoMDiff'
   | 'salesMoMRate'
   | 'salesMonthRate'
-  | 'salesPrevCumulative'
-  | 'salesLastYearPrevCumulative'
   | 'salesCurrentCumulative'
   | 'salesLastYearCumulative'
   | 'salesCumulativeYoYDiff'
@@ -120,8 +110,6 @@ type ColumnKey =
   | 'retailMoMDiff'
   | 'retailMoMRate'
   | 'retailMonthRate'
-  | 'retailPrevCumulative'
-  | 'retailLastYearPrevCumulative'
   | 'retailCurrentCumulative'
   | 'retailLastYearCumulative'
   | 'retailCumulativeYoYDiff'
@@ -149,8 +137,6 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'salesMoMDiff', label: '环比增量(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
   { key: 'salesMoMRate', label: '环比增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
   { key: 'salesMonthRate', label: '同比增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
-  { key: 'salesPrevCumulative', label: '本年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
-  { key: 'salesLastYearPrevCumulative', label: '上年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
   { key: 'salesCurrentCumulative', label: '本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'both', editable: true },
   { key: 'salesLastYearCumulative', label: '上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'both', editable: true },
   { key: 'salesCumulativeYoYDiff', label: '累计同比增量', widthClass: 'w-[160px]', align: 'right', kind: 'both' },
@@ -163,8 +149,6 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'retailMoMDiff', label: '零售额;环比增量(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'both' },
   { key: 'retailMoMRate', label: '零售额;环比增速(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'both' },
   { key: 'retailMonthRate', label: '零售额;同比增速(当月)', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'retailPrevCumulative', label: '零售额;本年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
-  { key: 'retailLastYearPrevCumulative', label: '零售额;上年-1—上月', widthClass: 'w-[160px]', align: 'right', kind: 'wr' },
   { key: 'retailCurrentCumulative', label: '零售额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
   { key: 'retailLastYearCumulative', label: '零售额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
   { key: 'retailCumulativeYoYDiff', label: '零售额;累计同比增量', widthClass: 'w-[170px]', align: 'right', kind: 'wr' },
@@ -302,13 +286,15 @@ export default function CompaniesTable(props: {
           <ScrollArea className="h-[520px] w-full">
             <div className="min-w-[1200px]">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-card/90 backdrop-blur">
+                <TableHeader className="bg-card/90">
                   <TableRow>
-                    <TableHead className="w-[260px] whitespace-nowrap text-center">企业名称</TableHead>
+                    <TableHead className="sticky top-0 z-20 w-[260px] whitespace-nowrap bg-card/90 text-center backdrop-blur">
+                      企业名称
+                    </TableHead>
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
-                        className={`${col.widthClass ?? ''} whitespace-nowrap ${
+                        className={`sticky top-0 z-20 bg-card/90 whitespace-nowrap backdrop-blur ${col.widthClass ?? ''} ${
                           col.align === 'right' ? 'text-right' : col.align === 'left' ? 'text-left' : 'text-center'
                         }`}
                         style={{
@@ -509,9 +495,6 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
     }
     if (key === 'salesLastYearMonth') {
       v = row.revenueLastYearMonth
-    }
-    if (key === 'salesPrevCumulative') {
-      v = row.revenuePrevCumulative
     }
     if (key === 'salesCurrentCumulative') {
       v = row.revenueCurrentCumulative

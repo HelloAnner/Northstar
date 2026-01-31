@@ -3,6 +3,7 @@ import json
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -58,6 +59,14 @@ def _js_set_value(credit_code: str, column_label: str, new_value: float) -> str:
         "    if (String(l).includes(';')) out.push(String(l).split(';', 2)[1]);\n"
         "    return Array.from(new Set(out.filter(Boolean)));\n"
         "  };\n"
+        "  const matchRow = (tr) => {\n"
+        "    try {\n"
+        "      const monos = Array.from(tr.querySelectorAll('.font-mono')).map(el => (el.textContent||'').trim());\n"
+        "      if (monos.includes(cc)) return true;\n"
+        "    } catch (_) {}\n"
+        "    const t = String(tr.textContent || '').replace(/\\s+/g, ' ').trim();\n"
+        "    return t.includes(cc);\n"
+        "  };\n"
         "  const table = document.querySelector('table');\n"
         "  if (!table) return { ok: false, error: 'table not found' };\n"
         "  const headers = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent||'').trim());\n"
@@ -72,13 +81,14 @@ def _js_set_value(credit_code: str, column_label: str, new_value: float) -> str:
         "  if (idx < 0) return { ok: false, error: 'header not found', label, headers };\n"
         "  const rows = Array.from(table.querySelectorAll('tbody tr'));\n"
         "  for (const tr of rows) {\n"
-        "    const ccEl = tr.querySelector('td:nth-child(1) .font-mono');\n"
-        "    const ccText = (ccEl?.textContent || '').trim();\n"
-        "    if (ccText !== cc) continue;\n"
-        "    const cell = tr.querySelector(`td:nth-child(${idx+1})`);\n"
-        "    if (!cell) return { ok: false, error: 'cell not found', idx };\n"
+        "    if (!matchRow(tr)) continue;\n"
+        "    const tds = Array.from(tr.querySelectorAll('td'));\n"
+        "    const cell = tds[idx];\n"
+        "    if (!cell) return { ok: false, error: 'cell not found', idx, cells: tds.length };\n"
         "    const input = cell.querySelector('input');\n"
         "    if (!input) return { ok: false, error: 'input not found (not editable?)', idx };\n"
+        "    try { cell.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}\n"
+        "    try { input.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}\n"
         "    input.focus();\n"
         "    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;\n"
         "    if (setter) setter.call(input, value); else input.value = value;\n"
@@ -104,6 +114,14 @@ def _js_get_value(credit_code: str, column_label: str) -> str:
         "    if (String(l).includes(';')) out.push(String(l).split(';', 2)[1]);\n"
         "    return Array.from(new Set(out.filter(Boolean)));\n"
         "  };\n"
+        "  const matchRow = (tr) => {\n"
+        "    try {\n"
+        "      const monos = Array.from(tr.querySelectorAll('.font-mono')).map(el => (el.textContent||'').trim());\n"
+        "      if (monos.includes(cc)) return true;\n"
+        "    } catch (_) {}\n"
+        "    const t = String(tr.textContent || '').replace(/\\s+/g, ' ').trim();\n"
+        "    return t.includes(cc);\n"
+        "  };\n"
         "  const table = document.querySelector('table');\n"
         "  if (!table) return { ok: false, error: 'table not found' };\n"
         "  const headers = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent||'').trim());\n"
@@ -118,11 +136,10 @@ def _js_get_value(credit_code: str, column_label: str) -> str:
         "  if (idx < 0) return { ok: false, error: 'header not found', label, headers };\n"
         "  const rows = Array.from(table.querySelectorAll('tbody tr'));\n"
         "  for (const tr of rows) {\n"
-        "    const ccEl = tr.querySelector('td:nth-child(1) .font-mono');\n"
-        "    const ccText = (ccEl?.textContent || '').trim();\n"
-        "    if (ccText !== cc) continue;\n"
-        "    const cell = tr.querySelector(`td:nth-child(${idx+1})`);\n"
-        "    if (!cell) return { ok: false, error: 'cell not found', idx };\n"
+        "    if (!matchRow(tr)) continue;\n"
+        "    const tds = Array.from(tr.querySelectorAll('td'));\n"
+        "    const cell = tds[idx];\n"
+        "    if (!cell) return { ok: false, error: 'cell not found', idx, cells: tds.length };\n"
         "    const input = cell.querySelector('input');\n"
         "    if (input) return { ok: true, value: String(input.value || '') };\n"
         "    return { ok: true, value: String((cell.textContent||'').trim()) };\n"
@@ -172,6 +189,8 @@ def main() -> None:
             _agent("wait --load networkidle", log_path)
             _agent(f'wait --text "{cc}"', log_path)
             set_ret = _agent_json(f'eval {shlex.quote(_js_set_value(cc, label, new_value))} --json', log_path)
+            # UI 的自动保存可能有 debounce，避免 networkidle 过早返回导致后续步骤抢跑。
+            time.sleep(0.8)
             _agent("wait --load networkidle", log_path)
             get_ret = _agent_json(f'eval {shlex.quote(_js_get_value(cc, label))} --json', log_path)
             set_res = _unwrap_agent_browser_json(set_ret)

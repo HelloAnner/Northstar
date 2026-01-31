@@ -249,10 +249,12 @@ agent-browser trace start | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/00_home.png" | tee -a "$LOG" || true
 
 echo ">>> Preparing table columns (enable all)..." | tee -a "$LOG"
-if agent-browser eval "(() => { const keys = ['companyScale','flags','salesPrevMonth','salesCurrentMonth','salesLastYearMonth','salesMonthRate','salesPrevCumulative','salesLastYearPrevCumulative','salesCurrentCumulative','salesLastYearCumulative','salesCumulativeRate','retailPrevMonth','retailCurrentMonth','retailLastYearMonth','retailMonthRate','retailPrevCumulative','retailLastYearPrevCumulative','retailCurrentCumulative','retailLastYearCumulative','retailCumulativeRate','retailRatio','roomPrevMonth','roomCurrentMonth','roomLastYearMonth','roomMonthRate','roomPrevCumulative','roomCurrentCumulative','roomLastYearCumulative','roomCumulativeRate','foodPrevMonth','foodCurrentMonth','foodLastYearMonth','foodMonthRate','foodPrevCumulative','foodCurrentCumulative','foodLastYearCumulative','foodCumulativeRate','goodsPrevMonth','goodsCurrentMonth','goodsLastYearMonth','goodsMonthRate','goodsPrevCumulative','goodsCurrentCumulative','goodsLastYearCumulative','goodsCumulativeRate','sourceSheet']; localStorage.setItem('northstar.visibleColumns', JSON.stringify(keys)); return {visibleColumns: keys.length}; })()" | tee -a "$LOG"; then
-  record_step "prepare_columns" "pass" "" ""
+# 兼容历史版本：之前 UI 用 localStorage 控制“显示哪些列”，现在列定义已经在前端固定；
+# 若用户浏览器里残留旧 key（例如已删除的 *PrevCumulative 列），可能造成列仍显示/顺序异常。
+if agent-browser eval "(() => { try { localStorage.removeItem('northstar.visibleColumns'); } catch (e) {} return {ok:true}; })()" | tee -a "$LOG"; then
+  record_step "prepare_columns" "pass" "cleared stale localStorage(northstar.visibleColumns)" ""
 else
-  record_step "prepare_columns" "fail" "failed to set visible columns in localStorage" "打开页面后 F12 Console 执行：localStorage.getItem('northstar.visibleColumns')"
+  record_step "prepare_columns" "fail" "failed to clear localStorage(northstar.visibleColumns)" "打开页面后 F12 Console 执行：localStorage.removeItem('northstar.visibleColumns')"
 fi
 agent-browser reload | tee -a "$LOG" || true
 agent-browser wait --load networkidle | tee -a "$LOG" || true
@@ -286,11 +288,63 @@ agent-browser wait --load networkidle | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/03_after_import.png" | tee -a "$LOG" || true
 
 echo ">>> Collecting tab row counts..." | tee -a "$LOG"
-if agent-browser eval "(async () => { const tabs = ['全部','批发','零售','住宿','餐饮']; const out = []; for (const name of tabs) { const el = Array.from(document.querySelectorAll('[role=tab]')).find(x => (x.textContent||'').trim() === name); if (!el) { out.push({ tab: name, ok: false, error: 'tab not found' }); continue; } el.click(); await new Promise(r => setTimeout(r, 600)); const rows = document.querySelectorAll('tbody tr').length; const totalText = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(t => t.startsWith('共 ') && t.includes(' 家企业')) || ''; out.push({ tab: name, ok: true, rows, totalText }); } return { collectedAt: new Date().toISOString(), items: out }; })()" --json >"$TAB_COUNTS"; then
-  record_step "tab_counts" "pass" "" ""
-else
-  record_step "tab_counts" "fail" "采集 tab 行数失败（页面结构变化/脚本异常）" "导入后手动切换“全部/批发/零售/住宿/餐饮”并观察是否有数据"
-fi
+TAB_COUNTS_JSONL="$RUN_DIR/tab_counts.jsonl"
+rm -f "$TAB_COUNTS_JSONL" 2>/dev/null || true
+
+for tab in "全部" "批发" "零售" "住宿" "餐饮"; do
+  echo ">>> Tab click: ${tab}" | tee -a "$LOG"
+  tab_ok="true"
+  tab_err=""
+  if agent-browser find role tab click --name "${tab}" | tee -a "$LOG"; then
+    :
+  else
+    tab_ok="false"
+    tab_err="tab click failed"
+  fi
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+  # Give UI time to load filtered list (requests are async).
+  agent-browser wait --fn "(() => { const t = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(v => v.startsWith('共 ') && v.includes(' 家企业')) || ''; const m = t.match(/共\\s*(\\d+)\\s*家企业/); if (!m) return true; const total = parseInt(m[1], 10); const rows = document.querySelectorAll('tbody tr').length; return rows === 0 || rows === total; })()" | tee -a "$LOG" || true
+
+  agent-browser eval "(() => { const rows = document.querySelectorAll('tbody tr').length; const totalText = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(t => t.startsWith('共 ') && t.includes(' 家企业')) || ''; return { rows, totalText }; })()" --json >"$RUN_DIR/tab_count_one.json" || true
+
+  python3 - "$tab" "$tab_ok" "$tab_err" "$RUN_DIR/tab_count_one.json" <<'PY' >>"$TAB_COUNTS_JSONL"
+import json, sys, pathlib
+tab, ok, err, p = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+payload = {}
+try:
+  payload = json.loads(pathlib.Path(p).read_text(encoding='utf-8'))
+except Exception:
+  payload = {}
+def unwrap(x):
+  if isinstance(x, dict) and x.get("success") and isinstance(x.get("data"), dict) and isinstance(x["data"].get("result"), dict):
+    return x["data"]["result"]
+  return x
+res = unwrap(payload) if payload else {}
+rows = int(res.get("rows") or 0) if isinstance(res, dict) else 0
+totalText = str(res.get("totalText") or "").strip() if isinstance(res, dict) else ""
+print(json.dumps({"tab": tab, "ok": ok == "true", "rows": rows, "totalText": totalText, "error": err}, ensure_ascii=False))
+PY
+done
+
+python3 - "$TAB_COUNTS_JSONL" "$TAB_COUNTS" <<'PY'
+import json, sys, datetime, pathlib
+src = pathlib.Path(sys.argv[1])
+out = pathlib.Path(sys.argv[2])
+items = []
+if src.exists():
+  for line in src.read_text(encoding="utf-8", errors="replace").splitlines():
+    line = line.strip()
+    if not line:
+      continue
+    try:
+      items.append(json.loads(line))
+    except Exception:
+      items.append({"tab": "_parse_error", "ok": False, "rows": 0, "totalText": "", "error": line})
+payload = {"collectedAt": datetime.datetime.now().isoformat(timespec="seconds"), "items": items}
+out.write_text(json.dumps({"success": True, "data": {"result": payload}, "error": None}, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+
+record_step "tab_counts" "pass" "" ""
 
 echo ">>> Extracting companies table (before modifications)..." | tee -a "$LOG"
 agent-browser find role tab click --name "全部" | tee -a "$LOG" || true
