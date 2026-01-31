@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -73,15 +73,28 @@ interface CompanyRow {
 
 type EditableField =
   | 'salesCurrentMonth'
+  | 'salesLastYearMonth'
+  | 'salesCurrentCumulative'
+  | 'salesLastYearCumulative'
   | 'retailCurrentMonth'
+  | 'retailLastYearMonth'
+  | 'retailCurrentCumulative'
+  | 'retailLastYearCumulative'
+  | 'salesMonthRate'
+  | 'salesCumulativeRate'
+  | 'retailMonthRate'
+  | 'retailCumulativeRate'
   | 'revenueCurrentMonth'
+  | 'revenueLastYearMonth'
+  | 'revenueCurrentCumulative'
+  | 'revenueLastYearCumulative'
+  | 'revenueMonthRate'
+  | 'revenueCumulativeRate'
   | 'roomCurrentMonth'
   | 'foodCurrentMonth'
   | 'goodsCurrentMonth'
 
 type ColumnKey =
-  | 'industryType'
-  | 'creditCode'
   | 'companyScale'
   | 'flags'
   | 'salesCurrentMonth'
@@ -118,43 +131,39 @@ interface ColumnDef {
 }
 
 const ALL_COLUMNS: ColumnDef[] = [
-  { key: 'industryType', label: '行业', widthClass: 'w-[88px]', align: 'center' },
-  { key: 'creditCode', label: '统一社会信用代码', widthClass: 'w-[220px]' },
   { key: 'companyScale', label: '规模', widthClass: 'w-[72px]', align: 'center' },
   { key: 'flags', label: '标记', widthClass: 'w-[120px]' },
 
-  { key: 'salesCurrentMonth', label: '本月销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr', editable: true },
-  { key: 'salesLastYearMonth', label: '去年同期销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'salesMonthRate', label: '销售额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'salesCurrentCumulative', label: '本年累计销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'salesLastYearCumulative', label: '上年累计销售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'salesCumulativeRate', label: '销售额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'salesCurrentMonth', label: '商品销售额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesLastYearMonth', label: '商品销售额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesMonthRate', label: '商品销售额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesCurrentCumulative', label: '商品销售额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesLastYearCumulative', label: '商品销售额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'salesCumulativeRate', label: '商品销售额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
 
-  { key: 'retailCurrentMonth', label: '本月零售额', widthClass: 'w-[140px]', align: 'right', kind: 'both', editable: true },
-  { key: 'retailLastYearMonth', label: '去年同期零售额', widthClass: 'w-[140px]', align: 'right', kind: 'both' },
-  { key: 'retailMonthRate', label: '零售额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'retailCurrentCumulative', label: '本年累计零售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'retailLastYearCumulative', label: '上年累计零售额', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
-  { key: 'retailCumulativeRate', label: '零售额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'wr' },
+  { key: 'retailCurrentMonth', label: '零售额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
+  { key: 'retailLastYearMonth', label: '零售额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'both', editable: true },
+  { key: 'retailMonthRate', label: '零售额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailCurrentCumulative', label: '零售额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailLastYearCumulative', label: '零售额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'wr', editable: true },
+  { key: 'retailCumulativeRate', label: '零售额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'wr', editable: true },
   { key: 'retailRatio', label: '零销比(%)', widthClass: 'w-[110px]', align: 'right', kind: 'wr' },
 
-  { key: 'revenueCurrentMonth', label: '本月营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
-  { key: 'revenueLastYearMonth', label: '去年同期营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
-  { key: 'revenueMonthRate', label: '营业额增速(当月)', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
-  { key: 'revenueCurrentCumulative', label: '本年累计营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
-  { key: 'revenueLastYearCumulative', label: '上年累计营业额', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
-  { key: 'revenueCumulativeRate', label: '营业额增速(累计)', widthClass: 'w-[140px]', align: 'right', kind: 'ac' },
+  { key: 'revenueCurrentMonth', label: '营业额;本年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueLastYearMonth', label: '营业额;上年-本月', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueMonthRate', label: '营业额;增速(当月)', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueCurrentCumulative', label: '营业额;本年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueLastYearCumulative', label: '营业额;上年-1—本月', widthClass: 'w-[170px]', align: 'right', kind: 'ac', editable: true },
+  { key: 'revenueCumulativeRate', label: '营业额;累计增速', widthClass: 'w-[160px]', align: 'right', kind: 'ac', editable: true },
 
   { key: 'roomCurrentMonth', label: '本月客房收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
   { key: 'foodCurrentMonth', label: '本月餐费收入', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
   { key: 'goodsCurrentMonth', label: '本月商品销售额', widthClass: 'w-[140px]', align: 'right', kind: 'ac', editable: true },
 
-  { key: 'sourceSheet', label: '来源Sheet', widthClass: 'w-[120px]' },
+  { key: 'sourceSheet', label: '来源表', widthClass: 'w-[120px]' },
 ]
 
 const DEFAULT_VISIBLE: ColumnKey[] = [
-  'industryType',
-  'creditCode',
   'companyScale',
   'flags',
   'salesCurrentMonth',
@@ -175,6 +184,7 @@ const DEFAULT_VISIBLE: ColumnKey[] = [
 export default function CompaniesTable(props: {
   onIndicatorsUpdate: (groups: IndicatorGroup[]) => void
   onSavingChange: (saving: boolean) => void
+  monthSelector?: ReactNode
   reloadToken: number
 }) {
   const [loading, setLoading] = useState(false)
@@ -270,7 +280,7 @@ export default function CompaniesTable(props: {
       })
       if (!res.ok) throw new Error('保存失败')
       const data = (await res.json()) as { company: CompanyRow; groups: IndicatorGroup[] }
-      setItems((prev) => prev.map((x) => (x.id === id ? data.company : x)))
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...data.company } : x)))
       if (Array.isArray(data.groups)) {
         props.onIndicatorsUpdate(data.groups)
       }
@@ -311,6 +321,7 @@ export default function CompaniesTable(props: {
           </Tabs>
 
           <div className="flex flex-1 items-center gap-2 lg:justify-end">
+            {props.monthSelector}
             <div className="relative w-full lg:max-w-[360px]">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -364,13 +375,13 @@ export default function CompaniesTable(props: {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card/90 backdrop-blur">
                   <TableRow>
-                    <TableHead className="w-[260px]">企业名称</TableHead>
+                    <TableHead className="w-[260px] whitespace-nowrap text-center">企业名称</TableHead>
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
-                        className={col.widthClass ?? ''}
+                        className={`${col.widthClass ?? ''} whitespace-nowrap text-center`}
                         style={{
-                          textAlign: col.align ?? 'left',
+                          textAlign: 'center',
                         }}
                       >
                         {col.label}
@@ -400,18 +411,22 @@ export default function CompaniesTable(props: {
                   {!loading &&
                     items.map((row) => (
                       <TableRow key={row.id} className="hover:bg-muted/30">
-                        <TableCell className="w-[260px]">
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between gap-2">
+                        <TableCell className="w-[260px] text-center">
+                          <div className="space-y-1 text-center">
+                            <div className="flex items-center justify-center gap-2">
                               <div className="truncate font-medium">{row.name}</div>
-                              <IndustryBadge type={row.industryType} />
+                              {industryType === 'all' && <IndustryBadge type={row.industryType} />}
                             </div>
-                            <div className="truncate text-xs text-muted-foreground">{row.creditCode || '-'}</div>
+                            <div className="truncate font-mono text-xs text-muted-foreground">{row.creditCode || '-'}</div>
                           </div>
                         </TableCell>
 
                         {columns.map((col) => (
-                          <TableCell key={col.key} className="align-middle" style={{ textAlign: col.align ?? 'left' }}>
+                          <TableCell
+                            key={col.key}
+                            className="align-middle whitespace-nowrap text-center"
+                            style={{ textAlign: 'center' }}
+                          >
                             <Cell
                               row={row}
                               col={col}
@@ -466,18 +481,12 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
   const { row, col } = props
   const key = col.key
 
-  if (key === 'industryType') {
-    return <span className="text-sm">{row.industryType || '-'}</span>
-  }
-  if (key === 'creditCode') {
-    return <span className="font-mono text-xs">{row.creditCode || '-'}</span>
-  }
   if (key === 'companyScale') {
     return <span className="text-sm">{row.companyScale ?? '-'}</span>
   }
   if (key === 'flags') {
     return (
-      <div className="flex flex-wrap justify-end gap-1">
+      <div className="flex flex-wrap justify-center gap-1">
         {row.isSmallMicro === 1 && (
           <Badge variant="secondary" className="h-5 px-2 text-[11px]">
             小微
@@ -503,7 +512,16 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
     return <EditableNumber value={current} onCommit={(v) => props.onUpdate(field, v)} />
   }
 
-  const v = (row as any)[key] as number | null | undefined
+  let v = (row as any)[key] as number | null | undefined
+  if ((v === null || v === undefined) && row.kind === 'ac') {
+    // 住餐表字段命名不同：goods* 对应 “商品销售额” 口径
+    if (key === 'salesLastYearMonth') {
+      v = row.goodsLastYearMonth
+    }
+    if (key === 'salesLastYearCumulative') {
+      v = row.goodsLastYearCumulative
+    }
+  }
   if (v === null || v === undefined) {
     return <span className="text-muted-foreground">-</span>
   }
@@ -516,14 +534,30 @@ function Cell(props: { row: CompanyRow; col: ColumnDef; onUpdate: (field: Editab
 function isEditableForRow(row: CompanyRow, key: ColumnKey) {
   const allowWR: Partial<Record<ColumnKey, boolean>> = {
     salesCurrentMonth: row.kind === 'wr',
+    salesLastYearMonth: row.kind === 'wr',
+    salesCurrentCumulative: row.kind === 'wr',
+    salesLastYearCumulative: row.kind === 'wr',
+    salesMonthRate: row.kind === 'wr',
+    salesCumulativeRate: row.kind === 'wr',
     retailCurrentMonth: true,
+    retailLastYearMonth: true,
+    retailMonthRate: row.kind === 'wr',
+    retailCurrentCumulative: row.kind === 'wr',
+    retailLastYearCumulative: row.kind === 'wr',
+    retailCumulativeRate: row.kind === 'wr',
   }
   const allowAC: Partial<Record<ColumnKey, boolean>> = {
     revenueCurrentMonth: row.kind === 'ac',
+    revenueLastYearMonth: row.kind === 'ac',
+    revenueCurrentCumulative: row.kind === 'ac',
+    revenueLastYearCumulative: row.kind === 'ac',
+    revenueMonthRate: row.kind === 'ac',
+    revenueCumulativeRate: row.kind === 'ac',
     roomCurrentMonth: row.kind === 'ac',
     foodCurrentMonth: row.kind === 'ac',
     goodsCurrentMonth: row.kind === 'ac',
     retailCurrentMonth: true,
+    retailLastYearMonth: true,
   }
   return Boolean(allowWR[key] || allowAC[key])
 }
@@ -557,7 +591,7 @@ function EditableNumber(props: { value?: number; onCommit: (v: number) => void }
   }
 
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-center gap-2">
       <Input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -567,7 +601,7 @@ function EditableNumber(props: { value?: number; onCommit: (v: number) => void }
             e.currentTarget.blur()
           }
         }}
-        className="h-8 w-[120px] bg-muted/20 text-right"
+        className="h-8 w-[120px] bg-muted/20 text-center"
       />
       {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
     </div>

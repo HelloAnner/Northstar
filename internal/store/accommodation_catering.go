@@ -241,6 +241,8 @@ func (s *Store) scanACRows(rows *sql.Rows) ([]*model.AccommodationCatering, erro
 
 	for rows.Next() {
 		r := &model.AccommodationCatering{}
+		var firstReportIP sql.NullString
+		var fillIP sql.NullString
 		err := rows.Scan(
 			&r.ID, &r.CreditCode, &r.Name, &r.IndustryCode, &r.IndustryType,
 			&r.CompanyScale, &r.RowNo,
@@ -256,7 +258,7 @@ func (s *Store) scanACRows(rows *sql.Rows) ([]*model.AccommodationCatering, erro
 			&r.GoodsPrevCumulative, &r.GoodsCurrentCumulative, &r.GoodsLastYearCumulative,
 			&r.RetailCurrentMonth, &r.RetailLastYearMonth,
 			&r.IsSmallMicro, &r.IsEatWearUse,
-			&r.FirstReportIP, &r.FillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
+			&firstReportIP, &fillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
 			&r.OriginalRevenueCurrentMonth, &r.OriginalRoomCurrentMonth,
 			&r.OriginalFoodCurrentMonth, &r.OriginalGoodsCurrentMonth,
 			&r.SourceSheet, &r.SourceFile,
@@ -265,6 +267,8 @@ func (s *Store) scanACRows(rows *sql.Rows) ([]*model.AccommodationCatering, erro
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+		r.FirstReportIP = firstReportIP.String
+		r.FillIP = fillIP.String
 		results = append(results, r)
 	}
 
@@ -278,6 +282,8 @@ func (s *Store) scanACRows(rows *sql.Rows) ([]*model.AccommodationCatering, erro
 // scanACRow 扫描单行住餐企业数据
 func (s *Store) scanACRow(row *sql.Row) (*model.AccommodationCatering, error) {
 	r := &model.AccommodationCatering{}
+	var firstReportIP sql.NullString
+	var fillIP sql.NullString
 	err := row.Scan(
 		&r.ID, &r.CreditCode, &r.Name, &r.IndustryCode, &r.IndustryType,
 		&r.CompanyScale, &r.RowNo,
@@ -293,7 +299,7 @@ func (s *Store) scanACRow(row *sql.Row) (*model.AccommodationCatering, error) {
 		&r.GoodsPrevCumulative, &r.GoodsCurrentCumulative, &r.GoodsLastYearCumulative,
 		&r.RetailCurrentMonth, &r.RetailLastYearMonth,
 		&r.IsSmallMicro, &r.IsEatWearUse,
-		&r.FirstReportIP, &r.FillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
+		&firstReportIP, &fillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
 		&r.OriginalRevenueCurrentMonth, &r.OriginalRoomCurrentMonth,
 		&r.OriginalFoodCurrentMonth, &r.OriginalGoodsCurrentMonth,
 		&r.SourceSheet, &r.SourceFile,
@@ -305,5 +311,7 @@ func (s *Store) scanACRow(row *sql.Row) (*model.AccommodationCatering, error) {
 		}
 		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
+	r.FirstReportIP = firstReportIP.String
+	r.FillIP = fillIP.String
 	return r, nil
 }

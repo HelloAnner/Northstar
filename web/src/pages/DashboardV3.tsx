@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, RefreshCw, Upload } from 'lucide-react'
 import ImportDialog from '@/components/ImportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
@@ -24,6 +25,14 @@ interface SystemStatus {
   acCount: number
 }
 
+interface YearMonthStat {
+  year: number
+  month: number
+  wrCount: number
+  acCount: number
+  totalCompanies: number
+}
+
 export default function DashboardV3() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
@@ -33,6 +42,8 @@ export default function DashboardV3() {
   const [optimizing, setOptimizing] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const [draftTargets, setDraftTargets] = useState<Record<string, string>>({})
+  const [months, setMonths] = useState<YearMonthStat[]>([])
+  const [monthsLoading, setMonthsLoading] = useState(false)
 
   // 加载系统状态
   const loadStatus = async () => {
@@ -42,6 +53,22 @@ export default function DashboardV3() {
       setStatus(data)
     } catch (err) {
       console.error('Failed to load status:', err)
+    }
+  }
+
+  // 加载可用月份（用于切换整个平台年月）
+  const loadMonths = async () => {
+    setMonthsLoading(true)
+    try {
+      const res = await fetch('/api/months')
+      if (!res.ok) throw new Error('加载月份失败')
+      const data = (await res.json()) as { items?: YearMonthStat[] }
+      setMonths(Array.isArray(data.items) ? data.items : [])
+    } catch (err) {
+      console.error(err)
+      setMonths([])
+    } finally {
+      setMonthsLoading(false)
     }
   }
 
@@ -63,6 +90,7 @@ export default function DashboardV3() {
   useEffect(() => {
     loadStatus()
     loadIndicators()
+    loadMonths()
   }, [])
 
   // 导入完成回调
@@ -70,6 +98,7 @@ export default function DashboardV3() {
     setShowImportDialog(false)
     loadStatus()
     loadIndicators()
+    loadMonths()
     setReloadToken((x) => x + 1)
   }
 
@@ -146,6 +175,40 @@ export default function DashboardV3() {
 
   const saving = tableSaving || optimizing
   const saveText = optimizing ? '智能调整中…' : '自动保存中…'
+
+  const currentMonthKey =
+    status && status.currentYear > 0 && status.currentMonth > 0
+      ? `${status.currentYear}-${String(status.currentMonth).padStart(2, '0')}`
+      : ''
+  const canSelectMonth = !saving && !monthsLoading && months.length > 0
+
+  const selectMonth = async (key: string) => {
+    const [yRaw, mRaw] = key.split('-')
+    const year = Number(yRaw)
+    const month = Number(mRaw)
+    if (!Number.isFinite(year) || !Number.isFinite(month)) return
+
+    try {
+      const res = await fetch('/api/months/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || '切换月份失败')
+
+      if (data.status) {
+        setStatus(data.status as SystemStatus)
+      }
+      if (Array.isArray(data.groups)) {
+        setGroups(data.groups as IndicatorGroup[])
+      }
+      setDraftTargets({})
+      setReloadToken((x) => x + 1)
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const handleExport = async () => {
     try {
@@ -254,6 +317,25 @@ export default function DashboardV3() {
                 </>
               )}
             </Badge>
+
+            <div className="flex items-center gap-2">
+              <span className="hidden text-xs text-muted-foreground lg:inline">月份</span>
+              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
+                <SelectTrigger className="h-9 w-[180px]">
+                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((it) => {
+                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {it.year}年{it.month}月 · {it.totalCompanies} 家
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
 
             <Button
               disabled={!hasDraft || optimizing}
@@ -369,6 +451,26 @@ export default function DashboardV3() {
           onSavingChange={(s) => {
             setTableSaving(s)
           }}
+          monthSelector={
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">月份</span>
+              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
+                <SelectTrigger className="h-9 w-[180px]">
+                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((it) => {
+                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {it.year}年{it.month}月 · {it.totalCompanies} 家
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          }
           reloadToken={reloadToken}
         />
 
@@ -443,9 +545,9 @@ function MetricRow(props: {
   const dirty = draft !== undefined && draft !== text
 
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="text-xs text-muted-foreground">{props.label}</div>
-      <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">{props.label}</div>
+      <div className="flex shrink-0 items-center gap-2">
         <Input
           value={displayValue}
           disabled={props.disabled || !id}

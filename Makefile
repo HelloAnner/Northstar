@@ -223,25 +223,8 @@ clean-test-reports:
 prepare-test-reports:
 	@mkdir -p $(REPORTS_DIR)
 
-# 安装 E2E 测试依赖
-.PHONY: setup-e2e
-setup-e2e:
-	@echo ">>> 设置 E2E 测试环境..."
-	@if [ ! -d "$(E2E_DIR)/venv" ]; then \
-		echo ">>> 创建 Python 虚拟环境..."; \
-		python3 -m venv $(E2E_DIR)/venv; \
-	fi
-	@echo ">>> 安装 Python 依赖..."
-	@. $(E2E_DIR)/venv/bin/activate && pip install -q -r $(E2E_DIR)/requirements.txt
-	@echo ">>> E2E 测试环境准备完成"
-
-# 生成测试数据
-.PHONY: generate-test-data
-generate-test-data: setup-e2e
-	@echo ">>> 生成测试数据 (300条企业数据)..."
-	@rm -rf $(E2E_DIR)/fixtures
-	@. $(E2E_DIR)/venv/bin/activate && python $(E2E_DIR)/test_data_generator.py
-	@echo ">>> 测试数据生成完成"
+## E2E (agent-browser)
+# 说明：不再使用 pytest/requests 方式模拟 API；e2e 由 agent-browser 驱动 UI 完整流程并生成报告。
 
 # 仅运行单元测试（独立运行，包含清理）
 .PHONY: test-unit
@@ -250,12 +233,12 @@ test-unit: clean-test-reports prepare-test-reports test-unit-only
 
 # 仅运行 E2E 测试（独立运行，包含清理和数据生成）
 .PHONY: test-e2e
-test-e2e: install clean-test-reports prepare-test-reports generate-test-data test-e2e-only
+test-e2e: clean-test-reports prepare-test-reports test-e2e-only
 	@echo ">>> 测试报告: $(REPORTS_DIR)/report.html"
 
 # 运行全部测试（单元测试 + E2E 测试）
 .PHONY: test
-test: install clean-test-reports prepare-test-reports generate-test-data test-unit-only test-e2e-only
+test: clean-test-reports prepare-test-reports test-unit-only test-e2e-only
 	@echo ""
 	@echo "=========================================="
 	@echo "  全部测试完成"
@@ -288,37 +271,16 @@ test-unit-only:
 test-e2e-only:
 	@echo ""
 	@echo "=========================================="
-	@echo "  运行 E2E 端到端测试"
+	@echo "  运行 E2E 端到端测试 (agent-browser)"
 	@echo "=========================================="
 	@echo ""
-	@echo ">>> 编译当前后端（E2E）..."
-	@mkdir -p $(HOST_INSTALL_DIR)
-	go build $(LDFLAGS) -o $(HOST_BIN) ./cmd/northstar
-	@cp config.toml.example $(HOST_INSTALL_DIR)/config.toml 2>/dev/null || true
-	@cp packaging/readme.txt $(HOST_INSTALL_DIR)/readme.txt 2>/dev/null || true
-	@echo ">>> 清理可能残留的测试服务器..."
-	@pkill -f "northstar -port $(TEST_PORT)" 2>/dev/null || true
-	@sleep 1
-	@echo ">>> 启动测试服务器 (端口: $(TEST_PORT))..."
-	@NS_MONTH_REPORT_TEMPLATE_XLSX="$${NS_MONTH_REPORT_TEMPLATE_XLSX:-$(CURDIR)/prd/12月月报（定）.xlsx}" \
-		NS_MONTH_REPORT_ESTIMATE_XLSX="$${NS_MONTH_REPORT_ESTIMATE_XLSX:-$(CURDIR)/prd/12月月报（预估）.xlsx}" \
-		NORTHSTAR_EXCEL_TEMPLATE_PATH="$${NS_MONTH_REPORT_TEMPLATE_XLSX:-$(CURDIR)/prd/12月月报（定）.xlsx}" \
-			$(HOST_BIN) -port $(TEST_PORT) -dataDir $(REPORTS_DIR)/data > $(REPORTS_DIR)/server.log 2>&1 &
-	@echo ">>> 等待服务器启动..."
-	@sleep 3
-	@echo ">>> 执行 E2E 测试用例..."
-	@. $(E2E_DIR)/venv/bin/activate && python -m pytest $(E2E_DIR)/ \
-		-v \
-		--html=$(REPORTS_DIR)/report.html \
-		--self-contained-html; \
-	TEST_RESULT=$$?; \
-	echo ">>> 停止测试服务器..."; \
-	pkill -f "northstar -port $(TEST_PORT)" 2>/dev/null || true; \
-	echo ">>> 复制测试数据文件..."; \
-	cp -r $(E2E_DIR)/fixtures/* $(REPORTS_DIR)/ 2>/dev/null || true; \
-	exit $$TEST_RESULT
+	@echo ">>> 执行 agent-browser 自动化脚本..."
+	@BASE_URL="$${BASE_URL:-http://localhost:8080}" \
+		INPUT_XLSX="$${INPUT_XLSX:-$(CURDIR)/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx}" \
+		RESULTS_ROOT="$(REPORTS_DIR)" \
+		bash $(E2E_DIR)/run_agent_browser_e2e.sh
 	@echo ""
-	@echo ">>> E2E 测试完成"
+	@echo ">>> E2E 测试完成: $(REPORTS_DIR)/report.html"
 
 # 快速测试（仅单元测试，不启动服务器）
 .PHONY: test-quick

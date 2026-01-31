@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -113,46 +114,56 @@ func (e *Exporter) fillTemplateWorkbook(f *excelize.File, opts ExportOptions) er
 }
 
 func (e *Exporter) fillWholesaleRetailSheets(f *excelize.File, records []*model.WholesaleRetail) error {
+	var wholesale []*model.WholesaleRetail
+	var retail []*model.WholesaleRetail
 	for _, r := range records {
-		sheet := ""
 		switch strings.TrimSpace(r.IndustryType) {
 		case "wholesale":
-			sheet = "批发"
+			wholesale = append(wholesale, r)
 		case "retail":
-			sheet = "零售"
+			retail = append(retail, r)
 		default:
 			continue
 		}
-
-		if err := writeWRRow(f, sheet, r); err != nil {
-			return fmt.Errorf("写入 %s 失败: %w", sheet, err)
-		}
-		if err := writeWRRow(f, "批零总表", r); err != nil {
-			return fmt.Errorf("写入 批零总表 失败: %w", err)
-		}
 	}
+
+	if err := fillWRSheetByIndustryCodeOrder(f, "批发", wholesale); err != nil {
+		return fmt.Errorf("写入 批发 失败: %w", err)
+	}
+	if err := fillWRSheetByIndustryCodeOrder(f, "零售", retail); err != nil {
+		return fmt.Errorf("写入 零售 失败: %w", err)
+	}
+	if err := fillWRSheetByIndustryCodeOrder(f, "批零总表", records); err != nil {
+		return fmt.Errorf("写入 批零总表 失败: %w", err)
+	}
+
 	return nil
 }
 
 func (e *Exporter) fillAccommodationCateringSheets(f *excelize.File, records []*model.AccommodationCatering) error {
+	var accommodation []*model.AccommodationCatering
+	var catering []*model.AccommodationCatering
 	for _, r := range records {
-		sheet := ""
 		switch strings.TrimSpace(r.IndustryType) {
 		case "accommodation":
-			sheet = "住宿"
+			accommodation = append(accommodation, r)
 		case "catering":
-			sheet = "餐饮"
+			catering = append(catering, r)
 		default:
 			continue
 		}
-
-		if err := writeACRow(f, sheet, r); err != nil {
-			return fmt.Errorf("写入 %s 失败: %w", sheet, err)
-		}
-		if err := writeACTotalRow(f, "住餐总表", r); err != nil {
-			return fmt.Errorf("写入 住餐总表 失败: %w", err)
-		}
 	}
+
+	if err := fillACIndustrySheetByIndustryCodeOrder(f, "住宿", accommodation); err != nil {
+		return fmt.Errorf("写入 住宿 失败: %w", err)
+	}
+	if err := fillACIndustrySheetByIndustryCodeOrder(f, "餐饮", catering); err != nil {
+		return fmt.Errorf("写入 餐饮 失败: %w", err)
+	}
+	if err := fillACTotalSheetByIndustryCodeOrder(f, "住餐总表", records); err != nil {
+		return fmt.Errorf("写入 住餐总表 失败: %w", err)
+	}
+
 	return nil
 }
 
@@ -211,19 +222,17 @@ func (e *Exporter) rewriteFixedTotals(f *excelize.File) error {
 
 // ---------- 行写入：批零（批发/零售/批零总表） ----------
 
-func writeWRRow(f *excelize.File, sheet string, r *model.WholesaleRetail) error {
-	row, err := findWRRow(f, sheet, r)
-	if err != nil {
-		return err
-	}
-	if row <= 0 {
-		return nil
+func writeWRRowAt(f *excelize.File, sheet string, row int, r *model.WholesaleRetail) error {
+	creditCode := strings.TrimSpace(r.CreditCode)
+	name := strings.TrimSpace(r.Name)
+	if creditCode == "" || name == "" {
+		return fmt.Errorf("%s 第 %d 行企业信息为空（统一社会信用代码/单位详细名称）", sheet, row)
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), r.CreditCode); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), creditCode); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), r.Name); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), name); err != nil {
 		return err
 	}
 
@@ -263,65 +272,28 @@ func writeWRRow(f *excelize.File, sheet string, r *model.WholesaleRetail) error 
 	return nil
 }
 
-func findWRRow(f *excelize.File, sheet string, r *model.WholesaleRetail) (int, error) {
-	maxRow, err := findMaxDataRow(f, sheet, "C", 2)
-	if err != nil {
-		return 0, err
-	}
-
-	codeNeedle := strings.TrimSpace(r.IndustryCode)
-	for row := 2; row <= maxRow; row++ {
-		code, err := getCellString(f, sheet, fmt.Sprintf("C%d", row))
-		if err != nil {
-			return 0, err
-		}
-		if strings.TrimSpace(code) != codeNeedle {
-			continue
-		}
-		salesLast, _ := getCellFloat(f, sheet, fmt.Sprintf("E%d", row))
-		salesLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("H%d", row))
-		retailLast, _ := getCellFloat(f, sheet, fmt.Sprintf("K%d", row))
-		retailLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("N%d", row))
-
-		if !closeFloat(salesLast, r.SalesLastYearMonth) {
-			continue
-		}
-		if !closeFloat(salesLastCum, r.SalesLastYearCumulative) {
-			continue
-		}
-		if !closeFloat(retailLast, r.RetailLastYearMonth) {
-			continue
-		}
-		if !closeFloat(retailLastCum, r.RetailLastYearCumulative) {
-			continue
-		}
-		return row, nil
-	}
-
-	// 无法定位：为了不破坏模板结构，这里不创建新行，直接跳过。
-	return 0, nil
-}
-
 // ---------- 行写入：住餐（住宿/餐饮） ----------
 
-func writeACRow(f *excelize.File, sheet string, r *model.AccommodationCatering) error {
-	row, err := findACRow(f, sheet, r)
-	if err != nil {
-		return err
-	}
-	if row <= 0 {
-		return nil
+func writeACRowAt(
+	f *excelize.File,
+	sheet string,
+	row int,
+	r *model.AccommodationCatering,
+	retailCur float64,
+	retailLast float64,
+	retailCurCum float64,
+	retailLastCum float64,
+) error {
+	creditCode := strings.TrimSpace(r.CreditCode)
+	name := strings.TrimSpace(r.Name)
+	if creditCode == "" || name == "" {
+		return fmt.Errorf("%s 第 %d 行企业信息为空（统一社会信用代码/单位详细名称）", sheet, row)
 	}
 
-	retailCur := r.FoodCurrentMonth + r.GoodsCurrentMonth
-	retailLast := r.FoodLastYearMonth + r.GoodsLastYearMonth
-	retailCurCum := r.FoodCurrentCumulative + r.GoodsCurrentCumulative
-	retailLastCum := r.FoodLastYearCumulative + r.GoodsLastYearCumulative
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), r.CreditCode); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), creditCode); err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), r.Name); err != nil {
+	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), name); err != nil {
 		return err
 	}
 
@@ -377,64 +349,157 @@ func writeACRow(f *excelize.File, sheet string, r *model.AccommodationCatering) 
 	return nil
 }
 
-func findACRow(f *excelize.File, sheet string, r *model.AccommodationCatering) (int, error) {
+func fillWRSheetByIndustryCodeOrder(f *excelize.File, sheet string, records []*model.WholesaleRetail) error {
 	maxRow, err := findMaxDataRow(f, sheet, "C", 2)
 	if err != nil {
-		return 0, err
+		return err
+	}
+	if len(records) == 0 {
+		return fmt.Errorf("%s 没有可用数据记录", sheet)
 	}
 
-	codeNeedle := strings.TrimSpace(r.IndustryCode)
-	retailLast := r.FoodLastYearMonth + r.GoodsLastYearMonth
-	retailLastCum := r.FoodLastYearCumulative + r.GoodsLastYearCumulative
+	byCode := map[string][]*model.WholesaleRetail{}
+	for _, r := range records {
+		code := normalizeCodeText(r.IndustryCode)
+		byCode[code] = append(byCode[code], r)
+	}
+	for k := range byCode {
+		rs := byCode[k]
+		sort.Slice(rs, func(i, j int) bool {
+			if rs[i].RowNo != rs[j].RowNo {
+				return rs[i].RowNo < rs[j].RowNo
+			}
+			return rs[i].ID < rs[j].ID
+		})
+		byCode[k] = rs
+	}
 
+	next := map[string]int{}
 	for row := 2; row <= maxRow; row++ {
 		code, err := getCellString(f, sheet, fmt.Sprintf("C%d", row))
 		if err != nil {
-			return 0, err
+			return err
 		}
-		if strings.TrimSpace(code) != codeNeedle {
-			continue
+		codeKey := normalizeCodeText(code)
+		list := byCode[codeKey]
+		i := next[codeKey]
+		if i >= len(list) {
+			return fmt.Errorf("%s 第 %d 行无法匹配到企业记录（行业代码=%s）", sheet, row, strings.TrimSpace(code))
 		}
-
-		revenueLast, _ := getCellFloat(f, sheet, fmt.Sprintf("E%d", row))
-		revenueLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("H%d", row))
-		retailLastOnTpl, _ := getCellFloat(f, sheet, fmt.Sprintf("W%d", row))
-		retailLastCumOnTpl, _ := getCellFloat(f, sheet, fmt.Sprintf("Y%d", row))
-
-		if !closeFloat(revenueLast, r.RevenueLastYearMonth) {
-			continue
+		next[codeKey] = i + 1
+		if err := writeWRRowAt(f, sheet, row, list[i]); err != nil {
+			return err
 		}
-		if !closeFloat(revenueLastCum, r.RevenueLastYearCumulative) {
-			continue
-		}
-		if !closeFloat(retailLastOnTpl, retailLast) {
-			continue
-		}
-		if !closeFloat(retailLastCumOnTpl, retailLastCum) {
-			continue
-		}
-
-		return row, nil
 	}
-
-	return 0, nil
+	return nil
 }
 
-// ---------- 行写入：住餐总表 ----------
-
-func writeACTotalRow(f *excelize.File, sheet string, r *model.AccommodationCatering) error {
-	row, err := findACTotalRow(f, sheet, r)
+func fillACIndustrySheetByIndustryCodeOrder(f *excelize.File, sheet string, records []*model.AccommodationCatering) error {
+	maxRow, err := findMaxDataRow(f, sheet, "C", 2)
 	if err != nil {
 		return err
 	}
-	if row <= 0 {
-		return nil
+	if len(records) == 0 {
+		return fmt.Errorf("%s 没有可用数据记录", sheet)
 	}
 
-	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), r.CreditCode); err != nil {
+	byCode := map[string][]*model.AccommodationCatering{}
+	for _, r := range records {
+		code := normalizeCodeText(r.IndustryCode)
+		byCode[code] = append(byCode[code], r)
+	}
+	for k := range byCode {
+		rs := byCode[k]
+		sort.Slice(rs, func(i, j int) bool {
+			if rs[i].RowNo != rs[j].RowNo {
+				return rs[i].RowNo < rs[j].RowNo
+			}
+			return rs[i].ID < rs[j].ID
+		})
+		byCode[k] = rs
+	}
+
+	next := map[string]int{}
+	for row := 2; row <= maxRow; row++ {
+		code, err := getCellString(f, sheet, fmt.Sprintf("C%d", row))
+		if err != nil {
+			return err
+		}
+		codeKey := normalizeCodeText(code)
+		list := byCode[codeKey]
+		i := next[codeKey]
+		if i >= len(list) {
+			return fmt.Errorf("%s 第 %d 行无法匹配到企业记录（行业代码=%s）", sheet, row, strings.TrimSpace(code))
+		}
+		next[codeKey] = i + 1
+		r := list[i]
+		retailCur := r.FoodCurrentMonth + r.GoodsCurrentMonth
+		retailLast := r.FoodLastYearMonth + r.GoodsLastYearMonth
+		retailCurCum := r.FoodCurrentCumulative + r.GoodsCurrentCumulative
+		retailLastCum := r.FoodLastYearCumulative + r.GoodsLastYearCumulative
+		if err := writeACRowAt(f, sheet, row, r, retailCur, retailLast, retailCurCum, retailLastCum); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fillACTotalSheetByIndustryCodeOrder(f *excelize.File, sheet string, records []*model.AccommodationCatering) error {
+	maxRow, err := findMaxDataRow(f, sheet, "C", 2)
+	if err != nil {
 		return err
 	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), r.Name); err != nil {
+	if len(records) == 0 {
+		return fmt.Errorf("%s 没有可用数据记录", sheet)
+	}
+
+	byCode := map[string][]*model.AccommodationCatering{}
+	for _, r := range records {
+		code := normalizeCodeText(r.IndustryCode)
+		byCode[code] = append(byCode[code], r)
+	}
+	for k := range byCode {
+		rs := byCode[k]
+		sort.Slice(rs, func(i, j int) bool {
+			if rs[i].RowNo != rs[j].RowNo {
+				return rs[i].RowNo < rs[j].RowNo
+			}
+			return rs[i].ID < rs[j].ID
+		})
+		byCode[k] = rs
+	}
+
+	next := map[string]int{}
+	for row := 2; row <= maxRow; row++ {
+		code, err := getCellString(f, sheet, fmt.Sprintf("C%d", row))
+		if err != nil {
+			return err
+		}
+		codeKey := normalizeCodeText(code)
+		list := byCode[codeKey]
+		i := next[codeKey]
+		if i >= len(list) {
+			return fmt.Errorf("%s 第 %d 行无法匹配到企业记录（行业代码=%s）", sheet, row, strings.TrimSpace(code))
+		}
+		next[codeKey] = i + 1
+		if err := writeACTotalRowAt(f, sheet, row, list[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeACTotalRowAt(f *excelize.File, sheet string, row int, r *model.AccommodationCatering) error {
+	creditCode := strings.TrimSpace(r.CreditCode)
+	name := strings.TrimSpace(r.Name)
+	if creditCode == "" || name == "" {
+		return fmt.Errorf("%s 第 %d 行企业信息为空（统一社会信用代码/单位详细名称）", sheet, row)
+	}
+
+	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), creditCode); err != nil {
+		return err
+	}
+	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), name); err != nil {
 		return err
 	}
 
@@ -475,48 +540,18 @@ func writeACTotalRow(f *excelize.File, sheet string, r *model.AccommodationCater
 	return nil
 }
 
-func findACTotalRow(f *excelize.File, sheet string, r *model.AccommodationCatering) (int, error) {
-	maxRow, err := findMaxDataRow(f, sheet, "C", 2)
-	if err != nil {
-		return 0, err
+func normalizeCodeText(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
 	}
-
-	codeNeedle := strings.TrimSpace(r.IndustryCode)
-	for row := 2; row <= maxRow; row++ {
-		code, err := getCellString(f, sheet, fmt.Sprintf("C%d", row))
-		if err != nil {
-			return 0, err
+	s = strings.ReplaceAll(s, ",", "")
+	if v, err := strconv.ParseFloat(s, 64); err == nil {
+		if math.Abs(v-math.Round(v)) <= 1e-9 {
+			return strconv.FormatInt(int64(math.Round(v)), 10)
 		}
-		if strings.TrimSpace(code) != codeNeedle {
-			continue
-		}
-
-		revenueLast, _ := getCellFloat(f, sheet, fmt.Sprintf("E%d", row))
-		revenueLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("H%d", row))
-		roomLast, _ := getCellFloat(f, sheet, fmt.Sprintf("K%d", row))
-		roomLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("M%d", row))
-		foodLast, _ := getCellFloat(f, sheet, fmt.Sprintf("O%d", row))
-		foodLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("Q%d", row))
-		goodsLast, _ := getCellFloat(f, sheet, fmt.Sprintf("S%d", row))
-		goodsLastCum, _ := getCellFloat(f, sheet, fmt.Sprintf("U%d", row))
-
-		if !closeFloat(revenueLast, r.RevenueLastYearMonth) || !closeFloat(revenueLastCum, r.RevenueLastYearCumulative) {
-			continue
-		}
-		if !closeFloat(roomLast, r.RoomLastYearMonth) || !closeFloat(roomLastCum, r.RoomLastYearCumulative) {
-			continue
-		}
-		if !closeFloat(foodLast, r.FoodLastYearMonth) || !closeFloat(foodLastCum, r.FoodLastYearCumulative) {
-			continue
-		}
-		if !closeFloat(goodsLast, r.GoodsLastYearMonth) || !closeFloat(goodsLastCum, r.GoodsLastYearCumulative) {
-			continue
-		}
-
-		return row, nil
 	}
-
-	return 0, nil
+	return s
 }
 
 // ---------- 汇总区重写 ----------
@@ -866,10 +901,6 @@ func getCellFloat(f *excelize.File, sheet, cell string) (float64, error) {
 
 func setCellValue(f *excelize.File, sheet, cell string, value interface{}) error {
 	return f.SetCellValue(sheet, cell, value)
-}
-
-func closeFloat(a, b float64) bool {
-	return math.Abs(a-b) <= 1e-6
 }
 
 func roundHalfUp(v float64, digits int) float64 {

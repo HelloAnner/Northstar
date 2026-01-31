@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -97,6 +98,9 @@ func InferFieldTimeType(columnName string, currentYear, currentMonth int) FieldT
 			} else if month == currentMonth-1 {
 				return PrevMonth
 			}
+		} else if currentMonth == 1 && year == currentYear-1 && month == 12 {
+			// 1 月特殊：上月是上年 12 月（不是“去年同期”）
+			return PrevMonth
 		} else if year == currentYear-1 {
 			return LastYearMonth
 		}
@@ -109,6 +113,9 @@ func InferFieldTimeType(columnName string, currentYear, currentMonth int) FieldT
 			return CurrentMonth
 		}
 		if month == currentMonth-1 {
+			return PrevMonth
+		}
+		if currentMonth == 1 && month == 12 {
 			return PrevMonth
 		}
 	}
@@ -138,6 +145,15 @@ func FindCurrentYearMonth(columnNames []string) (year, month int) {
 				maxMonth = m
 			}
 		}
+
+		// 兼容只出现累计范围但没有单月列的情况：例如 "2025年1-11月销售额"
+		y, _, endMonth, found := ExtractYearMonthRange(col)
+		if found {
+			if y > maxYear || (y == maxYear && endMonth > maxMonth) {
+				maxYear = y
+				maxMonth = endMonth
+			}
+		}
 	}
 
 	return maxYear, maxMonth
@@ -155,6 +171,28 @@ func NormalizeColumnName(name string) string {
 	re := regexp.MustCompile(`\s+`)
 	name = re.ReplaceAllString(name, "")
 	return name
+}
+
+func parseRatePercentPtr(s string) *float64 {
+	raw := strings.TrimSpace(s)
+	raw = strings.ReplaceAll(raw, ",", "")
+	raw = strings.ReplaceAll(raw, "％", "%")
+
+	hasPercent := strings.Contains(raw, "%")
+	raw = strings.ReplaceAll(raw, "%", "")
+
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil
+	}
+
+	// Excel 百分比单元格可能返回 0.1234（显示 12.34%），做一次轻量兼容
+	if !hasPercent && math.Abs(v) <= 1 {
+		v = v * 100
+	}
+
+	val := v
+	return &val
 }
 
 // ContainsAny 检查字符串是否包含任意一个关键词

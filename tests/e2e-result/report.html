@@ -1,1102 +1,276 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <title id="head-title">Northstar E2E 端到端测试报告</title>
-      <style type="text/css">body {
-  font-family: Helvetica, Arial, sans-serif;
-  font-size: 12px;
-  /* do not increase min-width as some may use split screens */
-  min-width: 800px;
-  color: #999;
-}
-
-h1 {
-  font-size: 24px;
-  color: black;
-}
-
-h2 {
-  font-size: 16px;
-  color: black;
-}
-
-p {
-  color: black;
-}
-
-a {
-  color: #999;
-}
-
-table {
-  border-collapse: collapse;
-}
-
-/******************************
- * SUMMARY INFORMATION
- ******************************/
-#environment td {
-  padding: 5px;
-  border: 1px solid #e6e6e6;
-  vertical-align: top;
-}
-#environment tr:nth-child(odd) {
-  background-color: #f6f6f6;
-}
-#environment ul {
-  margin: 0;
-  padding: 0 20px;
-}
-
-/******************************
- * TEST RESULT COLORS
- ******************************/
-span.passed,
-.passed .col-result {
-  color: green;
-}
-
-span.skipped,
-span.xfailed,
-span.rerun,
-.skipped .col-result,
-.xfailed .col-result,
-.rerun .col-result {
-  color: orange;
-}
-
-span.error,
-span.failed,
-span.xpassed,
-.error .col-result,
-.failed .col-result,
-.xpassed .col-result {
-  color: red;
-}
-
-.col-links__extra {
-  margin-right: 3px;
-}
-
-/******************************
- * RESULTS TABLE
- *
- * 1. Table Layout
- * 2. Extra
- * 3. Sorting items
- *
- ******************************/
-/*------------------
- * 1. Table Layout
- *------------------*/
-#results-table {
-  border: 1px solid #e6e6e6;
-  color: #999;
-  font-size: 12px;
-  width: 100%;
-}
-#results-table th,
-#results-table td {
-  padding: 5px;
-  border: 1px solid #e6e6e6;
-  text-align: left;
-}
-#results-table th {
-  font-weight: bold;
-}
-
-/*------------------
- * 2. Extra
- *------------------*/
-.logwrapper {
-  max-height: 230px;
-  overflow-y: scroll;
-  background-color: #e6e6e6;
-}
-.logwrapper.expanded {
-  max-height: none;
-}
-.logwrapper.expanded .logexpander:after {
-  content: "collapse [-]";
-}
-.logwrapper .logexpander {
-  z-index: 1;
-  position: sticky;
-  top: 10px;
-  width: max-content;
-  border: 1px solid;
-  border-radius: 3px;
-  padding: 5px 7px;
-  margin: 10px 0 10px calc(100% - 80px);
-  cursor: pointer;
-  background-color: #e6e6e6;
-}
-.logwrapper .logexpander:after {
-  content: "expand [+]";
-}
-.logwrapper .logexpander:hover {
-  color: #000;
-  border-color: #000;
-}
-.logwrapper .log {
-  min-height: 40px;
-  position: relative;
-  top: -50px;
-  height: calc(100% + 50px);
-  border: 1px solid #e6e6e6;
-  color: black;
-  display: block;
-  font-family: "Courier New", Courier, monospace;
-  padding: 5px;
-  padding-right: 80px;
-  white-space: pre-wrap;
-}
-
-div.media {
-  border: 1px solid #e6e6e6;
-  float: right;
-  height: 240px;
-  margin: 0 5px;
-  overflow: hidden;
-  width: 320px;
-}
-
-.media-container {
-  display: grid;
-  grid-template-columns: 25px auto 25px;
-  align-items: center;
-  flex: 1 1;
-  overflow: hidden;
-  height: 200px;
-}
-
-.media-container--fullscreen {
-  grid-template-columns: 0px auto 0px;
-}
-
-.media-container__nav--right,
-.media-container__nav--left {
-  text-align: center;
-  cursor: pointer;
-}
-
-.media-container__viewport {
-  cursor: pointer;
-  text-align: center;
-  height: inherit;
-}
-.media-container__viewport img,
-.media-container__viewport video {
-  object-fit: cover;
-  width: 100%;
-  max-height: 100%;
-}
-
-.media__name,
-.media__counter {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-  flex: 0 0 25px;
-  align-items: center;
-}
-
-.collapsible td:not(.col-links) {
-  cursor: pointer;
-}
-.collapsible td:not(.col-links):hover::after {
-  color: #bbb;
-  font-style: italic;
-  cursor: pointer;
-}
-
-.col-result {
-  width: 130px;
-}
-.col-result:hover::after {
-  content: " (hide details)";
-}
-
-.col-result.collapsed:hover::after {
-  content: " (show details)";
-}
-
-#environment-header h2:hover::after {
-  content: " (hide details)";
-  color: #bbb;
-  font-style: italic;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-#environment-header.collapsed h2:hover::after {
-  content: " (show details)";
-  color: #bbb;
-  font-style: italic;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-/*------------------
- * 3. Sorting items
- *------------------*/
-.sortable {
-  cursor: pointer;
-}
-.sortable.desc:after {
-  content: " ";
-  position: relative;
-  left: 5px;
-  bottom: -12.5px;
-  border: 10px solid #4caf50;
-  border-bottom: 0;
-  border-left-color: transparent;
-  border-right-color: transparent;
-}
-.sortable.asc:after {
-  content: " ";
-  position: relative;
-  left: 5px;
-  bottom: 12.5px;
-  border: 10px solid #4caf50;
-  border-top: 0;
-  border-left-color: transparent;
-  border-right-color: transparent;
-}
-
-.hidden, .summary__reload__button.hidden {
-  display: none;
-}
-
-.summary__data {
-  flex: 0 0 550px;
-}
-.summary__reload {
-  flex: 1 1;
-  display: flex;
-  justify-content: center;
-}
-.summary__reload__button {
-  flex: 0 0 300px;
-  display: flex;
-  color: white;
-  font-weight: bold;
-  background-color: #4caf50;
-  text-align: center;
-  justify-content: center;
-  align-items: center;
-  border-radius: 3px;
-  cursor: pointer;
-}
-.summary__reload__button:hover {
-  background-color: #46a049;
-}
-.summary__spacer {
-  flex: 0 0 550px;
-}
-
-.controls {
-  display: flex;
-  justify-content: space-between;
-}
-
-.filters,
-.collapse {
-  display: flex;
-  align-items: center;
-}
-.filters button,
-.collapse button {
-  color: #999;
-  border: none;
-  background: none;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.filters button:hover,
-.collapse button:hover {
-  color: #ccc;
-}
-
-.filter__label {
-  margin-right: 10px;
-}
-
-      </style>
-    
-  </head>
-  <body>
-    <h1 id="title">Northstar E2E 端到端测试报告</h1>
-    <p>Report generated on 29-Jan-2026 at 06:35:31 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a>
-        v4.2.0</p>
-    <div id="environment-header">
-      <h2>Environment</h2>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Northstar E2E (agent-browser) - FAIL</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f1b33;
+      --text: #e6edf3;
+      --muted: #a6b3c3;
+      --ok: #4ade80;
+      --bad: #fb7185;
+      --warn: #fbbf24;
+      --border: rgba(255,255,255,.10);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 18px 48px; }
+    .title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    h1 { font-size: 22px; margin: 0; }
+    .pill { padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; border: 1px solid var(--border); }
+    .pill.ok { color: #052e15; background: var(--ok); border-color: rgba(74,222,128,.35); }
+    .pill.bad { color: #2b0b11; background: var(--bad); border-color: rgba(251,113,133,.35); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 12px; }
+    .card h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 700; }
+    .kv { display: grid; grid-template-columns: 160px 1fr; gap: 6px 10px; font-size: 13px; }
+    .kv div { padding: 2px 0; }
+    .k { color: var(--muted); }
+    .v { font-family: var(--mono); }
+    .mono { font-family: var(--mono); }
+    .ok { color: var(--ok); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .section { margin-top: 14px; }
+    .section h3 { margin: 0 0 10px; font-size: 16px; }
+    a { color: #93c5fd; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul { margin: 8px 0 0 18px; }
+    li { margin: 3px 0; }
+    .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+    table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 12px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { position: sticky; top: 0; background: rgba(15,27,51,.95); backdrop-filter: blur(8px); }
+    .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .shot { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.02); }
+    .shot img { width: 100%; display: block; }
+    .shot .cap { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+    pre { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">
+      <h1>Northstar E2E（agent-browser）</h1>
+      <div class="pill bad">FAIL</div>
     </div>
-    <table id="environment"></table>
-    <!-- TEMPLATES -->
-      <template id="template_environment_row">
-      <tr>
-        <td></td>
-        <td></td>
-      </tr>
-    </template>
-    <template id="template_results-table__body--empty">
-      <tbody class="results-table-row">
-        <tr id="not-found-message">
-          <td colspan="6">No results found. Check the filters.</td>
-        </tr>
-      </tbody>
-    </template>
-    <template id="template_results-table__tbody">
-      <tbody class="results-table-row">
-        <tr class="collapsible">
-        </tr>
-        <tr class="extras-row">
-          <td class="extra" colspan="6">
-            <div class="extraHTML"></div>
-            <div class="media">
-              <div class="media-container">
-                  <div class="media-container__nav--left">&lt;</div>
-                  <div class="media-container__viewport">
-                    <img src="" />
-                    <video controls>
-                      <source src="" type="video/mp4">
-                    </video>
-                  </div>
-                  <div class="media-container__nav--right">&gt;</div>
-                </div>
-                <div class="media__name"></div>
-                <div class="media__counter"></div>
-            </div>
-            <div class="logwrapper">
-              <div class="logexpander"></div>
-              <div class="log"></div>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </template>
-    <!-- END TEMPLATES -->
-    <div class="summary">
-      <div class="summary__data">
-        <h2>Summary</h2>
-        <div class="additional-summary prefix">
-          <h2>测试概要</h2>
-          <p><strong>项目：</strong>Northstar 经济数据统计分析工具</p>
-          <p><strong>测试范围：</strong>完整业务流程验证（数据导入、修改、指标计算、智能调整、导出）</p>
-          <p><strong>测试数据：</strong>300条企业数据 (真实Excel文件，包含批发、零售、餐饮、住宿四大行业)</p>
-          <p><strong>API格式：</strong>{"code": 0, "message": "success", "data": {...}}</p>
-          <hr/>
-        </div>
-        <p class="run-count">58 tests took 271 ms.</p>
-        <p class="filter">(Un)check the boxes to filter the results.</p>
-        <div class="summary__reload">
-          <div class="summary__reload__button hidden" onclick="location.reload()">
-            <div>There are still tests running. <br />Reload this page to get the latest results!</div>
-          </div>
-        </div>
-        <div class="summary__spacer"></div>
-        <div class="controls">
-          <div class="filters">
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="failed" disabled>
-            <span class="failed">0 Failed,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="passed" >
-            <span class="passed">58 Passed,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="skipped" disabled>
-            <span class="skipped">0 Skipped,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xfailed" disabled>
-            <span class="xfailed">0 Expected failures,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xpassed" disabled>
-            <span class="xpassed">0 Unexpected passes,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="error" disabled>
-            <span class="error">0 Errors,</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="rerun" disabled>
-            <span class="rerun">0 Reruns</span>
-            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="retried" disabled>
-            <span class="retried">0 Retried,</span>
-          </div>
-          <div class="collapse">
-            <button id="show_all_details">Show all details</button>&nbsp;/&nbsp;<button id="hide_all_details">Hide all details</button>
-          </div>
+    <div class="grid">
+      <div class="card">
+        <h2>运行信息</h2>
+        <div class="kv">
+          <div class="k">时间</div><div class="v">2026-01-31 14:11:17</div>
+          <div class="k">BASE_URL</div><div class="v">http://localhost:8080</div>
+          <div class="k">输入 Excel</div><div class="v"><a href="/Users/anner/code/Northstar/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx">/Users/anner/code/Northstar/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx</a></div>
+          <div class="k">导出 Excel</div><div class="v"><a href="tests/e2e-result/run-20260131-141104/export.xlsx">tests/e2e-result/run-20260131-141104/export.xlsx</a></div>
+          <div class="k">抽取(导入后)</div><div class="v">2026-01-31T06:11:10.517Z</div>
+          <div class="k">抽取(修改后)</div><div class="v">2026-01-31T06:11:13.169Z</div>
         </div>
       </div>
-      <div class="additional-summary summary">
-      </div>
-      <div class="additional-summary postfix">
+      <div class="card">
+        <h2>附件</h2>
+        <ul>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/ui_companies_before.json">ui_companies_before.json</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/ui_companies_after.json">ui_companies_after.json</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/import_events.json">import_events.json</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/browser_console.txt">browser_console.txt</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/browser_errors.txt">browser_errors.txt</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/trace.zip">trace.zip</a></li>
+          <li><a class="mono" href="tests/e2e-result/run-20260131-141104/run.webm">run.webm</a></li>
+        </ul>
       </div>
     </div>
-    <table id="results-table">
-      <thead id="results-table-head">
-        <tr>
-          <th class="sortable result initial-sort" data-column-type="result">测试结果</th>
-          <th class="sortable" data-column-type="testId">测试用例</th>
-          <th class="sortable">测试描述</th>
-          <th>验证依据</th>
-          <th class="sortable" data-column-type="duration">耗时(秒)</th>
-          <th>Links</th>
-        </tr>
-      </thead>
-    </table>
-  <footer>
-    <div id="data-container" data-jsonblob="{&#34;environment&#34;: {&#34;Python&#34;: &#34;3.9.6&#34;, &#34;Platform&#34;: &#34;macOS-15.7.3-arm64-arm-64bit&#34;, &#34;Packages&#34;: {&#34;pytest&#34;: &#34;8.4.2&#34;, &#34;pluggy&#34;: &#34;1.6.0&#34;}, &#34;Plugins&#34;: {&#34;metadata&#34;: &#34;3.1.1&#34;, &#34;html&#34;: &#34;4.2.0&#34;, &#34;Faker&#34;: &#34;37.12.0&#34;}, &#34;JAVA_HOME&#34;: &#34;/Users/anner/package/zulu8/zulu-8.jdk/Contents/Home&#34;}, &#34;tests&#34;: {&#34;tests/e2e/test_api.py::TestServerHealth::test_server_is_running&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestServerHealth::test_server_is_running&#34;, &#34;duration&#34;: &#34;23 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestServerHealth::test_server_is_running&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-HEALTH-001: \u9a8c\u8bc1\u670d\u52a1\u5668\u6b63\u5e38\u8fd0\u884c&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 HTTP \u72b6\u6001\u7801 = 200\uff0c\u670d\u52a1\u5668\u6b63\u5e38\u54cd\u5e94&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;23 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestServerHealth::test_api_response_time&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestServerHealth::test_api_response_time&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestServerHealth::test_api_response_time&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-HEALTH-002: API \u54cd\u5e94\u65f6\u95f4\u5e94\u8be5\u5c0f\u4e8e 500ms&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u54cd\u5e94\u65f6\u95f4 &lt; 500ms\uff0c\u6ee1\u8db3\u6027\u80fd\u8981\u6c42&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_get_indicators_structure&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_get_indicators_structure&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestIndicatorsAPI::test_get_indicators_structure&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-IND-STRUCT: \u9a8c\u8bc1\u6307\u6807 API \u8fd4\u56de\u7684\u6570\u636e\u7ed3\u6784\u5b8c\u6574&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u8fd4\u56de\u6570\u636e\u5305\u542b\u5168\u90e816\u4e2a\u6307\u6807\u5b57\u6bb5\uff08\u9650\u4e0a\u793e\u96f6\u989d4\u9879\u3001\u4e13\u9879\u589e\u901f2\u9879\u3001\u884c\u4e1a\u589e\u901f8\u9879\u3001\u793e\u96f6\u603b\u989d2\u9879\uff09&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_industry_rates_complete&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_industry_rates_complete&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestIndicatorsAPI::test_industry_rates_complete&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-IND-007~014: \u9a8c\u8bc1\u56db\u5927\u884c\u4e1a\u589e\u901f\u6570\u636e\u5b8c\u6574&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u56db\u5927\u884c\u4e1a\uff08\u6279\u53d1/\u96f6\u552e/\u9910\u996e/\u4f4f\u5bbf\uff09\u5747\u6709\u5f53\u6708\u548c\u7d2f\u8ba1\u589e\u901f\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_indicators_value_types&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_indicators_value_types&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestIndicatorsAPI::test_indicators_value_types&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-IND-TYPE: \u9a8c\u8bc1\u6307\u6807\u6570\u503c\u7c7b\u578b\u6b63\u786e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6307\u6807\u503c\u4e3a\u6570\u5b57\u7c7b\u578b\uff08int/float\uff09&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_empty_data_indicators_zero&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestIndicatorsAPI::test_empty_data_indicators_zero&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestIndicatorsAPI::test_empty_data_indicators_zero&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-EDGE-002: \u7a7a\u6570\u636e\u65f6\u6240\u6709\u6307\u6807\u5e94\u4e3a 0&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u7a7a\u6570\u636e\u65f6\u589e\u901f\u4e3a0\uff0c\u4e0d\u4ea7\u751fNaN\u6216\u5f02\u5e38&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_list_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_list_companies&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCompaniesAPI::test_list_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-COMP-001: \u83b7\u53d6\u4f01\u4e1a\u5217\u8868&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u8fd4\u56de\u5305\u542b items/total/page/pageSize \u7684\u5206\u9875\u7ed3\u6784&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_pagination&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_pagination&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCompaniesAPI::test_pagination&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-COMP-002: \u5206\u9875\u529f\u80fd\u6d4b\u8bd5&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5206\u9875\u53c2\u6570\u6b63\u786e\u4f20\u9012\uff0cpage/pageSize \u503c\u4e0e\u8bf7\u6c42\u4e00\u81f4&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_search_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_search_companies&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCompaniesAPI::test_search_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-COMP-003: \u4f01\u4e1a\u641c\u7d22\u529f\u80fd&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u641c\u7d22API\u6b63\u5e38\u54cd\u5e94\uff0cHTTP 200&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_get_nonexistent_company&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_get_nonexistent_company&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCompaniesAPI::test_get_nonexistent_company&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-COMP-004: \u83b7\u53d6\u4e0d\u5b58\u5728\u7684\u4f01\u4e1a\u5e94\u8fd4\u56de\u9519\u8bef\u7801&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u4e0d\u5b58\u5728\u7684ID\u8fd4\u56de\u9519\u8bef\u7801(code\u22600)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_reset_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCompaniesAPI::test_reset_companies&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCompaniesAPI::test_reset_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-COMP-005: \u91cd\u7f6e\u4f01\u4e1a\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u91cd\u7f6eAPI\u6b63\u5e38\u6267\u884c\uff0cHTTP 200&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestConfigAPI::test_get_config&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestConfigAPI::test_get_config&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestConfigAPI::test_get_config&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-CFG-001: \u83b7\u53d6\u914d\u7f6e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u914d\u7f6e\u5305\u542b currentMonth \u548c lastYearLimitBelowCumulative&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestConfigAPI::test_config_default_values&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestConfigAPI::test_config_default_values&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestConfigAPI::test_config_default_values&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-CFG-002: \u9a8c\u8bc1\u9ed8\u8ba4\u914d\u7f6e\u503c&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 currentMonth\u57281-12\u4e4b\u95f4\uff0clastYearLimitBelowCumulative\u22650&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestConfigAPI::test_update_config&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestConfigAPI::test_update_config&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestConfigAPI::test_update_config&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-CFG-003: \u66f4\u65b0\u914d\u7f6e - \u9a8c\u8bc1\u914d\u7f6e\u66f4\u65b0 API \u6b63\u5e38\u5de5\u4f5c&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u914d\u7f6e\u66f4\u65b0API\u8fd4\u56de\u6210\u529f(code=0)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_preview&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_preview&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_preview&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-OPT-001: \u667a\u80fd\u8c03\u6574\u9884\u89c8&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u667a\u80fd\u8c03\u6574\u9884\u89c8API\u6b63\u5e38\u54cd\u5e94&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_invalid_target&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_invalid_target&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_invalid_target&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-OPT-002: \u65e0\u6548\u7684\u76ee\u6807\u589e\u901f\u53c2\u6570\u6d4b\u8bd5 - \u9a8c\u8bc1 API \u5bf9\u5f02\u5e38\u8f93\u5165\u7684\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 API\u80fd\u591f\u5904\u7406\u65e0\u6548\u53c2\u6570\u800c\u4e0d\u5d29\u6e83&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_extreme_target&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_extreme_target&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestOptimizeAPI::test_optimize_extreme_target&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-OPT-003: \u6781\u7aef\u76ee\u6807\u589e\u901f\uff08\u53ef\u80fd\u65e0\u89e3\uff09&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6781\u7aef\u76ee\u6807\u503cAPI\u6b63\u5e38\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestStaticFiles::test_index_page&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestStaticFiles::test_index_page&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestStaticFiles::test_index_page&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-STATIC-001: \u9996\u9875\u53ef\u8bbf\u95ee&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u9996\u9875\u8fd4\u56deHTML\uff0c\u5305\u542bNorthstar\u6807\u8bc6&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_import&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_import&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_import&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-STATIC-002: SPA \u8def\u7531 - /import&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 SPA\u8def\u7531\u6b63\u5e38\u5de5\u4f5c\uff0c\u8fd4\u56deHTML&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_unknown&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_unknown&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestStaticFiles::test_spa_routing_unknown&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-STATIC-003: \u672a\u77e5\u8def\u7531\u5e94\u8fd4\u56de\u9996\u9875\uff08SPA\uff09&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u672a\u77e5\u8def\u7531fallback\u5230\u9996\u9875\uff08SPA\u7279\u6027\uff09&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestStaticFiles::test_no_external_resources&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestStaticFiles::test_no_external_resources&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestStaticFiles::test_no_external_resources&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-OFFLINE-001: \u9996\u9875\u4e0d\u5e94\u5305\u542b\u5916\u90e8\u8d44\u6e90\u5f15\u7528&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u9996\u9875\u65e0\u5916\u90e8CDN\u4f9d\u8d56\uff08\u79bb\u7ebf\u53ef\u7528\uff09&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestValidation::test_update_company_invalid_id&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestValidation::test_update_company_invalid_id&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestValidation::test_update_company_invalid_id&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-VAL-001: \u66f4\u65b0\u4e0d\u5b58\u5728\u7684\u4f01\u4e1a\u5e94\u8fd4\u56de\u9519\u8bef&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u66f4\u65b0\u4e0d\u5b58\u5728\u7684\u4f01\u4e1a\u8fd4\u56de\u9519\u8bef\u7801&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestImportAPI::test_import_without_file&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestImportAPI::test_import_without_file&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestImportAPI::test_import_without_file&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-IMP-001: \u6ca1\u6709\u6587\u4ef6\u65f6\u4e0a\u4f20\u5e94\u8fd4\u56de\u9519\u8bef&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65e0\u6587\u4ef6\u4e0a\u4f20\u8fd4\u56de\u9519\u8bef\u7801&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestImportAPI::test_get_columns_invalid_file&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestImportAPI::test_get_columns_invalid_file&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestImportAPI::test_get_columns_invalid_file&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-IMP-002: \u65e0\u6548\u6587\u4ef6 ID \u83b7\u53d6\u5217\u4fe1\u606f\u5e94\u8fd4\u56de\u9519\u8bef&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65e0\u6548\u6587\u4ef6ID\u8fd4\u56de\u9519\u8bef\u7801&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestExportAPI::test_export_request&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestExportAPI::test_export_request&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestExportAPI::test_export_request&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-EXP-001: \u5bfc\u51fa\u8bf7\u6c42&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5bfc\u51faAPI\u6b63\u5e38\u54cd\u5e94&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestExportAPI::test_download_invalid_export&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestExportAPI::test_download_invalid_export&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestExportAPI::test_download_invalid_export&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-EXP-002: \u4e0b\u8f7d\u4e0d\u5b58\u5728\u7684\u5bfc\u51fa\u6587\u4ef6\u5e94\u8fd4\u56de 404&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u4e0b\u8f7d\u4e0d\u5b58\u5728\u7684\u5bfc\u51fa\u8fd4\u56de404\u6216\u9519\u8bef\u63d0\u793a&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestEdgeCases::test_empty_request_body&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestEdgeCases::test_empty_request_body&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestEdgeCases::test_empty_request_body&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-EDGE-001: \u7a7a\u8bf7\u6c42\u4f53\u6d4b\u8bd5 - \u9a8c\u8bc1 API \u5bf9\u7a7a\u8f93\u5165\u7684\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u7a7a\u8bf7\u6c42\u4f53API\u6b63\u5e38\u5904\u7406\uff0c\u54cd\u5e94\u7ed3\u6784\u5b8c\u6574&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestEdgeCases::test_concurrent_requests&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestEdgeCases::test_concurrent_requests&#34;, &#34;duration&#34;: &#34;10 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestEdgeCases::test_concurrent_requests&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-EDGE-003: \u5e76\u53d1\u8bf7\u6c42\u6d4b\u8bd5&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 20\u4e2a\u5e76\u53d1\u8bf7\u6c42\u5168\u90e8\u6210\u529f(HTTP 200)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;10 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestCORS::test_cors_headers&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestCORS::test_cors_headers&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestCORS::test_cors_headers&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-CORS-001: CORS \u5934\u5b58\u5728&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 OPTIONS\u8bf7\u6c42\u8fd4\u56de200\u6216204&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestAPIVersioning::test_api_v1_exists&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestAPIVersioning::test_api_v1_exists&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestAPIVersioning::test_api_v1_exists&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-API-001: API v1 \u8def\u5f84\u5b58\u5728&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 API v1\u7248\u672c\u8def\u5f84\u53ef\u8bbf\u95ee&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_api.py::TestAPIVersioning::test_api_root_not_found&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_api.py::TestAPIVersioning::test_api_root_not_found&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_api.py::TestAPIVersioning::test_api_root_not_found&lt;/td&gt;&#34;, &#34;&lt;td&gt;TC-API-002: \u76f4\u63a5\u8bbf\u95ee /api \u5e94\u8fd4\u56de 404&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 /api\u6839\u8def\u5f84\u6b63\u786e\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_01_upload_excel_file&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_01_upload_excel_file&#34;, &#34;duration&#34;: &#34;36 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_01_upload_excel_file&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u4e0a\u4f20 Excel \u6587\u4ef6&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 Excel\u6587\u4ef6\u4e0a\u4f20\u6210\u529f\uff0c\u8fd4\u56defileId\u548csheets\u5217\u8868&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;36 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u4e0a\u4f20\u6210\u529f\uff0c\u6587\u4ef6ID: 3e48ac18-93a0-44bd-8a63-79a03e3aae0d\n\u5de5\u4f5c\u8868: [{&amp;#x27;name&amp;#x27;: &amp;#x27;\u4f01\u4e1a\u6570\u636e&amp;#x27;, &amp;#x27;rowCount&amp;#x27;: 301}]\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_02_get_columns&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_02_get_columns&#34;, &#34;duration&#34;: &#34;12 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_02_get_columns&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u83b7\u53d6\u5217\u4fe1\u606f&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u83b7\u53d6Excel\u5217\u4fe1\u606f\uff0c\u8fd4\u56decolumns\u6570\u7ec4&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;12 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u83b7\u53d6\u5230\u5217\u4fe1\u606f: [&amp;#x27;\u4f01\u4e1a\u540d\u79f0&amp;#x27;, &amp;#x27;\u7edf\u4e00\u793e\u4f1a\u4fe1\u7528\u4ee3\u7801&amp;#x27;, &amp;#x27;\u884c\u4e1a\u4ee3\u7801&amp;#x27;, &amp;#x27;\u4f01\u4e1a\u89c4\u6a21&amp;#x27;, &amp;#x27;\u672c\u671f\u96f6\u552e\u989d&amp;#x27;, &amp;#x27;\u4e0a\u5e74\u540c\u671f\u96f6\u552e\u989d&amp;#x27;, &amp;#x27;\u672c\u5e74\u7d2f\u8ba1\u96f6\u552e\u989d&amp;#x27;, &amp;#x27;\u4e0a\u5e74\u7d2f\u8ba1\u96f6\u552e\u989d&amp;#x27;, &amp;#x27;\u672c\u671f\u9500\u552e\u989d&amp;#x27;, &amp;#x27;\u4e0a\u5e74\u540c\u671f\u9500\u552e\u989d&amp;#x27;, &amp;#x27;\u672c\u5e74\u7d2f\u8ba1\u9500\u552e\u989d&amp;#x27;, &amp;#x27;\u4e0a\u5e74\u7d2f\u8ba1\u9500\u552e\u989d&amp;#x27;]\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_03_set_mapping&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_03_set_mapping&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_03_set_mapping&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u8bbe\u7f6e\u5b57\u6bb5\u6620\u5c04&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5b57\u6bb5\u6620\u5c04\u8bbe\u7f6e\u6210\u529f(code=0)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5b57\u6bb5\u6620\u5c04\u8bbe\u7f6e\u6210\u529f\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_04_execute_import&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_04_execute_import&#34;, &#34;duration&#34;: &#34;7 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_04_execute_import&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u6267\u884c\u5bfc\u5165&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6570\u636e\u5bfc\u5165\u6210\u529f\uff0cimported\u6570\u91cf=300&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;7 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5bfc\u5165\u6210\u529f: 300 \u6761\u4f01\u4e1a\u6570\u636e\n\u9884\u671f\u5bfc\u5165: 300 \u6761\n\u5f53\u6708\u9650\u4e0a\u793e\u96f6\u989d\u589e\u901f: 8.45%\n\u7d2f\u8ba1\u9650\u4e0a\u793e\u96f6\u989d\u589e\u901f: 8.08%\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_05_list_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_05_list_companies&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_05_list_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u83b7\u53d6\u4f01\u4e1a\u5217\u8868&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5217\u8868\u8fd4\u56detotal=300\u6761\u4f01\u4e1a\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u4f01\u4e1a\u603b\u6570: 300\n\u5f53\u524d\u9875\u6570\u91cf: 50\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_06_modify_single_company&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_06_modify_single_company&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_06_modify_single_company&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u4fee\u6539\u5355\u4e2a\u4f01\u4e1a\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5355\u6761\u6570\u636e\u4fee\u6539\u6210\u529f(code=0)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u4fee\u6539\u4f01\u4e1a: \u4e0a\u6d77\u53bf\u4e5d\u6bdb\u4e5d\u5b9e\u4e1a\u6709\u9650\u516c\u53f8\n\u539f\u59cb\u96f6\u552e\u989d: 57.42\n\u65b0\u96f6\u552e\u989d: 63.16\n\u4fee\u6539\u6210\u529f\uff0c\u65b0\u589e\u901f: 3.29%\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_07_batch_modify_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_07_batch_modify_companies&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_07_batch_modify_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u6279\u91cf\u4fee\u6539\u4f01\u4e1a\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6279\u91cf\u4fee\u653910\u6761\u6570\u636e\u5168\u90e8\u6210\u529f&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u6279\u91cf\u4fee\u6539 10 \u4e2a\u4f01\u4e1a\n\u6279\u91cf\u4fee\u6539\u6210\u529f: 10 \u4e2a\u4f01\u4e1a\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_08_verify_indicators_updated&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_08_verify_indicators_updated&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_08_verify_indicators_updated&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u9a8c\u8bc1\u6307\u6807\u5df2\u66f4\u65b0&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6307\u6807\u6570\u636e\u5df2\u66f4\u65b0\uff0c\u6570\u503c\u6709\u53d8\u5316&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5f53\u524d\u6307\u6807:\n  \u9650\u4e0a\u793e\u96f6\u989d(\u5f53\u6708): 405366.49 \u4e07\u5143\n  \u9650\u4e0a\u793e\u96f6\u989d\u589e\u901f(\u5f53\u6708): 8.54%\n  \u9650\u4e0a\u793e\u96f6\u989d(\u7d2f\u8ba1): 2436510.37 \u4e07\u5143\n  \u9650\u4e0a\u793e\u96f6\u989d\u589e\u901f(\u7d2f\u8ba1): 8.09%\n  \u5403\u7a7f\u7528\u589e\u901f(\u5f53\u6708): 8.57%\n  \u5c0f\u5fae\u4f01\u4e1a\u589e\u901f(\u5f53\u6708): 5.70%\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_09_search_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_09_search_companies&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_09_search_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u4f01\u4e1a\u641c\u7d22\u529f\u80fd&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5173\u952e\u8bcd\u641c\u7d22\u8fd4\u56de\u7ed3\u679c\uff0ctotal&gt;0&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u641c\u7d22&amp;#x27;\u6709\u9650\u516c\u53f8&amp;#x27;\u7ed3\u679c: 300 \u6761\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_10_filter_by_industry&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_10_filter_by_industry&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_10_filter_by_industry&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u6309\u884c\u4e1a\u7b5b\u9009&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u884c\u4e1a\u7b5b\u9009\u6b63\u5e38\u5de5\u4f5c\uff0c\u8fd4\u56de\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u96f6\u552e\u4e1a\u4f01\u4e1a: 120 \u5bb6\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_11_smart_optimize_preview&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_11_smart_optimize_preview&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_11_smart_optimize_preview&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u667a\u80fd\u8c03\u6574\u9884\u89c8&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u667a\u80fd\u8c03\u6574\u9884\u89c8\u8fd4\u56de\u65b9\u6848&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u667a\u80fd\u8c03\u6574\u9884\u89c8: {&amp;#x27;code&amp;#x27;: 3002, &amp;#x27;message&amp;#x27;: &amp;#x27;\u76ee\u6807\u589e\u901f\u4f4e\u4e8e\u5f53\u524d\u503c\uff0c\u4e0d\u652f\u6301\u5411\u4e0b\u8c03\u6574&amp;#x27;}\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_12_export_data&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_12_export_data&#34;, &#34;duration&#34;: &#34;10 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_12_export_data&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u5bfc\u51fa\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6570\u636e\u5bfc\u51fa\u6210\u529f\uff0c\u8fd4\u56deexportId&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;10 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5bfc\u51fa\u4e0b\u8f7dURL: /api/v1/export/download/7cd75242-6d32-4921-84ac-603803a56b49\n\u5bfc\u51fa\u6587\u4ef6\u5df2\u4fdd\u5b58: /Users/anner/code/Northstar/tests/e2e-result/exported_data.xlsx\n\u5bfc\u51fa\u6587\u4ef6\u5927\u5c0f: 40012 bytes\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_13_reset_companies&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_13_reset_companies&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_13_reset_companies&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u91cd\u7f6e\u4f01\u4e1a\u6570\u636e&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u6570\u636e\u91cd\u7f6e\u6210\u529f(code=0)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u91cd\u7f6e 3 \u4e2a\u4f01\u4e1a\n\u91cd\u7f6e\u6210\u529f\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_14_reset_all_and_verify&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_14_reset_all_and_verify&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestFullWorkflow::test_14_reset_all_and_verify&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u91cd\u7f6e\u6240\u6709\u6570\u636e\u5e76\u9a8c\u8bc1&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u91cd\u7f6e\u540e\u4f01\u4e1a\u5217\u8868\u4e3a\u7a7a(total=0)&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5df2\u91cd\u7f6e\u6240\u6709\u4f01\u4e1a\u6570\u636e\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_industry_distribution&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_industry_distribution&#34;, &#34;duration&#34;: &#34;7 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_industry_distribution&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u9a8c\u8bc1\u884c\u4e1a\u5206\u5e03&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u884c\u4e1a\u5206\u5e03\u7b26\u5408\u9884\u8bbe\u6bd4\u4f8b&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;7 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u884c\u4e1a\u5206\u5e03 (\u5171 300 \u5bb6):\n  accommodation: 30 (10.0%)\n  catering: 60 (20.0%)\n  retail: 120 (40.0%)\n  wholesale: 90 (30.0%)\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_scale_distribution&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_scale_distribution&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestDataIntegrity::test_scale_distribution&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u9a8c\u8bc1\u4f01\u4e1a\u89c4\u6a21\u5206\u5e03&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u4f01\u4e1a\u89c4\u6a21\u5206\u5e03\u5408\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u89c4\u6a21\u5206\u5e03 (\u5171 300 \u5bb6):\n  \u5927\u578b: 12 (4.0%)\n  \u4e2d\u578b: 44 (14.7%)\n  \u5c0f\u578b: 127 (42.3%)\n  \u5fae\u578b: 117 (39.0%)\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_empty_file_upload&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_empty_file_upload&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestEdgeCases::test_empty_file_upload&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u4e0a\u4f20\u7a7a\u6587\u4ef6&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u7a7a\u6587\u4ef6\u4e0a\u4f20\u6b63\u786e\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u7a7a\u6587\u4ef6\u4e0a\u4f20\u6d4b\u8bd5\u901a\u8fc7\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_large_value_modification&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_large_value_modification&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestEdgeCases::test_large_value_modification&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u5927\u6570\u503c\u4fee\u6539&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u5927\u6570\u503c\u4fee\u6539\u6b63\u5e38\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u5927\u6570\u503c\u4fee\u6539\u6d4b\u8bd5\u901a\u8fc7: 999999999.99\n&#34;}], &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_negative_value_validation&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_full_workflow.py::TestEdgeCases::test_negative_value_validation&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_full_workflow.py::TestEdgeCases::test_negative_value_validation&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u6d4b\u8bd5\u8d1f\u6570\u503c\u6821\u9a8c&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u8d1f\u6570\u503c\u6b63\u786e\u5904\u7406&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\n\n\u8d1f\u6570\u6821\u9a8c\u7ed3\u679c: {&amp;#x27;errors&amp;#x27;: [{&amp;#x27;field&amp;#x27;: &amp;#x27;retailCurrentMonth&amp;#x27;, &amp;#x27;message&amp;#x27;: &amp;#x27;\u96f6\u552e\u989d\u4e0d\u80fd\u4e3a\u8d1f\u6570&amp;#x27;, &amp;#x27;severity&amp;#x27;: &amp;#x27;error&amp;#x27;}, {&amp;#x27;field&amp;#x27;: &amp;#x27;retailCurrentMonth&amp;#x27;, &amp;#x27;message&amp;#x27;: &amp;#x27;\u589e\u901f\u8d85\u51fa\u5408\u7406\u8303\u56f4(-50% ~ 100%)&amp;#x27;, &amp;#x27;severity&amp;#x27;: &amp;#x27;warning&amp;#x27;}], &amp;#x27;hasError&amp;#x27;: True}\n&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_01_create_project_a&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_01_create_project_a&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_01_create_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_01_create_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_02_create_project_b&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_02_create_project_b&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_02_create_project_b&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_02_create_project_b&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_03_select_project_a&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_03_select_project_a&#34;, &#34;duration&#34;: &#34;2 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_03_select_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_03_select_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;2 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04_import_into_project_a&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04_import_into_project_a&#34;, &#34;duration&#34;: &#34;17 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04_import_into_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_04_import_into_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;17 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04b_adjust_indicator_in_project_a&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04b_adjust_indicator_in_project_a&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_04b_adjust_indicator_in_project_a&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u5728\u9879\u76ee A \u4e2d\u8c03\u6574\u6307\u6807\uff0c\u9a8c\u8bc1 /indicators/adjust \u751f\u6548\u5e76\u8054\u52a8\u5237\u65b0&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_05_switch_to_project_b_isolated&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_05_switch_to_project_b_isolated&#34;, &#34;duration&#34;: &#34;4 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_05_switch_to_project_b_isolated&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_05_switch_to_project_b_isolated&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;4 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_06_switch_back_project_a_restored&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_06_switch_back_project_a_restored&#34;, &#34;duration&#34;: &#34;4 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_06_switch_back_project_a_restored&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_06_switch_back_project_a_restored&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;4 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_07_delete_projects_cleanup&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_07_delete_projects_cleanup&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/e2e/test_projects_workflow.py::TestProjectsWorkflow::test_07_delete_projects_cleanup&lt;/td&gt;&#34;, &#34;&lt;td&gt;test_07_delete_projects_cleanup&lt;/td&gt;&#34;, &#34;&lt;td&gt;\u2705 \u65ad\u8a00\u9a8c\u8bc1\u901a\u8fc7&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}]}, &#34;renderCollapsed&#34;: [&#34;passed&#34;], &#34;initialSort&#34;: &#34;result&#34;, &#34;title&#34;: &#34;Northstar E2E \u7aef\u5230\u7aef\u6d4b\u8bd5\u62a5\u544a&#34;}"></div>
-    <script>
-      (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-const { getCollapsedCategory, setCollapsedIds } = require('./storage.js')
 
-class DataManager {
-    setManager(data) {
-        const collapsedCategories = [...getCollapsedCategory(data.renderCollapsed)]
-        const collapsedIds = []
-        const tests = Object.values(data.tests).flat().map((test, index) => {
-            const collapsed = collapsedCategories.includes(test.result.toLowerCase())
-            const id = `test_${index}`
-            if (collapsed) {
-                collapsedIds.push(id)
-            }
-            return {
-                ...test,
-                id,
-                collapsed,
-            }
-        })
-        const dataBlob = { ...data, tests }
-        this.data = { ...dataBlob }
-        this.renderData = { ...dataBlob }
-        setCollapsedIds(collapsedIds)
-    }
-
-    get allData() {
-        return { ...this.data }
-    }
-
-    resetRender() {
-        this.renderData = { ...this.data }
-    }
-
-    setRender(data) {
-        this.renderData.tests = [...data]
-    }
-
-    toggleCollapsedItem(id) {
-        this.renderData.tests = this.renderData.tests.map((test) =>
-            test.id === id ? { ...test, collapsed: !test.collapsed } : test,
-        )
-    }
-
-    set allCollapsed(collapsed) {
-        this.renderData = { ...this.renderData, tests: [...this.renderData.tests.map((test) => (
-            { ...test, collapsed }
-        ))] }
-    }
-
-    get testSubset() {
-        return [...this.renderData.tests]
-    }
-
-    get environment() {
-        return this.renderData.environment
-    }
-
-    get initialSort() {
-        return this.data.initialSort
-    }
-}
-
-module.exports = {
-    manager: new DataManager(),
-}
-
-},{"./storage.js":8}],2:[function(require,module,exports){
-const mediaViewer = require('./mediaviewer.js')
-const templateEnvRow = document.getElementById('template_environment_row')
-const templateResult = document.getElementById('template_results-table__tbody')
-
-function htmlToElements(html) {
-    const temp = document.createElement('template')
-    temp.innerHTML = html
-    return temp.content.childNodes
-}
-
-const find = (selector, elem) => {
-    if (!elem) {
-        elem = document
-    }
-    return elem.querySelector(selector)
-}
-
-const findAll = (selector, elem) => {
-    if (!elem) {
-        elem = document
-    }
-    return [...elem.querySelectorAll(selector)]
-}
-
-const dom = {
-    getStaticRow: (key, value) => {
-        const envRow = templateEnvRow.content.cloneNode(true)
-        const isObj = typeof value === 'object' && value !== null
-        const values = isObj ? Object.keys(value).map((k) => `${k}: ${value[k]}`) : null
-
-        const valuesElement = htmlToElements(
-            values ? `<ul>${values.map((val) => `<li>${val}</li>`).join('')}<ul>` : `<div>${value}</div>`)[0]
-        const td = findAll('td', envRow)
-        td[0].textContent = key
-        td[1].appendChild(valuesElement)
-
-        return envRow
-    },
-    getResultTBody: ({ testId, id, log, extras, resultsTableRow, tableHtml, result, collapsed }) => {
-        const resultBody = templateResult.content.cloneNode(true)
-        resultBody.querySelector('tbody').classList.add(result.toLowerCase())
-        resultBody.querySelector('tbody').id = testId
-        resultBody.querySelector('.collapsible').dataset.id = id
-
-        resultsTableRow.forEach((html) => {
-            const t = document.createElement('template')
-            t.innerHTML = html
-            resultBody.querySelector('.collapsible').appendChild(t.content)
-        })
-
-        if (log) {
-            // Wrap lines starting with "E" with span.error to color those lines red
-            const wrappedLog = log.replace(/^E.*$/gm, (match) => `<span class="error">${match}</span>`)
-            resultBody.querySelector('.log').innerHTML = wrappedLog
-        } else {
-            resultBody.querySelector('.log').remove()
-        }
-
-        if (collapsed) {
-            resultBody.querySelector('.collapsible > .col-result')?.classList.add('collapsed')
-            resultBody.querySelector('.extras-row').classList.add('hidden')
-        } else {
-            resultBody.querySelector('.collapsible > .col-result')?.classList.remove('collapsed')
-        }
-
-        const media = []
-        extras?.forEach(({ name, format_type, content }) => {
-            if (['image', 'video'].includes(format_type)) {
-                media.push({ path: content, name, format_type })
-            }
-
-            if (format_type === 'html') {
-                resultBody.querySelector('.extraHTML').insertAdjacentHTML('beforeend', `<div>${content}</div>`)
-            }
-        })
-        mediaViewer.setup(resultBody, media)
-
-        // Add custom html from the pytest_html_results_table_html hook
-        tableHtml?.forEach((item) => {
-            resultBody.querySelector('td[class="extra"]').insertAdjacentHTML('beforeend', item)
-        })
-
-        return resultBody
-    },
-}
-
-module.exports = {
-    dom,
-    htmlToElements,
-    find,
-    findAll,
-}
-
-},{"./mediaviewer.js":6}],3:[function(require,module,exports){
-const { manager } = require('./datamanager.js')
-const { doSort } = require('./sort.js')
-const storageModule = require('./storage.js')
-
-const getFilteredSubSet = (filter) =>
-    manager.allData.tests.filter(({ result }) => filter.includes(result.toLowerCase()))
-
-const doInitFilter = () => {
-    const currentFilter = storageModule.getVisible()
-    const filteredSubset = getFilteredSubSet(currentFilter)
-    manager.setRender(filteredSubset)
-}
-
-const doFilter = (type, show) => {
-    if (show) {
-        storageModule.showCategory(type)
-    } else {
-        storageModule.hideCategory(type)
-    }
-
-    const currentFilter = storageModule.getVisible()
-    const filteredSubset = getFilteredSubSet(currentFilter)
-    manager.setRender(filteredSubset)
-
-    const sortColumn = storageModule.getSort()
-    doSort(sortColumn, true)
-}
-
-module.exports = {
-    doFilter,
-    doInitFilter,
-}
-
-},{"./datamanager.js":1,"./sort.js":7,"./storage.js":8}],4:[function(require,module,exports){
-const { redraw, bindEvents, renderStatic } = require('./main.js')
-const { doInitFilter } = require('./filter.js')
-const { doInitSort } = require('./sort.js')
-const { manager } = require('./datamanager.js')
-const data = JSON.parse(document.getElementById('data-container').dataset.jsonblob)
-
-function init() {
-    manager.setManager(data)
-    doInitFilter()
-    doInitSort()
-    renderStatic()
-    redraw()
-    bindEvents()
-}
-
-init()
-
-},{"./datamanager.js":1,"./filter.js":3,"./main.js":5,"./sort.js":7}],5:[function(require,module,exports){
-const { dom, find, findAll } = require('./dom.js')
-const { manager } = require('./datamanager.js')
-const { doSort } = require('./sort.js')
-const { doFilter } = require('./filter.js')
-const {
-    getVisible,
-    getCollapsedIds,
-    setCollapsedIds,
-    getSort,
-    getSortDirection,
-    possibleFilters,
-} = require('./storage.js')
-
-const removeChildren = (node) => {
-    while (node.firstChild) {
-        node.removeChild(node.firstChild)
-    }
-}
-
-const renderStatic = () => {
-    const renderEnvironmentTable = () => {
-        const environment = manager.environment
-        const rows = Object.keys(environment).map((key) => dom.getStaticRow(key, environment[key]))
-        const table = document.getElementById('environment')
-        removeChildren(table)
-        rows.forEach((row) => table.appendChild(row))
-    }
-    renderEnvironmentTable()
-}
-
-const addItemToggleListener = (elem) => {
-    elem.addEventListener('click', ({ target }) => {
-        const id = target.parentElement.dataset.id
-        manager.toggleCollapsedItem(id)
-
-        const collapsedIds = getCollapsedIds()
-        if (collapsedIds.includes(id)) {
-            const updated = collapsedIds.filter((item) => item !== id)
-            setCollapsedIds(updated)
-        } else {
-            collapsedIds.push(id)
-            setCollapsedIds(collapsedIds)
-        }
-        redraw()
-    })
-}
-
-const renderContent = (tests) => {
-    const sortAttr = getSort(manager.initialSort)
-    const sortAsc = JSON.parse(getSortDirection())
-    const rows = tests.map(dom.getResultTBody)
-    const table = document.getElementById('results-table')
-    const tableHeader = document.getElementById('results-table-head')
-
-    const newTable = document.createElement('table')
-    newTable.id = 'results-table'
-
-    // remove all sorting classes and set the relevant
-    findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
-    tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
-    newTable.appendChild(tableHeader)
-
-    if (!rows.length) {
-        const emptyTable = document.getElementById('template_results-table__body--empty').content.cloneNode(true)
-        newTable.appendChild(emptyTable)
-    } else {
-        rows.forEach((row) => {
-            if (!!row) {
-                findAll('.collapsible td:not(.col-links', row).forEach(addItemToggleListener)
-                find('.logexpander', row).addEventListener('click',
-                    (evt) => evt.target.parentNode.classList.toggle('expanded'),
-                )
-                newTable.appendChild(row)
-            }
-        })
-    }
-
-    table.replaceWith(newTable)
-}
-
-const renderDerived = () => {
-    const currentFilter = getVisible()
-    possibleFilters.forEach((result) => {
-        const input = document.querySelector(`input[data-test-result="${result}"]`)
-        input.checked = currentFilter.includes(result)
-    })
-}
-
-const bindEvents = () => {
-    const filterColumn = (evt) => {
-        const { target: element } = evt
-        const { testResult } = element.dataset
-
-        doFilter(testResult, element.checked)
-        const collapsedIds = getCollapsedIds()
-        const updated = manager.renderData.tests.map((test) => {
-            return {
-                ...test,
-                collapsed: collapsedIds.includes(test.id),
-            }
-        })
-        manager.setRender(updated)
-        redraw()
-    }
-
-    const header = document.getElementById('environment-header')
-    header.addEventListener('click', () => {
-        const table = document.getElementById('environment')
-        table.classList.toggle('hidden')
-        header.classList.toggle('collapsed')
-    })
-
-    findAll('input[name="filter_checkbox"]').forEach((elem) => {
-        elem.addEventListener('click', filterColumn)
-    })
-
-    findAll('.sortable').forEach((elem) => {
-        elem.addEventListener('click', (evt) => {
-            const { target: element } = evt
-            const { columnType } = element.dataset
-            doSort(columnType)
-            redraw()
-        })
-    })
-
-    document.getElementById('show_all_details').addEventListener('click', () => {
-        manager.allCollapsed = false
-        setCollapsedIds([])
-        redraw()
-    })
-    document.getElementById('hide_all_details').addEventListener('click', () => {
-        manager.allCollapsed = true
-        const allIds = manager.renderData.tests.map((test) => test.id)
-        setCollapsedIds(allIds)
-        redraw()
-    })
-}
-
-const redraw = () => {
-    const { testSubset } = manager
-
-    renderContent(testSubset)
-    renderDerived()
-}
-
-module.exports = {
-    redraw,
-    bindEvents,
-    renderStatic,
-}
-
-},{"./datamanager.js":1,"./dom.js":2,"./filter.js":3,"./sort.js":7,"./storage.js":8}],6:[function(require,module,exports){
-class MediaViewer {
-    constructor(assets) {
-        this.assets = assets
-        this.index = 0
-    }
-
-    nextActive() {
-        this.index = this.index === this.assets.length - 1 ? 0 : this.index + 1
-        return [this.activeFile, this.index]
-    }
-
-    prevActive() {
-        this.index = this.index === 0 ? this.assets.length - 1 : this.index -1
-        return [this.activeFile, this.index]
-    }
-
-    get currentIndex() {
-        return this.index
-    }
-
-    get activeFile() {
-        return this.assets[this.index]
-    }
-}
-
-
-const setup = (resultBody, assets) => {
-    if (!assets.length) {
-        resultBody.querySelector('.media').classList.add('hidden')
-        return
-    }
-
-    const mediaViewer = new MediaViewer(assets)
-    const container = resultBody.querySelector('.media-container')
-    const leftArrow = resultBody.querySelector('.media-container__nav--left')
-    const rightArrow = resultBody.querySelector('.media-container__nav--right')
-    const mediaName = resultBody.querySelector('.media__name')
-    const counter = resultBody.querySelector('.media__counter')
-    const imageEl = resultBody.querySelector('img')
-    const sourceEl = resultBody.querySelector('source')
-    const videoEl = resultBody.querySelector('video')
-
-    const setImg = (media, index) => {
-        if (media?.format_type === 'image') {
-            imageEl.src = media.path
-
-            imageEl.classList.remove('hidden')
-            videoEl.classList.add('hidden')
-        } else if (media?.format_type === 'video') {
-            sourceEl.src = media.path
-
-            videoEl.classList.remove('hidden')
-            imageEl.classList.add('hidden')
-        }
-
-        mediaName.innerText = media?.name
-        counter.innerText = `${index + 1} / ${assets.length}`
-    }
-    setImg(mediaViewer.activeFile, mediaViewer.currentIndex)
-
-    const moveLeft = () => {
-        const [media, index] = mediaViewer.prevActive()
-        setImg(media, index)
-    }
-    const doRight = () => {
-        const [media, index] = mediaViewer.nextActive()
-        setImg(media, index)
-    }
-    const openImg = () => {
-        window.open(mediaViewer.activeFile.path, '_blank')
-    }
-    if (assets.length === 1) {
-        container.classList.add('media-container--fullscreen')
-    } else {
-        leftArrow.addEventListener('click', moveLeft)
-        rightArrow.addEventListener('click', doRight)
-    }
-    imageEl.addEventListener('click', openImg)
-}
-
-module.exports = {
-    setup,
-}
-
-},{}],7:[function(require,module,exports){
-const { manager } = require('./datamanager.js')
-const storageModule = require('./storage.js')
-
-const genericSort = (list, key, ascending, customOrder) => {
-    let sorted
-    if (customOrder) {
-        sorted = list.sort((a, b) => {
-            const aValue = a.result.toLowerCase()
-            const bValue = b.result.toLowerCase()
-
-            const aIndex = customOrder.findIndex((item) => item.toLowerCase() === aValue)
-            const bIndex = customOrder.findIndex((item) => item.toLowerCase() === bValue)
-
-            // Compare the indices to determine the sort order
-            return aIndex - bIndex
-        })
-    } else {
-        sorted = list.sort((a, b) => a[key] === b[key] ? 0 : a[key] > b[key] ? 1 : -1)
-    }
-
-    if (ascending) {
-        sorted.reverse()
-    }
-    return sorted
-}
-
-const durationSort = (list, ascending) => {
-    const parseDuration = (duration) => {
-        if (duration.includes(':')) {
-            // If it's in the format "HH:mm:ss"
-            const [hours, minutes, seconds] = duration.split(':').map(Number)
-            return (hours * 3600 + minutes * 60 + seconds) * 1000
-        } else {
-            // If it's in the format "nnn ms"
-            return parseInt(duration)
-        }
-    }
-    const sorted = list.sort((a, b) => parseDuration(a['duration']) - parseDuration(b['duration']))
-    if (ascending) {
-        sorted.reverse()
-    }
-    return sorted
-}
-
-const doInitSort = () => {
-    const type = storageModule.getSort(manager.initialSort)
-    const ascending = storageModule.getSortDirection()
-    const list = manager.testSubset
-    const initialOrder = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed', 'Skipped', 'Passed']
-
-    storageModule.setSort(type)
-    storageModule.setSortDirection(ascending)
-
-    if (type?.toLowerCase() === 'original') {
-        manager.setRender(list)
-    } else {
-        let sortedList
-        switch (type) {
-        case 'duration':
-            sortedList = durationSort(list, ascending)
-            break
-        case 'result':
-            sortedList = genericSort(list, type, ascending, initialOrder)
-            break
-        default:
-            sortedList = genericSort(list, type, ascending)
-            break
-        }
-        manager.setRender(sortedList)
-    }
-}
-
-const doSort = (type, skipDirection) => {
-    const newSortType = storageModule.getSort(manager.initialSort) !== type
-    const currentAsc = storageModule.getSortDirection()
-    let ascending
-    if (skipDirection) {
-        ascending = currentAsc
-    } else {
-        ascending = newSortType ? false : !currentAsc
-    }
-    storageModule.setSort(type)
-    storageModule.setSortDirection(ascending)
-
-    const list = manager.testSubset
-    const sortedList = type === 'duration' ? durationSort(list, ascending) : genericSort(list, type, ascending)
-    manager.setRender(sortedList)
-}
-
-module.exports = {
-    doInitSort,
-    doSort,
-}
-
-},{"./datamanager.js":1,"./storage.js":8}],8:[function(require,module,exports){
-const possibleFilters = [
-    'passed',
-    'skipped',
-    'failed',
-    'error',
-    'xfailed',
-    'xpassed',
-    'rerun',
-]
-
-const getVisible = () => {
-    const url = new URL(window.location.href)
-    const settings = new URLSearchParams(url.search).get('visible')
-    const lower = (item) => {
-        const lowerItem = item.toLowerCase()
-        if (possibleFilters.includes(lowerItem)) {
-            return lowerItem
-        }
-        return null
-    }
-    return settings === null ?
-        possibleFilters :
-        [...new Set(settings?.split(',').map(lower).filter((item) => item))]
-}
-
-const hideCategory = (categoryToHide) => {
-    const url = new URL(window.location.href)
-    const visibleParams = new URLSearchParams(url.search).get('visible')
-    const currentVisible = visibleParams ? visibleParams.split(',') : [...possibleFilters]
-    const settings = [...new Set(currentVisible)].filter((f) => f !== categoryToHide).join(',')
-
-    url.searchParams.set('visible', settings)
-    window.history.pushState({}, null, unescape(url.href))
-}
-
-const showCategory = (categoryToShow) => {
-    if (typeof window === 'undefined') {
-        return
-    }
-    const url = new URL(window.location.href)
-    const currentVisible = new URLSearchParams(url.search).get('visible')?.split(',').filter(Boolean) ||
-        [...possibleFilters]
-    const settings = [...new Set([categoryToShow, ...currentVisible])]
-    const noFilter = possibleFilters.length === settings.length || !settings.length
-
-    noFilter ? url.searchParams.delete('visible') : url.searchParams.set('visible', settings.join(','))
-    window.history.pushState({}, null, unescape(url.href))
-}
-
-const getSort = (initialSort) => {
-    const url = new URL(window.location.href)
-    let sort = new URLSearchParams(url.search).get('sort')
-    if (!sort) {
-        sort = initialSort || 'result'
-    }
-    return sort
-}
-
-const setSort = (type) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('sort', type)
-    window.history.pushState({}, null, unescape(url.href))
-}
-
-const getCollapsedCategory = (renderCollapsed) => {
-    let categories
-    if (typeof window !== 'undefined') {
-        const url = new URL(window.location.href)
-        const collapsedItems = new URLSearchParams(url.search).get('collapsed')
-        switch (true) {
-        case !renderCollapsed && collapsedItems === null:
-            categories = ['passed']
-            break
-        case collapsedItems?.length === 0 || /^["']{2}$/.test(collapsedItems):
-            categories = []
-            break
-        case /^all$/.test(collapsedItems) || collapsedItems === null && /^all$/.test(renderCollapsed):
-            categories = [...possibleFilters]
-            break
-        default:
-            categories = collapsedItems?.split(',').map((item) => item.toLowerCase()) || renderCollapsed
-            break
-        }
-    } else {
-        categories = []
-    }
-    return categories
-}
-
-const getSortDirection = () => JSON.parse(sessionStorage.getItem('sortAsc')) || false
-const setSortDirection = (ascending) => sessionStorage.setItem('sortAsc', ascending)
-
-const getCollapsedIds = () => JSON.parse(sessionStorage.getItem('collapsedIds')) || []
-const setCollapsedIds = (list) => sessionStorage.setItem('collapsedIds', JSON.stringify(list))
-
-module.exports = {
-    getVisible,
-    hideCategory,
-    showCategory,
-    getCollapsedIds,
-    setCollapsedIds,
-    getSort,
-    setSort,
-    getSortDirection,
-    setSortDirection,
-    getCollapsedCategory,
-    possibleFilters,
-}
-
-},{}]},{},[4]);
-    </script>
-  </footer>
-  </body>
+    <div class="section">
+      <h3>执行步骤与不符合预期项</h3>
+      <div class="card">
+        <h2>步骤明细</h2>
+        <p class='warn'>未生成 steps.json（脚本可能在早期退出）</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>不符合预期项总览</h2>
+        <ul><li>导出字段不一致：1053（见“导出一致性/字段一致性”）</li><li>明细表完整性断言失败：44/2397（见“明细表数据完整性案例”）</li><li>衍生 Sheet 有值列未映射：64（见“衍生 Sheet 列覆盖”）</li></ul>
+        <p class="warn">复现入口：打开 <span class="mono">http://localhost:8080</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>修改动作覆盖</h2>
+        <p class="warn">复现：在首页输入框按信用代码搜索，修改对应字段输入框，失焦（blur）触发自动保存，然后导出检查。</p>
+        <div class='table-wrap'><table><thead><tr><th>#</th><th>统一社会信用代码</th><th>字段</th><th>新值</th><th>结果</th><th>覆盖场景</th><th>错误</th></tr></thead><tbody><tr><td class='mono'>1</td><td class='mono'>91440300KMJLU7B0T7</td><td>商品销售额;本年-本月</td><td class='mono'>123.45</td><td class='ok'>PASS</td><td>批发：小数微调，覆盖 decimal 保存</td><td class='mono'></td></tr><tr><td class='mono'>2</td><td class='mono'>91440300KMJLU7B0T7</td><td>商品销售额;增速(当月)</td><td class='mono'>12.34</td><td class='ok'>PASS</td><td>批发：修改增速字段，覆盖 rate 保存</td><td class='mono'></td></tr><tr><td class='mono'>3</td><td class='mono'>91440300E7LF36AEX2</td><td>零售额;本年-本月</td><td class='mono'></td><td class='ok'>PASS</td><td>零售：置 0，覆盖 zero 保存</td><td class='mono'></td></tr><tr><td class='mono'>4</td><td class='mono'>91440300E7LF36AEX2</td><td>零售额;增速(当月)</td><td class='mono'>-3.21</td><td class='ok'>PASS</td><td>零售：负增速，覆盖 rate/negative</td><td class='mono'></td></tr><tr><td class='mono'>5</td><td class='mono'>91320500TCE5UYN5HX</td><td>营业额;本年-本月</td><td class='mono'>50.0</td><td class='ok'>PASS</td><td>住宿：营业额微调，覆盖住餐主指标</td><td class='mono'></td></tr><tr><td class='mono'>6</td><td class='mono'>91320500TCE5UYN5HX</td><td>营业额;增速(当月)</td><td class='mono'>8.88</td><td class='ok'>PASS</td><td>住宿：修改增速字段，覆盖 rate 保存</td><td class='mono'></td></tr><tr><td class='mono'>7</td><td class='mono'>91510100HJG2TGMG64</td><td>本月餐费收入</td><td class='mono'>-10.0</td><td class='ok'>PASS</td><td>餐饮：负数微调，覆盖 negative 保存/校验</td><td class='mono'></td></tr></tbody></table></div>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>UI 抽取状态</h2>
+        <div class="kv">
+          <div class="k">导入后抽取</div><div class="v">OK</div>
+          <div class="k">导入后错误</div><div class="v"></div>
+          <div class="k">修改后抽取</div><div class="v">OK</div>
+          <div class="k">修改后错误</div><div class="v"></div>
+          <div class="k">输入 Excel 打开</div><div class="v">OK</div>
+          <div class="k">导出 Excel 打开</div><div class="v">OK</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>明细表数据完整性案例（输入 Excel → 明细表）</h3>
+      <div class="card">
+        <h2>字段级完整性（大量案例）</h2>
+        <p class="warn">完整列表：<a class="mono" href="completeness_cases.json">completeness_cases.json</a> / <a class="mono" href="completeness_summary.json">completeness_summary.json</a></p>
+        <p class='ok'>✅ 关键案例（用户指定）</p><div class='table-wrap'><table><thead><tr><th>Sheet</th><th>统一社会信用代码</th><th>企业</th><th>字段</th><th>Excel</th><th>明细表</th><th>结果</th><th>原因</th><th>如何复现</th></tr></thead><tbody><tr><td class='mono'>零售</td><td class='mono'>914401007RDD76M0RF</td><td>华南烟酒测试企业0355有限责任公司</td><td>商品销售额;上年-本月</td><td class='mono'>1841</td><td class='mono'>1841</td><td class='ok'>PASS</td><td></td><td>首页明细表搜索 914401007RDD76M0RF → 展示列 商品销售额;上年-本月 → 对照输入 Excel Sheet「零售」的对应列</td></tr></tbody></table></div><div style='height:12px'></div><p class='ok'>企业覆盖缺失：0</p><div style='height:12px'></div><p class='bad'>❌ 字段级完整性断言失败：44/2397</p><div class='table-wrap'><table><thead><tr><th>Sheet</th><th>统一社会信用代码</th><th>企业</th><th>字段</th><th>Excel</th><th>明细表</th><th>结果</th><th>原因</th><th>如何复现</th></tr></thead><tbody><tr><td class='mono'>批发</td><td class='mono'>91120000K0QH3LH7PH</td><td>龙城汽车测试企业0338有限公司</td><td>商品销售额;累计增速</td><td class='mono'>0.540638418955973</td><td class='mono'>54</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91120000K0QH3LH7PH → 展示列 商品销售额;累计增速 → 对照输入 Excel Sheet「批发」的对应列</td></tr><tr><td class='mono'>零售</td><td class='mono'>91510100DAD0JT3QGR</td><td>云城餐饮测试企业0417股份有限公司</td><td>商品销售额;累计增速</td><td class='mono'>-0.759775155970103</td><td class='mono'>-76</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91510100DAD0JT3QGR → 展示列 商品销售额;累计增速 → 对照输入 Excel Sheet「零售」的对应列</td></tr><tr><td class='mono'>零售</td><td class='mono'>91510100DAD0JT3QGR</td><td>云城餐饮测试企业0417股份有限公司</td><td>零售额;累计增速</td><td class='mono'>-0.759775155970103</td><td class='mono'>-76</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91510100DAD0JT3QGR → 展示列 零售额;累计增速 → 对照输入 Excel Sheet「零售」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>3460</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91350200T2GNMPQXBY → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>营业额;上年-本月</td><td class='mono'>327</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91320500TCE5UYN5HX → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>7682</td><td class='mono'>6703</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 914201001D4Q8L2ATD → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>3053</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100MWJE6MUDU8 → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>791</td><td class='mono'>405</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91510100YFBMD93HMM → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>10373</td><td class='mono'>4788</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91510100YFBMD93HMM → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>2184</td><td class='mono'>2009</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91330100J7T3DWW0HF → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>2802</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91320500YYNR3L6DH1 → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>营业额;上年-本月</td><td class='mono'>293</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91340100N4J9W677HX → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>3666</td><td class='mono'>3455</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91340100N4J9W677HX → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>住宿</td><td class='mono'>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>3566</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 911200002NHNAFGYMD → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「住宿」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>1487</td><td class='mono'>41</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91320500AQ70EH59PC → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91120000U256LKXA1X</td><td>西南便利测试企业0603有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>1391</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91120000U256LKXA1X → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>营业额;上年-本月</td><td class='mono'>235</td><td class='mono'>159</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100GJ9G0A3FPP → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>8944</td><td class='mono'>1565</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100GJ9G0A3FPP → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>9455</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91370100BXH3RXW2NU → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>营业额;上年-本月</td><td class='mono'>392</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91320500628G15BLFA → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100680Y57HEQG</td><td>海州酒店测试企业0608股份有限公司</td><td>营业额;上年-本月</td><td class='mono'>1051</td><td class='mono'>70</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100680Y57HEQG → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100680Y57HEQG</td><td>海州酒店测试企业0608股份有限公司</td><td>营业额;累计增速</td><td class='mono'>-0.407608695652174</td><td class='mono'>-41</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100680Y57HEQG → 展示列 营业额;累计增速 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>营业额;上年-本月</td><td class='mono'>161</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 914403008QQCD3W2JH → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91370100CBJRN5JJM1</td><td>龙城烟酒测试企业0610有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>1729</td><td class='mono'>1491</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91370100CBJRN5JJM1 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>408</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91110000N9B7AGD7XW → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>4342</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 9144030019HJ7TKMLM → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91120000JEL8FRH5TB</td><td>锦州商贸测试企业0615有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>2602</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91120000JEL8FRH5TB → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>营业额;上年-1—本月</td><td class='mono'>1030</td><td class='mono'>750</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 913100004MHT96F42H → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>营业额;累计增速</td><td class='mono'>0.604902897166507</td><td class='mono'>60</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 915101006H1LRDR0AU → 展示列 营业额;累计增速 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>9111000047L91UDRD4</td><td>西南家居测试企业0620有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>382</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 9111000047L91UDRD4 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>营业额;上年-本月</td><td class='mono'>243</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 913201004BBQW46NE5 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>229</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91110000ALPM9TX5GT → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>营业额;上年-本月</td><td class='mono'>212</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91410100XERJ7XG538 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>2649</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91120000YFQAN4PK02 → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>279</td><td class='mono'>264</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91350200LATG5U7GC0 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91310000E0XQ0C62B9</td><td>西南家居测试企业0630有限公司</td><td>营业额;上年-本月</td><td class='mono'>219</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91310000E0XQ0C62B9 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>203</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91320500BHNRPE6Q1P → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>营业额;上年-本月</td><td class='mono'>227</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 9151010067FUQ7U22H → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91350200MYJKTF7CW4</td><td>西南便利测试企业0634有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>209</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91350200MYJKTF7CW4 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>营业额;上年-本月</td><td class='mono'>225</td><td class='mono'>211</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100E02DXGEJKR → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>营业额;上年-本月</td><td class='mono'>496</td><td class='mono'>305</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 9135020026WEHKT0AT → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>营业额;上年-本月</td><td class='mono'>286</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91420100AUET7J33UY → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>913205009H7BJNM375</td><td>西南烟酒测试企业0638股份有限公司</td><td>营业额;上年-本月</td><td class='mono'>273</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 913205009H7BJNM375 → 展示列 营业额;上年-本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>营业额;上年-1—本月</td><td class='mono'>3021</td><td class='mono'>0</td><td class='bad'>FAIL</td><td>数值不一致（允许少量格式化/四舍五入容差）</td><td>首页明细表搜索 91340100WQ4CCB9BU3 → 展示列 营业额;上年-1—本月 → 对照输入 Excel Sheet「餐饮」的对应列</td></tr></tbody></table></div>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>缺失企业（Excel 有，但明细表缺）</h2>
+        <p class="warn">完整列表：<a class="mono" href="missing_codes_by_sheet.json">missing_codes_by_sheet.json</a></p>
+        <div class='card' style='margin-top:12px;'><h2>Sheet「批发」缺失企业：0</h2><p class='ok'>✅ 无缺失</p></div><div class='card' style='margin-top:12px;'><h2>Sheet「零售」缺失企业：0</h2><p class='ok'>✅ 无缺失</p></div><div class='card' style='margin-top:12px;'><h2>Sheet「住宿」缺失企业：0</h2><p class='ok'>✅ 无缺失</p></div><div class='card' style='margin-top:12px;'><h2>Sheet「餐饮」缺失企业：0</h2><p class='ok'>✅ 无缺失</p></div>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>衍生 Sheet 列覆盖（有值列 → UI 列是否存在）</h2>
+        <p class="warn">完整列表：<a class="mono" href="derived_column_coverage.json">derived_column_coverage.json</a></p>
+        <div class='table-wrap'><table><thead><tr><th>Sheet</th><th>Excel 列</th><th>有值数量</th><th>映射到明细表列</th><th>状态</th><th>示例</th><th>建议 UI 列名</th></tr></thead><tbody><tr><td class='mono'>批发</td><td class='mono'>2025年11月销售额</td><td class='mono'>24</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[462, 9021, 2748]</td><td class='mono'>2025年11月销售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年12月销售额</td><td class='mono'>1</td><td class='mono'>商品销售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月销售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年;12月;商品销售额;千元</td><td class='mono'>18</td><td class='mono'>商品销售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[848, 17086, 3095]</td><td class='mono'>2024年;12月;商品销售额;千元</td></tr><tr><td class='mono'>批发</td><td class='mono'>12月销售额增速</td><td class='mono'>24</td><td class='mono'>商品销售额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月销售额增速</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年1-11月销售额</td><td class='mono'>24</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[11289, 115542, 40271]</td><td class='mono'>2025年1-11月销售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年1-11月销售额</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[12850, 108921, 34367]</td><td class='mono'>2024年1-11月销售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年1-12月销售额</td><td class='mono'>24</td><td class='mono'>商品销售额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[11289, 115542, 40271]</td><td class='mono'>2025年1-12月销售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年;1-12月;商品销售额;千元</td><td class='mono'>24</td><td class='mono'>商品销售额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[13698, 126007, 37462]</td><td class='mono'>2024年;1-12月;商品销售额;千元</td></tr><tr><td class='mono'>批发</td><td class='mono'>1-12月增速</td><td class='mono'>24</td><td class='mono'>商品销售额;累计增速</td><td class='ok'>OK</td><td class='mono'>[-17.5865089794131, -8.30509416143548, 7.49826490844055]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年11月零售额</td><td class='mono'>24</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 3501, 1219]</td><td class='mono'>2025年11月零售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年12月零售额</td><td class='mono'>1</td><td class='mono'>零售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月零售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年;12月;商品零售额;千元</td><td class='mono'>17</td><td class='mono'>零售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[251, 6647, 0]</td><td class='mono'>2024年;12月;商品零售额;千元</td></tr><tr><td class='mono'>批发</td><td class='mono'>12月零售额增速</td><td class='mono'>24</td><td class='mono'>零售额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月零售额增速</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年1-11月零售额</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3066, 40335, 0]</td><td class='mono'>2025年1-11月零售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年1-11月零售额</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[4152, 38427, 0]</td><td class='mono'>2024年1-11月零售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2025年1-12月零售额</td><td class='mono'>24</td><td class='mono'>零售额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[3066, 40335, 0]</td><td class='mono'>2025年1-12月零售额</td></tr><tr><td class='mono'>批发</td><td class='mono'>2024年;1-12月;商品零售额;千元</td><td class='mono'>24</td><td class='mono'>零售额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[4403, 45074, 0]</td><td class='mono'>2024年;1-12月;商品零售额;千元</td></tr><tr><td class='mono'>批发</td><td class='mono'>1-12月增速#2</td><td class='mono'>24</td><td class='mono'>零售额;累计增速</td><td class='ok'>OK</td><td class='mono'>[-30.3656597774245, -10.5138217154013, 0]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>批发</td><td class='mono'>零售额占比</td><td class='mono'>24</td><td class='mono'>零销比(%)</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>零售额占比</td></tr><tr><td class='mono'>批发</td><td class='mono'>单位规模</td><td class='mono'>22</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3, 4, 0]</td><td class='mono'>单位规模</td></tr><tr><td class='mono'>批发</td><td class='mono'>粮油食品类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 512, 3523]</td><td class='mono'>粮油食品类</td></tr><tr><td class='mono'>批发</td><td class='mono'>饮料类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>饮料类</td></tr><tr><td class='mono'>批发</td><td class='mono'>烟酒类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>烟酒类</td></tr><tr><td class='mono'>批发</td><td class='mono'>服装鞋帽针纺类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>服装鞋帽针纺类</td></tr><tr><td class='mono'>批发</td><td class='mono'>日用品类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>日用品类</td></tr><tr><td class='mono'>批发</td><td class='mono'>汽车类</td><td class='mono'>23</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>汽车类</td></tr><tr><td class='mono'>批发</td><td class='mono'>小微企业</td><td class='mono'>8</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1]</td><td class='mono'>小微企业</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年11月销售额</td><td class='mono'>156</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2317, 4926, 1282]</td><td class='mono'>2025年11月销售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年12月销售额</td><td class='mono'>1</td><td class='mono'>商品销售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月销售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年;12月;商品销售额;千元</td><td class='mono'>131</td><td class='mono'>商品销售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[1841, 4997, 993]</td><td class='mono'>2024年;12月;商品销售额;千元</td></tr><tr><td class='mono'>零售</td><td class='mono'>12月销售额增速</td><td class='mono'>156</td><td class='mono'>商品销售额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月销售额增速</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年1-11月销售额</td><td class='mono'>156</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[19613, 44278, 8513]</td><td class='mono'>2025年1-11月销售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年1-11月销售额</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15691, 38439, 7202]</td><td class='mono'>2024年1-11月销售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年1-12月销售额</td><td class='mono'>156</td><td class='mono'>商品销售额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[19613, 44278, 8513]</td><td class='mono'>2025年1-12月销售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年;1-12月;商品销售额;千元</td><td class='mono'>156</td><td class='mono'>商品销售额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[17532, 43436, 8195]</td><td class='mono'>2024年;1-12月;商品销售额;千元</td></tr><tr><td class='mono'>零售</td><td class='mono'>1-12月增速</td><td class='mono'>156</td><td class='mono'>商品销售额;累计增速</td><td class='ok'>OK</td><td class='mono'>[11.869723933379, 1.93848420664886, 3.8804148871263]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年11月零售额</td><td class='mono'>156</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2317, 4926, 1282]</td><td class='mono'>2025年11月零售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年12月零售额</td><td class='mono'>155</td><td class='mono'>零售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月零售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年;12月;商品零售额;千元</td><td class='mono'>155</td><td class='mono'>零售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[1841, 4997, 993]</td><td class='mono'>2024年;12月;商品零售额;千元</td></tr><tr><td class='mono'>零售</td><td class='mono'>12月零售额增速</td><td class='mono'>156</td><td class='mono'>零售额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月零售额增速</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年1-11月零售额</td><td class='mono'>156</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[19613, 44278, 8513]</td><td class='mono'>2025年1-11月零售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年1-11月零售额</td><td class='mono'>156</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15691, 38439, 7202]</td><td class='mono'>2024年1-11月零售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2025年1-12月零售额</td><td class='mono'>155</td><td class='mono'>零售额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[19613, 44278, 8513]</td><td class='mono'>2025年1-12月零售额</td></tr><tr><td class='mono'>零售</td><td class='mono'>2024年;1-12月;商品零售额;千元</td><td class='mono'>156</td><td class='mono'>零售额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[17532, 43436, 8195]</td><td class='mono'>2024年;1-12月;商品零售额;千元</td></tr><tr><td class='mono'>零售</td><td class='mono'>1-12月增速#2</td><td class='mono'>156</td><td class='mono'>零售额;累计增速</td><td class='ok'>OK</td><td class='mono'>[11.869723933379, 1.93848420664886, 3.8804148871263]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>零售</td><td class='mono'>零售额占比</td><td class='mono'>154</td><td class='mono'>零销比(%)</td><td class='ok'>OK</td><td class='mono'>[3, 4, 2]</td><td class='mono'>零售额占比</td></tr><tr><td class='mono'>零售</td><td class='mono'>粮油食品类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2317, 4926, 1282]</td><td class='mono'>粮油食品类</td></tr><tr><td class='mono'>零售</td><td class='mono'>饮料类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 1106, 2013]</td><td class='mono'>饮料类</td></tr><tr><td class='mono'>零售</td><td class='mono'>烟酒类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 834, 1061]</td><td class='mono'>烟酒类</td></tr><tr><td class='mono'>零售</td><td class='mono'>服装鞋帽针纺类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 2863, 147]</td><td class='mono'>服装鞋帽针纺类</td></tr><tr><td class='mono'>零售</td><td class='mono'>日用品类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>日用品类</td></tr><tr><td class='mono'>零售</td><td class='mono'>汽车类</td><td class='mono'>155</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>汽车类</td></tr><tr><td class='mono'>零售</td><td class='mono'>小微企业</td><td class='mono'>24</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1]</td><td class='mono'>小微企业</td></tr><tr><td class='mono'>零售</td><td class='mono'>吃穿用</td><td class='mono'>1</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0]</td><td class='mono'>吃穿用</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年11月营业额</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[382, 408, 812]</td><td class='mono'>2025年11月营业额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年12月营业额</td><td class='mono'>1</td><td class='mono'>营业额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月营业额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年12月;营业额总计;千元</td><td class='mono'>9</td><td class='mono'>营业额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[311, 327, 785]</td><td class='mono'>2024年12月;营业额总计;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>12月增速</td><td class='mono'>10</td><td class='mono'>营业额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月增速</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-11月营业额</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3971, 4164, 8284]</td><td class='mono'>2025年1-11月营业额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-12月营业额</td><td class='mono'>10</td><td class='mono'>营业额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[3971, 4164, 8284]</td><td class='mono'>2025年1-12月营业额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年1-12月;营业额总计;千元</td><td class='mono'>10</td><td class='mono'>营业额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[3460, 3620, 7682]</td><td class='mono'>2024年1-12月;营业额总计;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>1-12月增速</td><td class='mono'>10</td><td class='mono'>营业额;累计增速</td><td class='ok'>OK</td><td class='mono'>[14.7687861271676, 15.0276243093923, 7.83650091122104]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>住宿</td><td class='mono'>11月客房收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[382, 408, 664]</td><td class='mono'>11月客房收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年12月客房收入</td><td class='mono'>1</td><td class='mono'>本月客房收入</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月客房收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年12月;营业额总计;客房收入;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[311, 327, 658]</td><td class='mono'>2024年12月;营业额总计;客房收入;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-11月客房收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3971, 4164, 7212]</td><td class='mono'>2025年1-11月客房收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-12月客房收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3971, 4164, 7212]</td><td class='mono'>2025年1-12月客房收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年1-12月;营业额总计;客房收入;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[3460, 3620, 6703]</td><td class='mono'>2024年1-12月;营业额总计;客房收入;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>11月餐费收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 439]</td><td class='mono'>11月餐费收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年12月餐费收入</td><td class='mono'>1</td><td class='mono'>本月餐费收入</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月餐费收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年12月;营业额总计;餐费收入;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 386]</td><td class='mono'>2024年12月;营业额总计;餐费收入;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-11月餐费收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 6086, 223]</td><td class='mono'>2025年1-11月餐费收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>1-12月餐费收入</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 6086, 223]</td><td class='mono'>1-12月餐费收入</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年1-12月;营业额总计;餐费收入;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 4788, 175]</td><td class='mono'>2024年1-12月;营业额总计;餐费收入;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>11月销售额</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 148, 12]</td><td class='mono'>11月销售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年12月销售额</td><td class='mono'>1</td><td class='mono'>本月商品销售额</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月销售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年12月;营业额总计;商品销售额;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 127, 50]</td><td class='mono'>2024年12月;营业额总计;商品销售额;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年1-11月销售额</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 1072, 154]</td><td class='mono'>2025年1-11月销售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>1-12月销售额</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 1072, 154]</td><td class='mono'>1-12月销售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年1-12月;营业额总计;商品销售额;千元</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[0, 979, 211]</td><td class='mono'>2024年1-12月;营业额总计;商品销售额;千元</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2025年12月零售额</td><td class='mono'>10</td><td class='mono'>零售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月零售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>2024年12月零售额</td><td class='mono'>10</td><td class='mono'>零售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[0, 127, 386]</td><td class='mono'>2024年12月零售额</td></tr><tr><td class='mono'>住宿</td><td class='mono'>小微企业</td><td class='mono'>10</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1, 0]</td><td class='mono'>小微企业</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年11月营业额</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1131, 1184, 0]</td><td class='mono'>2025年11月营业额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年12月营业额</td><td class='mono'>1</td><td class='mono'>营业额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月营业额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年12月;营业额总计;千元</td><td class='mono'>37</td><td class='mono'>营业额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[1487, 1391, 282]</td><td class='mono'>2024年12月;营业额总计;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>12月增速</td><td class='mono'>39</td><td class='mono'>营业额;增速(当月)</td><td class='ok'>OK</td><td class='mono'>[-100, 0]</td><td class='mono'>12月增速</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-11月营业额</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[18135, 15670, 1641]</td><td class='mono'>2025年1-11月营业额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-12月营业额</td><td class='mono'>39</td><td class='mono'>营业额;本年-1—本月</td><td class='ok'>OK</td><td class='mono'>[18135, 15670, 1641]</td><td class='mono'>2025年1-12月营业额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年1-12月;营业额总计;千元</td><td class='mono'>39</td><td class='mono'>营业额;上年-1—本月</td><td class='ok'>OK</td><td class='mono'>[17932, 15098, 3211]</td><td class='mono'>2024年1-12月;营业额总计;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>1-12月增速</td><td class='mono'>39</td><td class='mono'>营业额;累计增速</td><td class='ok'>OK</td><td class='mono'>[1.1320544278385, 3.78858126904226, -48.894425412644]</td><td class='mono'>1-12月增速</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>11月客房收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[325, 1115, 0]</td><td class='mono'>11月客房收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年12月客房收入</td><td class='mono'>1</td><td class='mono'>本月客房收入</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月客房收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年12月;营业额总计;客房收入;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[41, 27, 0]</td><td class='mono'>2024年12月;营业额总计;客房收入;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-11月客房收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2690, 2206, 0]</td><td class='mono'>2025年1-11月客房收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-12月客房收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2690, 2206, 0]</td><td class='mono'>2025年1-12月客房收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年1-12月;营业额总计;客房收入;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[2374, 2015, 0]</td><td class='mono'>2024年1-12月;营业额总计;客房收入;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>11月餐费收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[792, 69, 0]</td><td class='mono'>11月餐费收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年12月餐费收入</td><td class='mono'>1</td><td class='mono'>本月餐费收入</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月餐费收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年12月;营业额总计;餐费收入;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1431, 1364, 282]</td><td class='mono'>2024年12月;营业额总计;餐费收入;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-11月餐费收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15284, 13464, 1641]</td><td class='mono'>2025年1-11月餐费收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>1-12月餐费收入</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15284, 13464, 1641]</td><td class='mono'>1-12月餐费收入</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年1-12月;营业额总计;餐费收入;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15402, 13083, 3211]</td><td class='mono'>2024年1-12月;营业额总计;餐费收入;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>11月销售额</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[14, 0, 56]</td><td class='mono'>11月销售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年12月销售额</td><td class='mono'>1</td><td class='mono'>本月商品销售额</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月销售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年12月;营业额总计;商品销售额;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[15, 0, 70]</td><td class='mono'>2024年12月;营业额总计;商品销售额;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年1-11月销售额</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[161, 0, 454]</td><td class='mono'>2025年1-11月销售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>1-12月销售额</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[161, 0, 454]</td><td class='mono'>1-12月销售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年1-12月;营业额总计;商品销售额;千元</td><td class='mono'>39</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[156, 0, 454]</td><td class='mono'>2024年1-12月;营业额总计;商品销售额;千元</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2025年12月零售额</td><td class='mono'>39</td><td class='mono'>零售额;本年-本月</td><td class='ok'>OK</td><td class='mono'>[0]</td><td class='mono'>2025年12月零售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>2024年12月零售额</td><td class='mono'>39</td><td class='mono'>零售额;上年-本月</td><td class='ok'>OK</td><td class='mono'>[1446, 1364, 282]</td><td class='mono'>2024年12月零售额</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>小微企业</td><td class='mono'>15</td><td class='mono'></td><td class='bad'>UNMAPPED</td><td class='mono'>[1]</td><td class='mono'>小微企业</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>改动建议（仅写在报告内）</h3>
+      <div class="card">
+        <h2>建议汇总</h2>
+        <ul><li>导出字段不一致：优先排查修改是否真正落库（输入框 blur 自动保存），以及导出是否读取最新数据。</li></ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>导入一致性（明细表 vs 输入 Excel）</h3>
+      <div class="card">
+        <h2>覆盖检查</h2>
+        <p class='ok'>✅ 覆盖完整</p>
+        <p class="warn">复现：打开输入 Excel 的对应 Sheet（来源表），在“统一社会信用代码”列定位企业，对比明细表同字段显示。</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>字段一致性</h2>
+        <p class='ok'>✅ 未发现差异</p>
+        <p class="warn">复现：首页明细表搜索信用代码，打开“列”展示相关字段，对照输入 Excel 的同字段值。</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>导出一致性（导出 Excel vs 明细表[修改后]）</h3>
+      <div class="card">
+        <h2>覆盖检查</h2>
+        <p class='ok'>✅ 覆盖完整</p>
+        <p class="warn">复现：点击“导出”下载 xlsx，打开后在对应 Sheet 用“统一社会信用代码”定位行，对照明细表修改后的值。</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>字段一致性</h2>
+        <p class='bad'>❌ 差异数量：1053</p><p class='warn'>仅展示前 200 条，剩余 853 条请查看原始数据 JSON。</p><div class='table-wrap'><table><thead><tr><th>统一社会信用代码</th><th>企业</th><th>Sheet</th><th>字段</th><th>Excel</th><th>明细表</th></tr></thead><tbody><tr><td>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500TCE5UYN5HX</td><td>东北酒店测试企业0641有限公司</td><td>住宿</td><td>营业额;上年-本月</td><td class='mono'>327</td><td class='mono'>0</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>2802</td><td class='mono'>0</td></tr><tr><td>91320500YYNR3L6DH1</td><td>华东电器测试企业0646股份有限公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>9.92</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>979</td><td class='mono'>-</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>127</td><td class='mono'>-</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>7682</td><td class='mono'>4788</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>营业额;上年-本月</td><td class='mono'>785</td><td class='mono'>405</td></tr><tr><td>91510100YFBMD93HMM</td><td>华南批发测试企业0644有限责任公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>174.94</td><td class='mono'>26.91</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>3460</td><td class='mono'>0</td></tr><tr><td>91350200T2GNMPQXBY</td><td>安城食品测试企业0640有限责任公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>14.77</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>3053</td><td class='mono'>0</td></tr><tr><td>91420100MWJE6MUDU8</td><td>星河家居测试企业0643有限公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>11.5</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>1072</td><td class='mono'>-</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>3973</td><td class='mono'>6703</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>营业额;上年-本月</td><td class='mono'>367</td><td class='mono'>785</td></tr><tr><td>914201001D4Q8L2ATD</td><td>星河汽车测试企业0642有限责任公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>23.59</td><td class='mono'>7.84</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>211</td><td class='mono'>-</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>50</td><td class='mono'>-</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>154</td><td class='mono'>-</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>3666</td><td class='mono'>3455</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>营业额;上年-本月</td><td class='mono'>293</td><td class='mono'>0</td></tr><tr><td>91340100N4J9W677HX</td><td>江城烟酒测试企业0647有限公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-0.52</td><td class='mono'>-6.25</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>10373</td><td class='mono'>2009</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>营业额;上年-本月</td><td class='mono'>791</td><td class='mono'>0</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>营业额;增速(当月) (export:(衍生指标)营业额当月增速)</td><td class='mono'>-100</td><td class='mono'>0</td></tr><tr><td>91330100J7T3DWW0HF</td><td>江城零售测试企业0645有限责任公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>127.48</td><td class='mono'>109.25</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>营业额;上年-1—本月</td><td class='mono'>3566</td><td class='mono'>0</td></tr><tr><td>911200002NHNAFGYMD</td><td>海州商贸测试企业0648股份有限公司</td><td>住宿</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>-4.96</td></tr><tr><td>91510100HJG2TGMG64</td><td>东北便利测试企业0619有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91510100HJG2TGMG64</td><td>东北便利测试企业0619有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91510100HJG2TGMG64</td><td>东北便利测试企业0619有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91510100HJG2TGMG64</td><td>东北便利测试企业0619有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>8944</td><td class='mono'>1565</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>235</td><td class='mono'>159</td></tr><tr><td>91420100GJ9G0A3FPP</td><td>东北餐饮测试企业0605有限公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>488.5</td><td class='mono'>2.97</td></tr><tr><td>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>915101006H1LRDR0AU</td><td>东北饮料测试企业0618有限责任公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>0.6</td><td class='mono'>60</td></tr><tr><td>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9151010067FUQ7U22H</td><td>中部汽车测试企业0632有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>227</td><td class='mono'>0</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>4143</td><td class='mono'>4413</td></tr><tr><td>91110000N9B7AGD7XW</td><td>中部烟酒测试企业0612有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>144</td><td class='mono'>0</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>3021</td><td class='mono'>0</td></tr><tr><td>91340100WQ4CCB9BU3</td><td>云城商贸测试企业0639有限公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>15</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>131</td><td class='mono'>-</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>4413</td><td class='mono'>0</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>408</td><td class='mono'>207</td></tr><tr><td>9144030019HJ7TKMLM</td><td>云城批发测试企业0613有限责任公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>-7.88</td></tr><tr><td>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500628G15BLFA</td><td>云城汽车测试企业0607股份有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>392</td><td class='mono'>0</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>2602</td><td class='mono'>1302</td></tr><tr><td>91350200YY5YNDRHTX</td><td>华东日用品测试企业0617有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>205</td><td class='mono'>298</td></tr><tr><td>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100AUET7J33UY</td><td>华东服饰测试企业0637股份有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>286</td><td class='mono'>0</td></tr><tr><td>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>156</td><td class='mono'>-</td></tr><tr><td>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>15</td><td class='mono'>-</td></tr><tr><td>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>161</td><td class='mono'>-</td></tr><tr><td>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500AQ70EH59PC</td><td>华东零售测试企业0602有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>1487</td><td class='mono'>41</td></tr><tr><td>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91320500BHNRPE6Q1P</td><td>华北商贸测试企业0631有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>203</td><td class='mono'>0</td></tr><tr><td>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913201004BBQW46NE5</td><td>华北零售测试企业0621有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>243</td><td class='mono'>0</td></tr><tr><td>913401003NX1WKEBLX</td><td>华南服饰测试企业0633有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913401003NX1WKEBLX</td><td>华南服饰测试企业0633有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>913401003NX1WKEBLX</td><td>华南服饰测试企业0633有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913401003NX1WKEBLX</td><td>华南服饰测试企业0633有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000AWLM49JH9K</td><td>华南百货测试企业0623有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000AWLM49JH9K</td><td>华南百货测试企业0623有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91120000AWLM49JH9K</td><td>华南百货测试企业0623有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000AWLM49JH9K</td><td>华南百货测试企业0623有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201008WFU1LU3T8</td><td>华南超市测试企业0628有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201008WFU1LU3T8</td><td>华南超市测试企业0628有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201008WFU1LU3T8</td><td>华南超市测试企业0628有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201008WFU1LU3T8</td><td>华南超市测试企业0628有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914201008WFU1LU3T8</td><td>华南超市测试企业0628有限公司</td><td>餐饮</td><td>营业额;增速(当月) (export:(衍生指标)营业额当月增速)</td><td class='mono'>-100</td><td class='mono'>0</td></tr><tr><td>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>9135020026WEHKT0AT</td><td>华南酒店测试企业0636有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>496</td><td class='mono'>305</td></tr><tr><td>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>245</td><td class='mono'>-</td></tr><tr><td>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>15</td><td class='mono'>-</td></tr><tr><td>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>246</td><td class='mono'>-</td></tr><tr><td>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91350200LATG5U7GC0</td><td>安城家居测试企业0629有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>279</td><td class='mono'>264</td></tr><tr><td>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91420100E02DXGEJKR</td><td>安城食品测试企业0635有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>225</td><td class='mono'>211</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>2939</td><td class='mono'>4143</td></tr><tr><td>914403002LC18FGY1J</td><td>安城餐饮测试企业0611股份有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>335</td><td class='mono'>144</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>2649</td><td class='mono'>0</td></tr><tr><td>91120000YFQAN4PK02</td><td>春城日用品测试企业0627有限公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>7.63</td></tr><tr><td>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>914403008QQCD3W2JH</td><td>春城电器测试企业0609股份有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>161</td><td class='mono'>0</td></tr><tr><td>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91110000ALPM9TX5GT</td><td>江城商贸测试企业0624有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>229</td><td class='mono'>0</td></tr><tr><td>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91410100XERJ7XG538</td><td>江城电器测试企业0626有限公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>212</td><td class='mono'>0</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>9455</td><td class='mono'>0</td></tr><tr><td>91370100BXH3RXW2NU</td><td>江城食品测试企业0606有限责任公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>-100</td><td class='mono'>-1.33</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>None</td><td class='mono'>-</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>商品销售额;本年-本月</td><td class='mono'>0</td><td class='mono'>-</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>营业额;上年-1—本月</td><td class='mono'>2721</td><td class='mono'>750</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>营业额;上年-本月</td><td class='mono'>332</td><td class='mono'>228</td></tr><tr><td>913100004MHT96F42H</td><td>江城餐饮测试企业0616有限责任公司</td><td>餐饮</td><td>营业额;累计增速 (export:(衍生指标)营业额累计增速)</td><td class='mono'>549.73</td><td class='mono'>373.11</td></tr><tr><td>91420100680Y57HEQG</td><td>海州酒店测试企业0608股份有限公司</td><td>餐饮</td><td>商品销售额;上年-1—本月</td><td class='mono'>454</td><td class='mono'>-</td></tr><tr><td>91420100680Y57HEQG</td><td>海州酒店测试企业0608股份有限公司</td><td>餐饮</td><td>商品销售额;上年-本月</td><td class='mono'>70</td><td class='mono'>-</td></tr><tr><td>91420100680Y57HEQG</td><td>海州酒店测试企业0608股份有限公司</td><td>餐饮</td><td>商品销售额;本年-1—本月</td><td class='mono'>454</td><td class='mono'>-</td></tr></tbody></table></div>
+        <p class="warn">复现：先确认修改动作已保存（输入框失焦），再导出并对照字段。</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>修改动作 → 导出回归校验</h2>
+        <p class="warn">完整列表：<a class="mono" href="action_export_checks.json">action_export_checks.json</a></p>
+        <p class='bad'>❌ FAIL：6/7</p><div class='table-wrap'><table><thead><tr><th>统一社会信用代码</th><th>字段</th><th>Sheet</th><th>导出列</th><th>期望</th><th>实际</th><th>结果</th><th>原因</th></tr></thead><tbody><tr><td class='mono'>91440300KMJLU7B0T7</td><td>商品销售额;本年-本月</td><td class='mono'>批发</td><td class='mono'>商品销售额;本年-本月</td><td class='mono'>123.45</td><td class='mono'></td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr><tr><td class='mono'>91440300KMJLU7B0T7</td><td>商品销售额;增速(当月)</td><td class='mono'>批发</td><td class='mono'>(衍生指标)销售额当月增速</td><td class='mono'>12.34</td><td class='mono'>-100</td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr><tr><td class='mono'>91440300E7LF36AEX2</td><td>零售额;本年-本月</td><td class='mono'>零售</td><td class='mono'>零售额;本年-本月</td><td class='mono'></td><td class='mono'></td><td class='ok'>PASS</td><td></td></tr><tr><td class='mono'>91440300E7LF36AEX2</td><td>零售额;增速(当月)</td><td class='mono'>零售</td><td class='mono'>(衍生指标)零售额当月增速</td><td class='mono'>-3.21</td><td class='mono'>-100</td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr><tr><td class='mono'>91320500TCE5UYN5HX</td><td>营业额;本年-本月</td><td class='mono'>住宿</td><td class='mono'>营业额;本年-本月</td><td class='mono'>50.0</td><td class='mono'></td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr><tr><td class='mono'>91320500TCE5UYN5HX</td><td>营业额;增速(当月)</td><td class='mono'>住宿</td><td class='mono'>(衍生指标)营业额当月增速</td><td class='mono'>8.88</td><td class='mono'>-100</td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr><tr><td class='mono'>91510100HJG2TGMG64</td><td>本月餐费收入</td><td class='mono'>餐饮</td><td class='mono'>餐费收入;本年-本月</td><td class='mono'>-10.0</td><td class='mono'></td><td class='bad'>FAIL</td><td>导出值与修改后预期不一致</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>导入日志（UI）</h3>
+      <div class="card">
+        <h2>进度事件</h2>
+        <p class="mono">count=55</p>
+        <pre>开始导入 Excel 文件
+发现 15 个 Sheet
+正在解析 Sheet: 2024年12月批零
+Sheet &quot;2024年12月批零&quot; 识别为: wr_snapshot (置信度: 1.00)
+Sheet &quot;2024年12月批零&quot; 导入成功: 153 行
+正在解析 Sheet: 2025年11月批零
+Sheet &quot;2025年11月批零&quot; 识别为: wr_snapshot (置信度: 1.00)
+Sheet &quot;2025年11月批零&quot; 导入成功: 178 行
+正在解析 Sheet: 2024年3月
+Sheet &quot;2024年3月&quot; 识别为: wr_snapshot (置信度: 0.95)
+Sheet &quot;2024年3月&quot; 导入成功: 153 行
+正在解析 Sheet: 2025年2月
+Sheet &quot;2025年2月&quot; 识别为: wr_snapshot (置信度: 0.95)
+Sheet &quot;2025年2月&quot; 导入成功: 176 行
+正在解析 Sheet: 批发
+Sheet &quot;批发&quot; 识别为: wholesale (置信度: 1.00)
+识别数据月份: 2025年12月
+Sheet &quot;批发&quot; 导入成功: 23 行
+正在解析 Sheet: 零售
+Sheet &quot;零售&quot; 识别为: retail (置信度: 1.00)
+Sheet &quot;零售&quot; 导入成功: 155 行
+正在解析 Sheet: 2024年12月住餐
+Sheet &quot;2024年12月住餐&quot; 识别为: ac_snapshot (置信度: 1.00)
+Sheet &quot;2024年12月住餐&quot; 导入成功: 45 行
+正在解析 Sheet: 2025年11月住餐
+Sheet &quot;2025年11月住餐&quot; 识别为: ac_snapshot (置信度: 1.00)
+Sheet &quot;2025年11月住餐&quot; 导入成功: 47 行
+正在解析 Sheet: 2024年3月住
+Sheet &quot;2024年3月住&quot; 识别为: ac_snapshot (置信度: 0.95)
+Sheet &quot;2024年3月住&quot; 导入成功: 45 行
+正在解析 Sheet: 2025年2月住
+Sheet &quot;2025年2月住&quot; 识别为: ac_snapshot (置信度: 0.95)
+Sheet &quot;2025年2月住&quot; 导入成功: 47 行
+正在解析 Sheet: 餐饮
+Sheet &quot;餐饮&quot; 识别为: catering (置信度: 1.00)
+Sheet &quot;餐饮&quot; 导入成功: 38 行
+正在解析 Sheet: 住宿
+Sheet &quot;住宿&quot; 识别为: accommodation (置信度: 1.00)
+Sheet &quot;住宿&quot; 导入成功: 9 行
+正在解析 Sheet: 限上零售额
+Sheet &quot;限上零售额&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;限上零售额&quot; 已跳过
+跳过汇总表: 限上零售额
+正在解析 Sheet: 小微
+Sheet &quot;小微&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;小微&quot; 已跳过
+跳过汇总表: 小微
+正在解析 Sheet: 吃穿用
+Sheet &quot;吃穿用&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;吃穿用&quot; 已跳过
+跳过汇总表: 吃穿用
+正在计算衍生字段...
+衍生字段计算完成
+当前操作月份已更新为: 2025年12月
+导入完成</pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>浏览器日志</h3>
+      <div class="grid">
+        <div class="card">
+          <h2>Console</h2>
+          <pre>[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+[33m[warning][0m Select is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+</pre>
+        </div>
+        <div class="card">
+          <h2>Errors</h2>
+          <pre></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>关键截图</h3>
+      <div class="shots">
+        <div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/00_home.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/00_home.png" alt="shot"/></a><div class="cap mono">00_home.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/01_all_columns.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/01_all_columns.png" alt="shot"/></a><div class="cap mono">01_all_columns.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/02_import_done.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/02_import_done.png" alt="shot"/></a><div class="cap mono">02_import_done.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/03_after_import.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/03_after_import.png" alt="shot"/></a><div class="cap mono">03_after_import.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/04_before_actions.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/04_before_actions.png" alt="shot"/></a><div class="cap mono">04_before_actions.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_1.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_1.png" alt="shot"/></a><div class="cap mono">05_action_1.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_2.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_2.png" alt="shot"/></a><div class="cap mono">05_action_2.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_3.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_3.png" alt="shot"/></a><div class="cap mono">05_action_3.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_4.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_4.png" alt="shot"/></a><div class="cap mono">05_action_4.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_5.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_5.png" alt="shot"/></a><div class="cap mono">05_action_5.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_6.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_6.png" alt="shot"/></a><div class="cap mono">05_action_6.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/05_action_7.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/05_action_7.png" alt="shot"/></a><div class="cap mono">05_action_7.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/10_after_modifications.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/10_after_modifications.png" alt="shot"/></a><div class="cap mono">10_after_modifications.png</div></div><div class="shot"><a href="tests/e2e-result/run-20260131-141104/screenshots/11_after_export.png"><img src="tests/e2e-result/run-20260131-141104/screenshots/11_after_export.png" alt="shot"/></a><div class="cap mono">11_after_export.png</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>结论</h3>
+      <div class="card">
+        <p>❌ 存在不符合预期项：请优先查看【执行步骤与不符合预期项】与两段一致性差异表；所有改动建议也写在 report 内。</p>
+      </div>
+    </div>
+  </div>
+</body>
 </html>

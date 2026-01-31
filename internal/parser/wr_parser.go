@@ -11,10 +11,12 @@ import (
 
 // WRParser 批零主表解析器
 type WRParser struct {
-	file         *excelize.File
-	recognizer   *SheetRecognizer
-	currentYear  int
-	currentMonth int
+	file          *excelize.File
+	recognizer    *SheetRecognizer
+	currentYear   int
+	currentMonth  int
+	fallbackYear  int
+	fallbackMonth int
 }
 
 // NewWRParser 创建批零解析器
@@ -23,6 +25,14 @@ func NewWRParser(file *excelize.File) *WRParser {
 		file:       file,
 		recognizer: NewSheetRecognizer(),
 	}
+}
+
+// NewWRParserWithFallback 创建批零解析器（当文件列名无法推断年月时，使用兜底年月）
+func NewWRParserWithFallback(file *excelize.File, fallbackYear, fallbackMonth int) *WRParser {
+	p := NewWRParser(file)
+	p.fallbackYear = fallbackYear
+	p.fallbackMonth = fallbackMonth
+	return p
 }
 
 // ParseSheet 解析批零 Sheet
@@ -49,7 +59,15 @@ func (p *WRParser) ParseSheet(sheetName string) ([]*model.WholesaleRetail, error
 	// 从列名中识别当前年月
 	year, month := FindCurrentYearMonth(headers)
 	if year == 0 || month == 0 {
-		return nil, fmt.Errorf("cannot determine data year/month from columns")
+		// 兜底：部分文件列头可能不带年份/月份，但 sheet 名包含 "YYYY年MM月"
+		if y, m, found := ExtractYearMonth(sheetName); found {
+			year, month = y, m
+		} else if p.fallbackYear > 0 && p.fallbackMonth > 0 {
+			// 兜底：对于 “本年-本月/上年-本月” 口径的文件，本月以前端选择为准
+			year, month = p.fallbackYear, p.fallbackMonth
+		} else {
+			return nil, fmt.Errorf("cannot determine data year/month from columns or sheet name")
+		}
 	}
 
 	p.currentYear = year
@@ -106,16 +124,6 @@ func (p *WRParser) parseWRRow(row []string, mappings map[int]FieldMapping, sheet
 		record.IndustryType = RecognizeIndustryType(record.IndustryCode)
 	}
 
-	// 备份原始值
-	if record.SalesCurrentMonth != 0 {
-		val := record.SalesCurrentMonth
-		record.OriginalSalesCurrentMonth = &val
-	}
-	if record.RetailCurrentMonth != 0 {
-		val := record.RetailCurrentMonth
-		record.OriginalRetailCurrentMonth = &val
-	}
-
 	return record
 }
 
@@ -138,9 +146,15 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 	case "sales_prev_month":
 		record.SalesPrevMonth = parseFloat(value)
 	case "sales_current_month":
-		record.SalesCurrentMonth = parseFloat(value)
+		v := parseFloat(value)
+		record.SalesCurrentMonth = v
+		if v != 0 {
+			record.OriginalSalesCurrentMonth = &v
+		}
 	case "sales_last_year_month":
 		record.SalesLastYearMonth = parseFloat(value)
+	case "sales_month_rate":
+		record.SalesMonthRate = parseRatePercentPtr(value)
 	case "sales_prev_cumulative":
 		record.SalesPrevCumulative = parseFloat(value)
 	case "sales_last_year_prev_cumulative":
@@ -149,14 +163,22 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 		record.SalesCurrentCumulative = parseFloat(value)
 	case "sales_last_year_cumulative":
 		record.SalesLastYearCumulative = parseFloat(value)
+	case "sales_cumulative_rate":
+		record.SalesCumulativeRate = parseRatePercentPtr(value)
 
 	// 零售额
 	case "retail_prev_month":
 		record.RetailPrevMonth = parseFloat(value)
 	case "retail_current_month":
-		record.RetailCurrentMonth = parseFloat(value)
+		v := parseFloat(value)
+		record.RetailCurrentMonth = v
+		if v != 0 {
+			record.OriginalRetailCurrentMonth = &v
+		}
 	case "retail_last_year_month":
 		record.RetailLastYearMonth = parseFloat(value)
+	case "retail_month_rate":
+		record.RetailMonthRate = parseRatePercentPtr(value)
 	case "retail_prev_cumulative":
 		record.RetailPrevCumulative = parseFloat(value)
 	case "retail_last_year_prev_cumulative":
@@ -165,6 +187,8 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 		record.RetailCurrentCumulative = parseFloat(value)
 	case "retail_last_year_cumulative":
 		record.RetailLastYearCumulative = parseFloat(value)
+	case "retail_cumulative_rate":
+		record.RetailCumulativeRate = parseRatePercentPtr(value)
 
 	// 商品分类
 	case "cat_grain_oil_food":
@@ -214,6 +238,8 @@ func parseInt(s string) int {
 func parseFloat(s string) float64 {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "") // 移除千分位
+	s = strings.ReplaceAll(s, "％", "%")
+	s = strings.ReplaceAll(s, "%", "")
 	f, _ := strconv.ParseFloat(s, 64)
 	return f
 }

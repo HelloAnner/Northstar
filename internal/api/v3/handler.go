@@ -23,6 +23,9 @@ func NewHandler(store *store.Store, templatePath string) *Handler {
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	// 系统状态
 	router.GET("/status", h.GetStatus)
+	// 可用月份
+	router.GET("/months", h.ListMonths)
+	router.POST("/months/select", h.SelectMonth)
 
 	// 配置管理
 	router.GET("/config", h.GetConfig)

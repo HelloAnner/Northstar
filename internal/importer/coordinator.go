@@ -573,26 +573,40 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 		Timestamp: time.Now(),
 	})
 
+	// 当导入的“本月金额”为 0/空时，用累计差自动补齐（优先保留导入的非 0 值）
+	if err := c.backfillCalculableFields(ctx.CurrentYear, ctx.CurrentMonth); err != nil {
+		c.sendProgress(ctx.ProgressChan, ProgressEvent{
+			Type:      "warning",
+			Message:   fmt.Sprintf("本月金额回填失败: %v", err),
+			Timestamp: time.Now(),
+		})
+	}
+
 	// 批零增速计算
 	err := c.store.Exec(`
 		UPDATE wholesale_retail SET
 			sales_month_rate = CASE
+				WHEN sales_month_rate IS NOT NULL THEN sales_month_rate
 				WHEN sales_last_year_month = 0 THEN NULL
 				ELSE (sales_current_month - sales_last_year_month) / sales_last_year_month * 100
 			END,
 			sales_cumulative_rate = CASE
+				WHEN sales_cumulative_rate IS NOT NULL THEN sales_cumulative_rate
 				WHEN sales_last_year_cumulative = 0 THEN NULL
 				ELSE (sales_current_cumulative - sales_last_year_cumulative) / sales_last_year_cumulative * 100
 			END,
 			retail_month_rate = CASE
+				WHEN retail_month_rate IS NOT NULL THEN retail_month_rate
 				WHEN retail_last_year_month = 0 THEN NULL
 				ELSE (retail_current_month - retail_last_year_month) / retail_last_year_month * 100
 			END,
 			retail_cumulative_rate = CASE
+				WHEN retail_cumulative_rate IS NOT NULL THEN retail_cumulative_rate
 				WHEN retail_last_year_cumulative = 0 THEN NULL
 				ELSE (retail_current_cumulative - retail_last_year_cumulative) / retail_last_year_cumulative * 100
 			END,
 			retail_ratio = CASE
+				WHEN retail_ratio IS NOT NULL THEN retail_ratio
 				WHEN sales_current_month = 0 THEN NULL
 				ELSE retail_current_month / sales_current_month * 100
 			END
@@ -611,10 +625,12 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 	err = c.store.Exec(`
 		UPDATE accommodation_catering SET
 			revenue_month_rate = CASE
+				WHEN revenue_month_rate IS NOT NULL THEN revenue_month_rate
 				WHEN revenue_last_year_month = 0 THEN NULL
 				ELSE (revenue_current_month - revenue_last_year_month) / revenue_last_year_month * 100
 			END,
 			revenue_cumulative_rate = CASE
+				WHEN revenue_cumulative_rate IS NOT NULL THEN revenue_cumulative_rate
 				WHEN revenue_last_year_cumulative = 0 THEN NULL
 				ELSE (revenue_current_cumulative - revenue_last_year_cumulative) / revenue_last_year_cumulative * 100
 			END

@@ -3,11 +3,23 @@ package v3
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"northstar/internal/calculator"
 	"northstar/internal/exporter"
 )
+
+func buildExportContentDisposition(year, month int) string {
+	asciiFilename := fmt.Sprintf("monthly-report-%d-%02d.xlsx", year, month)
+	utf8Filename := fmt.Sprintf("%d年%02d月月报.xlsx", year, month)
+	// 同时提供 filename + filename*，兼容不同浏览器对中文文件名的处理
+	return fmt.Sprintf(
+		"attachment; filename=\"%s\"; filename*=UTF-8''%s",
+		asciiFilename,
+		url.PathEscape(utf8Filename),
+	)
+}
 
 // GetIndicators 获取16项指标
 // GET /api/indicators
@@ -60,8 +72,7 @@ func (h *Handler) Export(c *gin.Context) {
 	}
 
 	// 设置响应头
-	filename := fmt.Sprintf("月报-%d-%02d.xlsx", year, month)
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("Content-Disposition", buildExportContentDisposition(year, month))
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 	// 写入文件

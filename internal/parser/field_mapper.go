@@ -22,13 +22,18 @@ func NewFieldMapper(currentYear, currentMonth int) *FieldMapper {
 func (m *FieldMapper) MapWholesaleRetail(columnNames []string) map[int]FieldMapping {
 	mappings := make(map[int]FieldMapping)
 
+	normalized := make([]string, len(columnNames))
+	for i, col := range columnNames {
+		normalized[i] = NormalizeColumnName(col)
+	}
+
 	for idx, col := range columnNames {
-		col = NormalizeColumnName(col)
+		col = normalized[idx]
 		if col == "" {
 			continue
 		}
 
-		mapping := m.mapWRColumn(col, idx)
+		mapping := m.mapWRColumnWithContext(col, idx, normalized)
 		if mapping.DBField != "" {
 			mappings[idx] = mapping
 		}
@@ -41,13 +46,18 @@ func (m *FieldMapper) MapWholesaleRetail(columnNames []string) map[int]FieldMapp
 func (m *FieldMapper) MapAccommodationCatering(columnNames []string) map[int]FieldMapping {
 	mappings := make(map[int]FieldMapping)
 
+	normalized := make([]string, len(columnNames))
+	for i, col := range columnNames {
+		normalized[i] = NormalizeColumnName(col)
+	}
+
 	for idx, col := range columnNames {
-		col = NormalizeColumnName(col)
+		col = normalized[idx]
 		if col == "" {
 			continue
 		}
 
-		mapping := m.mapACColumn(col, idx)
+		mapping := m.mapACColumnWithContext(col, idx, normalized)
 		if mapping.DBField != "" {
 			mappings[idx] = mapping
 		}
@@ -56,15 +66,28 @@ func (m *FieldMapper) MapAccommodationCatering(columnNames []string) map[int]Fie
 	return mappings
 }
 
-// mapWRColumn 映射批零单个列
-func (m *FieldMapper) mapWRColumn(col string, idx int) FieldMapping {
+// mapWRColumnWithContext 映射批零单个列（支持根据上下文推断“增速”口径归属）
+func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []string) FieldMapping {
 	mapping := FieldMapping{
 		ColumnIndex: idx,
 		ColumnName:  col,
 	}
 
-	// 跳过增速列（避免覆盖金额字段；增速由系统计算）
+	// 增速字段（优先导入；为空时由系统计算/补齐）
 	if strings.Contains(col, "增速") {
+		isCum := strings.Contains(col, "累计") || strings.Contains(col, "1-") || strings.Contains(col, "1—")
+		if strings.Contains(col, "销售额") {
+			mapping.DBField = pickRateField("sales", isCum)
+			return mapping
+		}
+		if strings.Contains(col, "零售额") {
+			mapping.DBField = pickRateField("retail", isCum)
+			return mapping
+		}
+		metric, inferredCum, ok := inferWRRateMetric(columns, idx)
+		if ok {
+			mapping.DBField = pickRateField(metric, isCum || inferredCum)
+		}
 		return mapping
 	}
 
@@ -165,15 +188,23 @@ func (m *FieldMapper) mapWRColumn(col string, idx int) FieldMapping {
 	return mapping
 }
 
-// mapACColumn 映射住餐单个列
-func (m *FieldMapper) mapACColumn(col string, idx int) FieldMapping {
+// mapACColumnWithContext 映射住餐单个列（支持根据上下文推断“增速”口径归属）
+func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []string) FieldMapping {
 	mapping := FieldMapping{
 		ColumnIndex: idx,
 		ColumnName:  col,
 	}
 
-	// 跳过增速列（避免覆盖金额字段；增速由系统计算）
+	// 增速字段（优先导入；为空时由系统计算/补齐）
 	if strings.Contains(col, "增速") {
+		isCum := strings.Contains(col, "累计") || strings.Contains(col, "1-") || strings.Contains(col, "1—")
+		if strings.Contains(col, "营业额") {
+			mapping.DBField = pickRateField("revenue", isCum)
+			return mapping
+		}
+		if _, inferredCum, ok := inferACRevenueRate(columns, idx); ok {
+			mapping.DBField = pickRateField("revenue", isCum || inferredCum)
+		}
 		return mapping
 	}
 
@@ -271,6 +302,67 @@ func (m *FieldMapper) mapACColumn(col string, idx int) FieldMapping {
 	}
 
 	return mapping
+}
+
+func pickRateField(metric string, isCumulative bool) string {
+	switch metric {
+	case "sales":
+		if isCumulative {
+			return "sales_cumulative_rate"
+		}
+		return "sales_month_rate"
+	case "retail":
+		if isCumulative {
+			return "retail_cumulative_rate"
+		}
+		return "retail_month_rate"
+	case "revenue":
+		if isCumulative {
+			return "revenue_cumulative_rate"
+		}
+		return "revenue_month_rate"
+	default:
+		return ""
+	}
+}
+
+func inferWRRateMetric(columns []string, idx int) (metric string, isCumulative bool, ok bool) {
+	// 典型列：...;商品销售额;千元 + "1-12月增速"（无“销售额/零售额”字样），靠前一列判断
+	for back := 1; back <= 4; back++ {
+		j := idx - back
+		if j < 0 || j >= len(columns) {
+			continue
+		}
+		prev := columns[j]
+		if prev == "" {
+			continue
+		}
+		if strings.Contains(prev, "销售额") {
+			return "sales", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
+		}
+		if strings.Contains(prev, "零售额") {
+			return "retail", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
+		}
+	}
+	return "", false, false
+}
+
+func inferACRevenueRate(columns []string, idx int) (metric string, isCumulative bool, ok bool) {
+	// 住宿/餐饮主表的增速列通常是 “12月增速”“1-12月增速”，不带“营业额”字样。
+	for back := 1; back <= 4; back++ {
+		j := idx - back
+		if j < 0 || j >= len(columns) {
+			continue
+		}
+		prev := columns[j]
+		if prev == "" {
+			continue
+		}
+		if strings.Contains(prev, "营业额") {
+			return "revenue", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
+		}
+	}
+	return "", false, false
 }
 
 // mapSalesField 映射销售额字段

@@ -48,7 +48,12 @@ func (p *ACParser) ParseSheet(sheetName string) ([]*model.AccommodationCatering,
 	// 从列名中识别当前年月
 	year, month := FindCurrentYearMonth(headers)
 	if year == 0 || month == 0 {
-		return nil, fmt.Errorf("cannot determine data year/month from columns")
+		// 兜底：部分文件列头可能不带年份/月份，但 sheet 名包含 "YYYY年MM月"
+		if y, m, found := ExtractYearMonth(sheetName); found {
+			year, month = y, m
+		} else {
+			return nil, fmt.Errorf("cannot determine data year/month from columns or sheet name")
+		}
 	}
 
 	p.currentYear = year
@@ -145,12 +150,16 @@ func (p *ACParser) setACFieldValue(record *model.AccommodationCatering, field, v
 		record.RevenueCurrentMonth = parseFloat(value)
 	case "revenue_last_year_month":
 		record.RevenueLastYearMonth = parseFloat(value)
+	case "revenue_month_rate":
+		record.RevenueMonthRate = parseRatePercentPtr(value)
 	case "revenue_prev_cumulative":
 		record.RevenuePrevCumulative = parseFloat(value)
 	case "revenue_current_cumulative":
 		record.RevenueCurrentCumulative = parseFloat(value)
 	case "revenue_last_year_cumulative":
 		record.RevenueLastYearCumulative = parseFloat(value)
+	case "revenue_cumulative_rate":
+		record.RevenueCumulativeRate = parseRatePercentPtr(value)
 
 	// 客房收入
 	case "room_prev_month":

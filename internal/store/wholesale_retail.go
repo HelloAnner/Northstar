@@ -235,6 +235,8 @@ func (s *Store) scanWRRows(rows *sql.Rows) ([]*model.WholesaleRetail, error) {
 
 	for rows.Next() {
 		r := &model.WholesaleRetail{}
+		var firstReportIP sql.NullString
+		var fillIP sql.NullString
 		err := rows.Scan(
 			&r.ID, &r.CreditCode, &r.Name, &r.IndustryCode, &r.IndustryType,
 			&r.CompanyScale, &r.RowNo,
@@ -249,7 +251,7 @@ func (s *Store) scanWRRows(rows *sql.Rows) ([]*model.WholesaleRetail, error) {
 			&r.CatGrainOilFood, &r.CatBeverage, &r.CatTobaccoLiquor,
 			&r.CatClothing, &r.CatDailyUse, &r.CatAutomobile,
 			&r.IsSmallMicro, &r.IsEatWearUse,
-			&r.FirstReportIP, &r.FillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
+			&firstReportIP, &fillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
 			&r.OriginalSalesCurrentMonth, &r.OriginalRetailCurrentMonth,
 			&r.SourceSheet, &r.SourceFile,
 			&r.CreatedAt, &r.UpdatedAt,
@@ -257,6 +259,8 @@ func (s *Store) scanWRRows(rows *sql.Rows) ([]*model.WholesaleRetail, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+		r.FirstReportIP = firstReportIP.String
+		r.FillIP = fillIP.String
 		results = append(results, r)
 	}
 
@@ -270,6 +274,8 @@ func (s *Store) scanWRRows(rows *sql.Rows) ([]*model.WholesaleRetail, error) {
 // scanWRRow 扫描单行批零企业数据
 func (s *Store) scanWRRow(row *sql.Row) (*model.WholesaleRetail, error) {
 	r := &model.WholesaleRetail{}
+	var firstReportIP sql.NullString
+	var fillIP sql.NullString
 	err := row.Scan(
 		&r.ID, &r.CreditCode, &r.Name, &r.IndustryCode, &r.IndustryType,
 		&r.CompanyScale, &r.RowNo,
@@ -284,7 +290,7 @@ func (s *Store) scanWRRow(row *sql.Row) (*model.WholesaleRetail, error) {
 		&r.CatGrainOilFood, &r.CatBeverage, &r.CatTobaccoLiquor,
 		&r.CatClothing, &r.CatDailyUse, &r.CatAutomobile,
 		&r.IsSmallMicro, &r.IsEatWearUse,
-		&r.FirstReportIP, &r.FillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
+		&firstReportIP, &fillIP, &r.NetworkSales, &r.OpeningYear, &r.OpeningMonth,
 		&r.OriginalSalesCurrentMonth, &r.OriginalRetailCurrentMonth,
 		&r.SourceSheet, &r.SourceFile,
 		&r.CreatedAt, &r.UpdatedAt,
@@ -295,5 +301,7 @@ func (s *Store) scanWRRow(row *sql.Row) (*model.WholesaleRetail, error) {
 		}
 		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
+	r.FirstReportIP = firstReportIP.String
+	r.FillIP = fillIP.String
 	return r, nil
 }
