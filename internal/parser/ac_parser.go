@@ -142,11 +142,11 @@ func (p *ACParser) parseACRow(row []string, mappings map[int]FieldMapping, sheet
 func (p *ACParser) setACFieldValue(record *model.AccommodationCatering, field, value string) {
 	switch field {
 	case "credit_code":
-		record.CreditCode = value
+		record.CreditCode = normalizeCodeValue(value)
 	case "name":
-		record.Name = value
+		record.Name = normalizeTextValue(value)
 	case "industry_code":
-		record.IndustryCode = value
+		record.IndustryCode = normalizeIndustryCode(value)
 	case "company_scale":
 		record.CompanyScale = parseInt(value)
 

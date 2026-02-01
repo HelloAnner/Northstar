@@ -25,12 +25,20 @@ UI_AFTER="$RUN_DIR/ui_companies_after.json"
 IMPORT_EVENTS="$RUN_DIR/import_events.json"
 TAB_COUNTS="$RUN_DIR/tab_counts.json"
 EXPORT_XLSX="$RUN_DIR/export.xlsx"
+EXPORT_ALT_XLSX="$RUN_DIR/export_alt.xlsx"
+EXPORT_PARAM_META="$RUN_DIR/export_param_meta.json"
 CONSOLE_LOG="$RUN_DIR/browser_console.txt"
 ERRORS_LOG="$RUN_DIR/browser_errors.txt"
 TRACE_ZIP="$RUN_DIR/trace.zip"
 VIDEO_WEBM="$RUN_DIR/run.webm"
 REPORT_HTML="$RUN_DIR/report.html"
 ACTION_RESULTS_JSON="$RUN_DIR/actions_result.json"
+INDICATOR_ACTIONS_JSON="$RUN_DIR/indicator_actions.json"
+INDICATOR_ACTIONS_RESULT_JSON="$RUN_DIR/indicator_actions_result.json"
+INDICATORS_BEFORE="$RUN_DIR/indicators_before.json"
+INDICATORS_AFTER="$RUN_DIR/indicators_after.json"
+UI_DAG_BEFORE="$RUN_DIR/ui_companies_before_dag.json"
+UI_DAG_AFTER="$RUN_DIR/ui_companies_after_dag.json"
 STEPS_JSON="$RUN_DIR/steps.json"
 STEPS_JSONL="$RUN_DIR/steps.jsonl"
 SERVER_DIR="$RUN_DIR/server"
@@ -38,6 +46,8 @@ SERVER_BIN="$SERVER_DIR/northstar"
 SERVER_PID="$RUN_DIR/server.pid"
 SERVER_LOG="$RUN_DIR/server.log"
 KEEP_E2E_SERVER="${KEEP_E2E_SERVER:-0}"
+RUN_DAG_CASE="${RUN_DAG_CASE:-0}"
+RUN_EXPORT_PARAM="${RUN_EXPORT_PARAM:-0}"
 
 if [[ ! -f "$INPUT_XLSX" ]]; then
   echo "ERROR: INPUT_XLSX not found: $INPUT_XLSX" | tee -a "$LOG" >&2
@@ -404,6 +414,70 @@ else
 fi
 agent-browser screenshot "$SCREENSHOTS_DIR/11_after_export.png" | tee -a "$LOG" || true
 
+if [[ "$RUN_EXPORT_PARAM" == "1" ]]; then
+  echo ">>> Export parameterization check (alternate month export)..." | tee -a "$LOG"
+  if python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_export_param.py" "$BASE_URL" "$EXPORT_ALT_XLSX" "$EXPORT_PARAM_META" | tee -a "$LOG"; then
+    record_step "export_param" "pass" "" ""
+  else
+    record_step "export_param" "fail" "导出参数化检查失败（切换月份/二次导出失败）" "确认 /api/months 有至少 2 个可用月份"
+  fi
+else
+  record_step "export_param" "skip" "RUN_EXPORT_PARAM=0" "如需执行导出参数化检查：RUN_EXPORT_PARAM=1 make test-e2e"
+fi
+
+if [[ "$RUN_DAG_CASE" == "1" ]]; then
+  echo ">>> DAG linkage check (indicator adjust -> table changes)..." | tee -a "$LOG"
+  agent-browser press "Escape" | tee -a "$LOG" || true
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+  agent-browser reload | tee -a "$LOG" || true
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+
+  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_BEFORE"; then
+    record_step "indicator_before" "pass" "" ""
+  else
+    record_step "indicator_before" "fail" "指标面板抽取失败" "打开首页指标面板，确认 16 项指标可见"
+  fi
+
+  if agent-browser eval "(() => { const table = document.querySelector('table'); if (!table) return { error: 'table not found' }; const headers = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent || '').trim()); const bodyRows = Array.from(table.querySelectorAll('tbody tr')); const rows = []; for (const tr of bodyRows) { const tds = Array.from(tr.querySelectorAll('td')); if (tds.length < 2) continue; const name = (tds[0].querySelector('.truncate.font-medium')?.textContent || '').trim(); const credit = (tds[0].querySelector('.font-mono')?.textContent || '').trim(); if (!name && !credit) continue; const badge = (tds[0].querySelector('.h-5')?.textContent || '').trim(); const row = { __name: name, __creditCode: credit, __industry: badge }; for (let i = 1; i < tds.length && i < headers.length; i++) { const header = headers[i] || ('col_' + String(i)); const cell = tds[i]; const input = cell.querySelector('input'); let v = ''; if (input) v = String(input.value || ''); else v = String((cell.textContent || '').trim()); row[header] = v; } rows.push(row); } return { extractedAt: new Date().toISOString(), headers, rowCount: rows.length, rows }; })()" --json >"$UI_DAG_BEFORE"; then
+    record_step "dag_table_before" "pass" "" ""
+  else
+    record_step "dag_table_before" "fail" "DAG 前明细表抽取失败" "确认表格加载完成后重试"
+  fi
+
+  if python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_generate_indicator_actions.py" "$INDICATORS_BEFORE" "$INDICATOR_ACTIONS_JSON" | tee -a "$LOG"; then
+    record_step "generate_indicator_actions" "pass" "" ""
+  else
+    record_step "generate_indicator_actions" "fail" "生成指标调整动作失败" "检查 indicators_before.json 是否包含 16 项指标"
+  fi
+
+  if [[ -f "$INDICATOR_ACTIONS_JSON" ]]; then
+    if python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_exec_indicator_actions.py" "$INDICATOR_ACTIONS_JSON" "$LOG" "$SCREENSHOTS_DIR" | tee -a "$LOG"; then
+      record_step "execute_indicator_actions" "pass" "" ""
+    else
+      record_step "execute_indicator_actions" "fail" "执行指标调整动作失败" "确认指标面板输入框可编辑且“智能调整”可点击"
+    fi
+  else
+    record_step "execute_indicator_actions" "fail" "indicator_actions.json 不存在" "先检查指标抽取是否成功"
+  fi
+
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+  agent-browser screenshot "$SCREENSHOTS_DIR/13_after_indicator_adjust.png" | tee -a "$LOG" || true
+
+  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_AFTER"; then
+    record_step "indicator_after" "pass" "" ""
+  else
+    record_step "indicator_after" "fail" "指标面板抽取失败（调整后）" "确认智能调整完成后指标仍可见"
+  fi
+
+  if agent-browser eval "(() => { const table = document.querySelector('table'); if (!table) return { error: 'table not found' }; const headers = Array.from(table.querySelectorAll('thead th')).map(th => (th.textContent || '').trim()); const bodyRows = Array.from(table.querySelectorAll('tbody tr')); const rows = []; for (const tr of bodyRows) { const tds = Array.from(tr.querySelectorAll('td')); if (tds.length < 2) continue; const name = (tds[0].querySelector('.truncate.font-medium')?.textContent || '').trim(); const credit = (tds[0].querySelector('.font-mono')?.textContent || '').trim(); if (!name && !credit) continue; const badge = (tds[0].querySelector('.h-5')?.textContent || '').trim(); const row = { __name: name, __creditCode: credit, __industry: badge }; for (let i = 1; i < tds.length && i < headers.length; i++) { const header = headers[i] || ('col_' + String(i)); const cell = tds[i]; const input = cell.querySelector('input'); let v = ''; if (input) v = String(input.value || ''); else v = String((cell.textContent || '').trim()); row[header] = v; } rows.push(row); } return { extractedAt: new Date().toISOString(), headers, rowCount: rows.length, rows }; })()" --json >"$UI_DAG_AFTER"; then
+    record_step "dag_table_after" "pass" "" ""
+  else
+    record_step "dag_table_after" "fail" "DAG 后明细表抽取失败" "确认智能调整后表格可见"
+  fi
+else
+  record_step "indicator_dag" "skip" "RUN_DAG_CASE=0" "如需执行指标→DAG测试：RUN_DAG_CASE=1 make test-e2e"
+fi
+
 echo ">>> Capturing browser console/errors..." | tee -a "$LOG"
 agent-browser console >"$CONSOLE_LOG" || true
 agent-browser errors >"$ERRORS_LOG" || true
@@ -425,6 +499,13 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --tab-counts "$TAB_COUNTS" \
   --steps "$STEPS_JSON" \
   --actions "$ACTION_RESULTS_JSON" \
+  --indicator-actions "$INDICATOR_ACTIONS_RESULT_JSON" \
+  --indicators-before "$INDICATORS_BEFORE" \
+  --indicators-after "$INDICATORS_AFTER" \
+  --ui-dag-before "$UI_DAG_BEFORE" \
+  --ui-dag-after "$UI_DAG_AFTER" \
+  --export-alt-xlsx "$EXPORT_ALT_XLSX" \
+  --export-param-meta "$EXPORT_PARAM_META" \
   --console "$CONSOLE_LOG" \
   --errors "$ERRORS_LOG" \
   --trace "$TRACE_ZIP" \
@@ -450,6 +531,13 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --tab-counts "latest/tab_counts.json" \
   --steps "latest/steps.json" \
   --actions "latest/actions_result.json" \
+  --indicator-actions "latest/indicator_actions_result.json" \
+  --indicators-before "latest/indicators_before.json" \
+  --indicators-after "latest/indicators_after.json" \
+  --ui-dag-before "latest/ui_companies_before_dag.json" \
+  --ui-dag-after "latest/ui_companies_after_dag.json" \
+  --export-alt-xlsx "latest/export_alt.xlsx" \
+  --export-param-meta "latest/export_param_meta.json" \
   --console "latest/browser_console.txt" \
   --errors "latest/browser_errors.txt" \
   --trace "latest/trace.zip" \

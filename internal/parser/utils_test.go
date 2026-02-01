@@ -70,3 +70,13 @@ func TestInferFieldTimeType_JanuaryPrevMonth(t *testing.T) {
 		t.Fatalf("12月销售额 want=%v got=%v", PrevMonth, got)
 	}
 }
+
+func TestNormalizeColumnName_FullWidthSeparators(t *testing.T) {
+	t.Parallel()
+
+	got := NormalizeColumnName(" 2024年；12月；商品零售额；千元 ")
+	want := "2024年;12月;商品零售额;千元"
+	if got != want {
+		t.Fatalf("unexpected normalize: %q", got)
+	}
+}

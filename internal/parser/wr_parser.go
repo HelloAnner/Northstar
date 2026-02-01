@@ -139,11 +139,11 @@ func (p *WRParser) parseWRRow(row []string, mappings map[int]FieldMapping, sheet
 func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value string) {
 	switch field {
 	case "credit_code":
-		record.CreditCode = value
+		record.CreditCode = normalizeCodeValue(value)
 	case "name":
-		record.Name = value
+		record.Name = normalizeTextValue(value)
 	case "industry_code":
-		record.IndustryCode = value
+		record.IndustryCode = normalizeIndustryCode(value)
 	case "company_scale":
 		record.CompanyScale = parseInt(value)
 	case "retail_ratio":
@@ -236,16 +236,14 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 
 // parseInt 安全转换为整数
 func parseInt(s string) int {
-	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, ",", "") // 移除千分位
+	s = normalizeNumberText(s)
 	i, _ := strconv.Atoi(s)
 	return i
 }
 
 // parseFloat 安全转换为浮点数
 func parseFloat(s string) float64 {
-	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, ",", "") // 移除千分位
+	s = normalizeNumberText(s)
 	s = strings.ReplaceAll(s, "％", "%")
 	s = strings.ReplaceAll(s, "%", "")
 	f, _ := strconv.ParseFloat(s, 64)

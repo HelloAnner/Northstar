@@ -125,13 +125,17 @@
       <div class="side-head">
         <div>
           <div class="side-title">报告目录</div>
-          <div class="side-sub mono">2026-01-31 20:12:30</div>
+          <div class="side-sub mono">2026-02-01 13:36:17</div>
         </div>
         <div class="pill ok">PASS</div>
       </div>
       <nav class="side-nav" id="toc">
         <a href="#overview">总览</a>
         <a href="#steps">执行步骤</a>
+        <div class="group">差距覆盖</div>
+        <a href="#dag">指标与DAG</a>
+        <a href="#export-param">导出参数化</a>
+        <a href="#normalize">输入标准化</a>
         <a href="#completeness">明细完整性</a>
         <a href="#suggestions">改动建议</a>
         <div class="group">一致性</div>
@@ -166,12 +170,12 @@
         <div class="card">
           <h2>运行信息</h2>
           <div class="kv">
-            <div class="k">时间</div><div class="v">2026-01-31 20:12:30</div>
+            <div class="k">时间</div><div class="v">2026-02-01 13:36:17</div>
             <div class="k">BASE_URL</div><div class="v">http://localhost:20260</div>
             <div class="k">输入 Excel</div><div class="v"><a href="/Users/anner/code/Northstar/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx">/Users/anner/code/Northstar/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx</a></div>
             <div class="k">导出 Excel</div><div class="v"><a href="latest/export.xlsx">latest/export.xlsx</a></div>
-            <div class="k">抽取(导入后)</div><div class="v">2026-01-31T12:11:56.725Z</div>
-            <div class="k">抽取(修改后)</div><div class="v">2026-01-31T12:12:18.627Z</div>
+            <div class="k">抽取(导入后)</div><div class="v">2026-02-01T05:35:45.351Z</div>
+            <div class="k">抽取(修改后)</div><div class="v">2026-02-01T05:36:06.606Z</div>
           </div>
         </div>
         <div class="card">
@@ -181,6 +185,14 @@
             <li><a class="mono" href="latest/ui_companies_after.json">ui_companies_after.json</a></li>
             <li><a class="mono" href="latest/import_events.json">import_events.json</a></li>
             <li><a class="mono" href="latest/tab_counts.json">tab_counts.json</a></li>
+            <li><a class="mono" href="latest/indicators_before.json">indicators_before.json</a></li>
+            <li><a class="mono" href="latest/indicators_after.json">indicators_after.json</a></li>
+            <li><a class="mono" href="latest/indicator_actions_result.json">indicator_actions_result.json</a></li>
+            <li><a class="mono" href="latest/ui_companies_before_dag.json">ui_companies_before_dag.json</a></li>
+            <li><a class="mono" href="latest/ui_companies_after_dag.json">ui_companies_after_dag.json</a></li>
+            <li><a class="mono" href="latest/export_alt.xlsx">export_alt.xlsx</a></li>
+            <li><a class="mono" href="latest/export_param_meta.json">export_param_meta.json</a></li>
+            <li><a class="mono" href="ui_normalization_checks.json">ui_normalization_checks.json</a></li>
             <li><a class="mono" href="latest/browser_console.txt">browser_console.txt</a></li>
             <li><a class="mono" href="latest/browser_errors.txt">browser_errors.txt</a></li>
             <li><a class="mono" href="latest/trace.zip">trace.zip</a></li>
@@ -235,13 +247,61 @@
           <div class="k">导出 Excel 打开</div><div class="v">OK</div>
           <div class="k">导出 Excel(raw) 打开</div><div class="v">OK</div>
           <div class="k">导出 raw 错误</div><div class="v"></div>
-          <div class="k">定稿模板</div><div class="v">/Users/anner/code/Northstar/prd/12月月报（定）.xlsx</div>
+          <div class="k">导出 Excel(alt) 打开</div><div class="v">FAIL</div>
+          <div class="k">导出 alt 错误</div><div class="v"></div>
+          <div class="k">定稿模板</div><div class="v">/Users/anner/code/Northstar/prd/12月月报（定）(1).xlsx</div>
           <div class="k">定稿模板错误</div><div class="v"></div>
         </div>
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>输入 Excel 结构对标 PRD</h2>
         <p class='ok'>✅ 输入 sheet 集合符合 PRD（允许 extra）</p><p class='warn'>完整列表：<a class='mono' href='input_structure.json'>input_structure.json</a></p>
+      </div>
+    </div>
+
+    <div class="section" id="dag">
+      <div class="h3line">
+        <h3>指标调整与DAG联动覆盖</h3>
+        <a class="permalink" href="#dag">#</a>
+      </div>
+      <div class="card">
+        <h2>指标调整动作</h2>
+        <p class="warn">目的：覆盖“修改16项指标 → 智能调整 → 写回企业数据”的链路。</p>
+        <p class='warn'>未执行指标调整动作或未生成 indicator_actions_result.json</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>指标变化校验</h2>
+        <p class="warn">期望：16项指标全部发生变化。</p>
+        <p class='warn'>未执行指标变化校验（缺少 indicators_before/after）。</p>
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>DAG 下游明细表变化</h2>
+        <p class="warn">期望：所有明细表节点均发生变化（随机调整）。</p>
+        <p class='warn'>未执行 DAG 明细表差异校验（缺少 ui_companies_before/after_dag）。</p>
+      </div>
+    </div>
+
+    <div class="section" id="export-param">
+      <div class="h3line">
+        <h3>导出数字参数化</h3>
+        <a class="permalink" href="#export-param">#</a>
+      </div>
+      <div class="card">
+        <h2>月份参数化检验（双导出对比）</h2>
+        <p class="warn">复现：切换到不同月份导出，再对比包含数字的文本/表头是否变化。</p>
+        <p class='warn'>未执行导出参数化检查（缺少 export_alt.xlsx 或 export_param_meta.json）。</p>
+      </div>
+    </div>
+
+    <div class="section" id="normalize">
+      <div class="h3line">
+        <h3>输入标准化/兼容性</h3>
+        <a class="permalink" href="#normalize">#</a>
+      </div>
+      <div class="card">
+        <h2>来源表/表头标准化</h2>
+        <p class="warn">目的：兼容非标准 sheet/字段名称并标准化入库。</p>
+        <p class='ok'>未知表头: 0；未知来源表: 0；未知行业: 0</p><p class='ok'>✅ UI 字段与来源表已标准化</p><div class='kv'><div class='k'>未知表头</div><div class='v'>[]</div><div class='k'>未知来源表</div><div class='v'>[]</div><div class='k'>未知行业</div><div class='v'>[]</div></div>
       </div>
     </div>
 
@@ -324,7 +384,7 @@
         </div>
 	      <div class="card">
 	        <h2>Sheet/表头结构</h2>
-	        <p class='warn'>定稿模板：/Users/anner/code/Northstar/prd/12月月报（定）.xlsx</p><p class='warn'>完整列表：<a class='mono' href='export_template_checks.json'>export_template_checks.json</a></p><div class='table-wrap'><table><thead><tr><th>Sheet</th><th>模板表头列数</th><th>导出表头列数</th><th>结果</th><th>原因</th><th>复现</th></tr></thead><tbody><tr><td class='mono'>批零总表</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「批零总表」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>住餐总表</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「住餐总表」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>批发</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「批发」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>零售</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「零售」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>住宿</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「住宿」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「餐饮」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>吃穿用</td><td class='mono'>26</td><td class='mono'>26</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「吃穿用」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>小微</td><td class='mono'>6</td><td class='mono'>6</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「小微」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>吃穿用（剔除）</td><td class='mono'>5</td><td class='mono'>5</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）.xlsx 与导出 Excel 的 Sheet「吃穿用（剔除）」，对比表头（含空白列）是否逐列一致</td></tr></tbody></table></div>
+	        <p class='warn'>定稿模板：/Users/anner/code/Northstar/prd/12月月报（定）(1).xlsx</p><p class='warn'>完整列表：<a class='mono' href='export_template_checks.json'>export_template_checks.json</a></p><div class='table-wrap'><table><thead><tr><th>Sheet</th><th>模板表头列数</th><th>导出表头列数</th><th>结果</th><th>原因</th><th>复现</th></tr></thead><tbody><tr><td class='mono'>批零总表</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「批零总表」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>住餐总表</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「住餐总表」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>批发</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「批发」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>零售</td><td class='mono'>17</td><td class='mono'>17</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「零售」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>住宿</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「住宿」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>餐饮</td><td class='mono'>21</td><td class='mono'>21</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「餐饮」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>吃穿用</td><td class='mono'>26</td><td class='mono'>26</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「吃穿用」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>小微</td><td class='mono'>6</td><td class='mono'>6</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「小微」，对比表头（含空白列）是否逐列一致</td></tr><tr><td class='mono'>吃穿用（剔除）</td><td class='mono'>5</td><td class='mono'>5</td><td class='ok'>OK</td><td></td><td>打开 prd/12月月报（定）(1).xlsx 与导出 Excel 的 Sheet「吃穿用（剔除）」，对比表头（含空白列）是否逐列一致</td></tr></tbody></table></div>
 	      </div>
 	      <div class="card" style="margin-top: 12px;">
 	        <h2>模板公式（社零额/汇总表）</h2>
@@ -349,10 +409,10 @@ Sheet &quot;2024年12月批零&quot; 导入成功: 153 行
 Sheet &quot;2025年11月批零&quot; 识别为: wr_snapshot (置信度: 1.00)
 Sheet &quot;2025年11月批零&quot; 导入成功: 178 行
 正在解析 Sheet: 2024年3月
-Sheet &quot;2024年3月&quot; 识别为: wr_snapshot (置信度: 0.95)
+Sheet &quot;2024年3月&quot; 识别为: wr_snapshot (置信度: 1.00)
 Sheet &quot;2024年3月&quot; 导入成功: 153 行
 正在解析 Sheet: 2025年2月
-Sheet &quot;2025年2月&quot; 识别为: wr_snapshot (置信度: 0.95)
+Sheet &quot;2025年2月&quot; 识别为: wr_snapshot (置信度: 1.00)
 Sheet &quot;2025年2月&quot; 导入成功: 176 行
 正在解析 Sheet: 批发
 Sheet &quot;批发&quot; 识别为: wholesale (置信度: 1.00)
@@ -368,10 +428,10 @@ Sheet &quot;2024年12月住餐&quot; 导入成功: 45 行
 Sheet &quot;2025年11月住餐&quot; 识别为: ac_snapshot (置信度: 1.00)
 Sheet &quot;2025年11月住餐&quot; 导入成功: 47 行
 正在解析 Sheet: 2024年3月住
-Sheet &quot;2024年3月住&quot; 识别为: ac_snapshot (置信度: 0.95)
+Sheet &quot;2024年3月住&quot; 识别为: ac_snapshot (置信度: 1.00)
 Sheet &quot;2024年3月住&quot; 导入成功: 45 行
 正在解析 Sheet: 2025年2月住
-Sheet &quot;2025年2月住&quot; 识别为: ac_snapshot (置信度: 0.95)
+Sheet &quot;2025年2月住&quot; 识别为: ac_snapshot (置信度: 0.88)
 Sheet &quot;2025年2月住&quot; 导入成功: 47 行
 正在解析 Sheet: 餐饮
 Sheet &quot;餐饮&quot; 识别为: catering (置信度: 1.00)
@@ -380,15 +440,15 @@ Sheet &quot;餐饮&quot; 导入成功: 38 行
 Sheet &quot;住宿&quot; 识别为: accommodation (置信度: 1.00)
 Sheet &quot;住宿&quot; 导入成功: 9 行
 正在解析 Sheet: 限上零售额
-Sheet &quot;限上零售额&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;限上零售额&quot; 识别为: summary (置信度: 0.40)
 Sheet &quot;限上零售额&quot; 已跳过
 跳过汇总表: 限上零售额
 正在解析 Sheet: 小微
-Sheet &quot;小微&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;小微&quot; 识别为: summary (置信度: 0.40)
 Sheet &quot;小微&quot; 已跳过
 跳过汇总表: 小微
 正在解析 Sheet: 吃穿用
-Sheet &quot;吃穿用&quot; 识别为: summary (置信度: 0.80)
+Sheet &quot;吃穿用&quot; 识别为: summary (置信度: 0.40)
 Sheet &quot;吃穿用&quot; 已跳过
 跳过汇总表: 吃穿用
 正在计算衍生字段...

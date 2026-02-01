@@ -56,3 +56,19 @@ func TestSheetRecognizer_DecemberMonthlyReport_20260129(t *testing.T) {
 	}
 }
 
+func TestSheetRecognizer_SummaryByHeaders(t *testing.T) {
+	t.Parallel()
+
+	r := NewSheetRecognizer()
+	headers := []string{
+		"限上零售额",
+		"限下",
+		"小微",
+		"吃穿用",
+		"增速",
+	}
+	res := r.Recognize("SheetX", headers)
+	if res.SheetType != SheetTypeSummary {
+		t.Fatalf("unexpected type: %s conf=%.2f", res.SheetType, res.Confidence)
+	}
+}

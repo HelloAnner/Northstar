@@ -92,7 +92,7 @@ func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []stri
 	}
 
 	// 基础信息字段
-	if MatchPattern(col, `统一社会信用代码`) {
+	if MatchPattern(col, `统一社会信用代码|统一社会信用码`) {
 		mapping.DBField = "credit_code"
 		return mapping
 	}
@@ -130,7 +130,7 @@ func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []stri
 	}
 
 	// 商品分类
-	if MatchPattern(col, `粮油食品类`) {
+	if MatchPattern(col, `粮油.*食品类`) {
 		mapping.DBField = "cat_grain_oil_food"
 		return mapping
 	}
@@ -142,7 +142,7 @@ func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []stri
 		mapping.DBField = "cat_tobacco_liquor"
 		return mapping
 	}
-	if MatchPattern(col, `服装鞋帽针纺织品类|服装`) {
+	if MatchPattern(col, `服装.*针纺织品类|服装`) {
 		mapping.DBField = "cat_clothing"
 		return mapping
 	}
@@ -209,7 +209,7 @@ func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []stri
 	}
 
 	// 基础信息字段
-	if MatchPattern(col, `统一社会信用代码`) {
+	if MatchPattern(col, `统一社会信用代码|统一社会信用码`) {
 		mapping.DBField = "credit_code"
 		return mapping
 	}

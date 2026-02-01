@@ -7,9 +7,74 @@ import (
 	"strings"
 )
 
+func normalizeFullWidth(text string) string {
+	text = strings.NewReplacer(
+		"　", " ",
+		"（", "(",
+		"）", ")",
+		"；", ";",
+		"，", ",",
+		"：", ":",
+		"／", "/",
+		"｜", "|",
+		"－", "-",
+		"—", "-",
+		"–", "-",
+		"％", "%",
+		"＋", "+",
+		"【", "[",
+		"】", "]",
+	).Replace(text)
+	return strings.Map(func(r rune) rune {
+		if r >= '０' && r <= '９' {
+			return r - '０' + '0'
+		}
+		return r
+	}, text)
+}
+
+func normalizeColumnSeparators(text string) string {
+	return strings.NewReplacer(
+		"|", ";",
+		"/", ";",
+		"、", ";",
+		"，", ";",
+	).Replace(text)
+}
+
+func normalizeNumberText(text string) string {
+	text = normalizeFullWidth(text)
+	text = strings.TrimSpace(text)
+	text = strings.ReplaceAll(text, ",", "")
+	return text
+}
+
+func normalizeTextValue(text string) string {
+	return strings.TrimSpace(normalizeFullWidth(text))
+}
+
+func normalizeCodeValue(text string) string {
+	text = normalizeTextValue(text)
+	text = strings.ReplaceAll(text, " ", "")
+	text = strings.ReplaceAll(text, "\t", "")
+	return text
+}
+
+func normalizeIndustryCode(text string) string {
+	text = normalizeCodeValue(text)
+	var b strings.Builder
+	for _, r := range text {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // ExtractYearMonth 从字符串中提取年月信息
 // 支持格式: "2025年12月销售额" / "2025年12月" / "销售额;2025年12月"
 func ExtractYearMonth(text string) (year, month int, found bool) {
+	text = normalizeFullWidth(text)
 	// 允许 "2024年;12月" / "2024年12月;xxx" 等分隔符形式
 	re := regexp.MustCompile(`(\d{4})年[^0-9]{0,3}0?(\d{1,2})月`)
 	matches := re.FindStringSubmatch(text)
@@ -24,6 +89,7 @@ func ExtractYearMonth(text string) (year, month int, found bool) {
 // ExtractMonthOnly 提取不带年份的月份
 // 支持格式: "11月客房收入" / "12月销售额增速"
 func ExtractMonthOnly(text string) (month int, found bool) {
+	text = normalizeFullWidth(text)
 	re := regexp.MustCompile(`(^|[^0-9])0?(\d{1,2})月`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) >= 3 {
@@ -36,6 +102,7 @@ func ExtractMonthOnly(text string) (month int, found bool) {
 // ExtractYearMonthRange 提取年月范围
 // 支持格式: "2025年1-12月" / "2025年1—12月"
 func ExtractYearMonthRange(text string) (year, startMonth, endMonth int, found bool) {
+	text = normalizeFullWidth(text)
 	// 允许 "2024年;1-12月" / "2024年1-12月;xxx" 等分隔符形式
 	re := regexp.MustCompile(`(\d{4})年[^0-9]{0,3}0?(\d{1,2})[-—]0?(\d{1,2})月`)
 	matches := re.FindStringSubmatch(text)
@@ -161,21 +228,28 @@ func FindCurrentYearMonth(columnNames []string) (year, month int) {
 
 // NormalizeColumnName 规范化列名，去除空格和特殊字符
 func NormalizeColumnName(name string) string {
-	// 去除首尾空格
 	name = strings.TrimSpace(name)
-	// 去除换行符和制表符
+	name = normalizeFullWidth(name)
 	name = strings.ReplaceAll(name, "\n", "")
 	name = strings.ReplaceAll(name, "\r", "")
 	name = strings.ReplaceAll(name, "\t", "")
-	// 压缩多个空格为一个
+	name = normalizeColumnSeparators(name)
+	name = strings.ReplaceAll(name, "—", "-")
+	name = strings.ReplaceAll(name, "–", "-")
+	name = strings.ReplaceAll(name, "－", "-")
+	name = strings.ReplaceAll(name, "[", "")
+	name = strings.ReplaceAll(name, "]", "")
+	name = strings.ReplaceAll(name, "【", "")
+	name = strings.ReplaceAll(name, "】", "")
 	re := regexp.MustCompile(`\s+`)
 	name = re.ReplaceAllString(name, "")
+	name = regexp.MustCompile(`;+`).ReplaceAllString(name, ";")
+	name = strings.Trim(name, ";")
 	return name
 }
 
 func parseRatePercentPtr(s string) *float64 {
-	raw := strings.TrimSpace(s)
-	raw = strings.ReplaceAll(raw, ",", "")
+	raw := normalizeNumberText(s)
 	raw = strings.ReplaceAll(raw, "％", "%")
 
 	hasPercent := strings.Contains(raw, "%")

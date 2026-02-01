@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,17 @@ func (e *Exporter) Export(opts ExportOptions) (*excelize.File, error) {
 
 	reportProgress(opts.Progress, 12, "填充导出数据")
 	if err := e.fillTemplateWorkbook(f, opts); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+
+	reportProgress(opts.Progress, 96, "参数化数字并回填")
+	params, err := parameterizeWorkbookNumbers(f)
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	if err := materializeWorkbookNumbers(f, params); err != nil {
 		_ = f.Close()
 		return nil, err
 	}
@@ -919,6 +931,140 @@ func setCellValue(f *excelize.File, sheet, cell string, value interface{}) error
 	}
 	_ = f.SetCellFormula(sheet, cell, "")
 	return nil
+}
+
+type numericParamCell struct {
+	sheet        string
+	cell         string
+	template     string
+	numericOnly  bool
+	numericValue float64
+}
+
+type numericParamMap struct {
+	next   int
+	values map[string]string
+	cells  []numericParamCell
+}
+
+func newNumericParamMap() *numericParamMap {
+	return &numericParamMap{
+		next:   1,
+		values: map[string]string{},
+	}
+}
+
+func parameterizeWorkbookNumbers(f *excelize.File) (*numericParamMap, error) {
+	params := newNumericParamMap()
+	for _, sheet := range f.GetSheetList() {
+		rows, err := f.GetRows(sheet)
+		if err != nil {
+			return nil, err
+		}
+		for rIdx, row := range rows {
+			for cIdx, raw := range row {
+				val := strings.TrimSpace(raw)
+				if val == "" {
+					continue
+				}
+				cell, err := excelize.CoordinatesToCellName(cIdx+1, rIdx+1)
+				if err != nil {
+					return nil, err
+				}
+				formula, err := f.GetCellFormula(sheet, cell)
+				if err != nil {
+					return nil, err
+				}
+				if strings.TrimSpace(formula) != "" {
+					continue
+				}
+				template, info, ok := params.parameterizeCellValue(val)
+				if !ok {
+					continue
+				}
+				if err := f.SetCellValue(sheet, cell, template); err != nil {
+					return nil, err
+				}
+				params.cells = append(params.cells, numericParamCell{
+					sheet:        sheet,
+					cell:         cell,
+					template:     template,
+					numericOnly:  info.numericOnly,
+					numericValue: info.numericValue,
+				})
+			}
+		}
+	}
+	return params, nil
+}
+
+func materializeWorkbookNumbers(f *excelize.File, params *numericParamMap) error {
+	if params == nil {
+		return nil
+	}
+	replacer := params.buildReplacer()
+	for _, cell := range params.cells {
+		if cell.numericOnly {
+			if err := f.SetCellValue(cell.sheet, cell.cell, cell.numericValue); err != nil {
+				return err
+			}
+			continue
+		}
+		final := replacer.Replace(cell.template)
+		if err := f.SetCellValue(cell.sheet, cell.cell, final); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type paramCellInfo struct {
+	numericOnly  bool
+	numericValue float64
+}
+
+var numberParamPattern = regexp.MustCompile(`-?\d+(?:\.\d+)?`)
+
+func (p *numericParamMap) parameterizeCellValue(val string) (string, paramCellInfo, bool) {
+	if !numberParamPattern.MatchString(val) {
+		return "", paramCellInfo{}, false
+	}
+	trimmed := strings.TrimSpace(val)
+	numericOnly := numberParamPattern.ReplaceAllString(trimmed, "") == ""
+	template := numberParamPattern.ReplaceAllStringFunc(val, func(m string) string {
+		placeholder := p.nextPlaceholder()
+		p.values[placeholder] = m
+		return placeholder
+	})
+	info := paramCellInfo{numericOnly: numericOnly}
+	if numericOnly {
+		info.numericValue = parseNumericValue(trimmed)
+	}
+	return template, info, true
+}
+
+func (p *numericParamMap) nextPlaceholder() string {
+	placeholder := fmt.Sprintf("{{P%04d}}", p.next)
+	p.next++
+	return placeholder
+}
+
+func (p *numericParamMap) buildReplacer() *strings.Replacer {
+	pairs := make([]string, 0, len(p.values)*2)
+	for k, v := range p.values {
+		pairs = append(pairs, k, v)
+	}
+	return strings.NewReplacer(pairs...)
+}
+
+func parseNumericValue(raw string) float64 {
+	raw = strings.ReplaceAll(raw, ",", "")
+	raw = strings.TrimSpace(raw)
+	val, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0
+	}
+	return val
 }
 
 func roundHalfUp(v float64, digits int) float64 {

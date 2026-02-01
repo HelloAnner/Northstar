@@ -126,6 +126,14 @@ interface ColumnDef {
   editable?: boolean
 }
 
+type IndustryTypeFilter = 'all' | 'wholesale' | 'retail' | 'accommodation' | 'catering'
+
+const industryTypeFilters: IndustryTypeFilter[] = ['all', 'wholesale', 'retail', 'accommodation', 'catering']
+
+const isIndustryTypeFilter = (value: string): value is IndustryTypeFilter => {
+  return industryTypeFilters.includes(value as IndustryTypeFilter)
+}
+
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'companyScale', label: '规模', widthClass: 'w-[72px]', align: 'center' },
   { key: 'flags', label: '标记', widthClass: 'w-[120px]' },
@@ -168,9 +176,12 @@ export default function CompaniesTable(props: {
   const [items, setItems] = useState<CompanyRow[]>([])
   const [total, setTotal] = useState(0)
 
-  const [industryType, setIndustryType] = useState<'all' | 'wholesale' | 'retail' | 'accommodation' | 'catering'>(
-    'all'
-  )
+  const [industryType, setIndustryType] = useState<IndustryTypeFilter>('all')
+  const handleIndustryChange = (value: string) => {
+    if (isIndustryTypeFilter(value)) {
+      setIndustryType(value)
+    }
+  }
   const [keyword, setKeyword] = useState('')
 
   const searchTimer = useRef<number | null>(null)
@@ -256,7 +267,7 @@ export default function CompaniesTable(props: {
         </div>
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <Tabs value={industryType} onValueChange={(v) => setIndustryType(v as any)}>
+          <Tabs value={industryType} onValueChange={handleIndustryChange}>
             <TabsList className="w-full lg:w-auto">
               <TabsTrigger value="all">全部</TabsTrigger>
               <TabsTrigger value="wholesale">批发</TabsTrigger>

@@ -1,7 +1,13 @@
 package parser
 
 import (
+	"regexp"
 	"strings"
+)
+
+var (
+	yearMonthTokenPattern = regexp.MustCompile(`\d{4}年[^0-9]{0,3}0?\d{1,2}月`)
+	yearRangeTokenPattern = regexp.MustCompile(`\d{4}年[^0-9]{0,3}0?\d{1,2}[-—]0?\d{1,2}月`)
 )
 
 // SheetRecognizer Sheet 类型识别器
@@ -12,19 +18,69 @@ func NewSheetRecognizer() *SheetRecognizer {
 	return &SheetRecognizer{}
 }
 
+var (
+	wrMainRequired = []string{
+		"统一社会信用代?码",
+		"单位详细名称|单位名称|企业名称",
+		"行业代码",
+		"YEAR_MONTH.*销售额",
+		"YEAR_RANGE.*销售额",
+		"YEAR_MONTH.*零售额",
+		"YEAR_RANGE.*零售额",
+		"单位规模",
+	}
+	acMainRequired = []string{
+		"统一社会信用代?码",
+		"单位详细名称|单位名称|企业名称",
+		"行业代码",
+		"YEAR_MONTH.*营业额",
+		"YEAR_RANGE.*营业额",
+		"YEAR_MONTH.*客房收入",
+		"YEAR_MONTH.*餐费收入",
+		"YEAR_MONTH.*销售额",
+	}
+	wrSnapshotRequired = []string{
+		"统一社会信用代?码",
+		"单位详细名称|单位名称|企业名称",
+		"行业代码",
+		"商品销售额.*本年-本月",
+		"商品销售额.*本年-1-本月",
+		"零售额.*本年-本月",
+		"零售额.*本年-1-本月",
+		"单位规模",
+	}
+	acSnapshotRequired = []string{
+		"统一社会信用代?码",
+		"单位详细名称|单位名称|企业名称",
+		"行业代码",
+		"营业额.*本年-本月",
+		"营业额.*本年-1-本月",
+		"客房收入.*本年-本月",
+		"餐费收入.*本年-本月",
+		"商品销售额.*本年-本月",
+	}
+	summaryRequired = []string{
+		"限上零售额",
+		"限下",
+		"小微",
+		"吃穿用",
+		"增速",
+	}
+)
+
 // Recognize 识别 Sheet 类型
 func (r *SheetRecognizer) Recognize(sheetName string, columnNames []string) SheetRecognitionResult {
 	// 规范化列名
 	normalized := make([]string, len(columnNames))
 	for i, col := range columnNames {
-		normalized[i] = NormalizeColumnName(col)
+		normalized[i] = normalizeHeaderForRecognition(col)
 	}
 
 	// 尝试从 Sheet 名提取年月
 	year, month, _ := ExtractYearMonth(sheetName)
 
 	// 快照表优先：一旦命中 “本年-本月/上年-本月” 口径，不允许被主表误判
-	if snap := r.recognizeSnapshot(sheetName, normalized); snap.Confidence >= 0.9 {
+	if snap := r.recognizeSnapshot(sheetName, normalized); snap.Confidence >= 0.7 {
 		snap.DataYear = year
 		snap.DataMonth = month
 		return snap
@@ -67,154 +123,58 @@ func (r *SheetRecognizer) Recognize(sheetName string, columnNames []string) Shee
 
 // recognizeWholesaleRetail 识别批发零售主表
 func (r *SheetRecognizer) recognizeWholesaleRetail(sheetName string, columns []string) SheetRecognitionResult {
-	// 关键字段列表
-	keyFields := []string{
-		"统一社会信用代码",
-		"单位详细名称|单位名称|企业名称",
-		"行业代码",
-		"销售额",
-		"零售额",
-		"单位规模",
-		"粮油食品类",
-	}
-
-	matchCount := 0
-	for _, field := range keyFields {
-		for _, col := range columns {
-			if MatchPattern(col, field) {
-				matchCount++
-				break
-			}
-		}
-	}
-
-	confidence := float64(matchCount) / float64(len(keyFields))
-
-	// Sheet 名称辅助判定
+	confidence := scoreByRequiredHeaders(columns, wrMainRequired)
 	nameBoost := 0.0
+	sheetType := SheetTypeWholesale
 	if strings.Contains(sheetName, "批发") {
 		nameBoost = 0.2
-		if confidence >= 0.5 {
-			return SheetRecognitionResult{
-				SheetName:  sheetName,
-				SheetType:  SheetTypeWholesale,
-				Confidence: clampConfidence(confidence + nameBoost),
-			}
-		}
+		sheetType = SheetTypeWholesale
 	}
 	if strings.Contains(sheetName, "零售") {
 		nameBoost = 0.2
-		if confidence >= 0.5 {
-			return SheetRecognitionResult{
-				SheetName:  sheetName,
-				SheetType:  SheetTypeRetail,
-				Confidence: clampConfidence(confidence + nameBoost),
-			}
-		}
+		sheetType = SheetTypeRetail
 	}
 	if strings.Contains(sheetName, "批零") {
 		nameBoost = 0.15
 	}
-
-	// 通过行业代码列内容判断
-	// 这里先返回通用的批零类型，具体类型在解析时根据行业代码区分
-	if confidence >= 0.5 {
-		sheetType := SheetTypeWholesale // 默认批发
-		if strings.Contains(sheetName, "零售") {
-			sheetType = SheetTypeRetail
-		}
-		return SheetRecognitionResult{
-			SheetName:  sheetName,
-			SheetType:  sheetType,
-			Confidence: clampConfidence(confidence + nameBoost),
-		}
-	}
-
 	return SheetRecognitionResult{
 		SheetName:  sheetName,
-		SheetType:  SheetTypeUnknown,
-		Confidence: confidence,
+		SheetType:  sheetType,
+		Confidence: clampConfidence(confidence + nameBoost),
 	}
 }
 
 // recognizeAccommodationCatering 识别住宿餐饮主表
 func (r *SheetRecognizer) recognizeAccommodationCatering(sheetName string, columns []string) SheetRecognitionResult {
-	keyFields := []string{
-		"统一社会信用代码",
-		"单位详细名称|单位名称|企业名称",
-		"行业代码",
-		"营业额",
-		"客房收入",
-		"餐费收入",
-	}
-
-	matchCount := 0
-	for _, field := range keyFields {
-		for _, col := range columns {
-			if MatchPattern(col, field) {
-				matchCount++
-				break
-			}
-		}
-	}
-
-	confidence := float64(matchCount) / float64(len(keyFields))
-
-	// Sheet 名称辅助判定
+	confidence := scoreByRequiredHeaders(columns, acMainRequired)
 	nameBoost := 0.0
+	sheetType := SheetTypeAccommodation
 	if strings.Contains(sheetName, "住宿") {
 		nameBoost = 0.2
-		if confidence >= 0.5 {
-			return SheetRecognitionResult{
-				SheetName:  sheetName,
-				SheetType:  SheetTypeAccommodation,
-				Confidence: clampConfidence(confidence + nameBoost),
-			}
-		}
+		sheetType = SheetTypeAccommodation
 	}
 	if strings.Contains(sheetName, "餐饮") {
 		nameBoost = 0.2
-		if confidence >= 0.5 {
-			return SheetRecognitionResult{
-				SheetName:  sheetName,
-				SheetType:  SheetTypeCatering,
-				Confidence: clampConfidence(confidence + nameBoost),
-			}
-		}
+		sheetType = SheetTypeCatering
 	}
 	if strings.Contains(sheetName, "住餐") {
 		nameBoost = 0.15
 	}
-
-	if confidence >= 0.5 {
-		sheetType := SheetTypeAccommodation // 默认住宿
-		if strings.Contains(sheetName, "餐饮") {
-			sheetType = SheetTypeCatering
-		}
-		return SheetRecognitionResult{
-			SheetName:  sheetName,
-			SheetType:  sheetType,
-			Confidence: clampConfidence(confidence + nameBoost),
-		}
-	}
-
 	return SheetRecognitionResult{
 		SheetName:  sheetName,
-		SheetType:  SheetTypeUnknown,
-		Confidence: confidence,
+		SheetType:  sheetType,
+		Confidence: clampConfidence(confidence + nameBoost),
 	}
 }
 
 // recognizeSnapshot 识别快照表
 func (r *SheetRecognizer) recognizeSnapshot(sheetName string, columns []string) SheetRecognitionResult {
-	// 快照表特征：列名包含 "本年-本月" / "上年-本月" 等格式
 	snapshotKeywords := []string{
 		"本年-本月",
-		"本年-1—本月",
+		"本年-1-本月",
 		"上年-本月",
-		"上年-1—本月",
+		"上年-1-本月",
 	}
-
 	hasSnapshotFormat := false
 	for _, col := range columns {
 		if ContainsAny(col, snapshotKeywords) {
@@ -222,7 +182,6 @@ func (r *SheetRecognizer) recognizeSnapshot(sheetName string, columns []string) 
 			break
 		}
 	}
-
 	if !hasSnapshotFormat {
 		return SheetRecognitionResult{
 			SheetName:  sheetName,
@@ -231,54 +190,40 @@ func (r *SheetRecognizer) recognizeSnapshot(sheetName string, columns []string) 
 		}
 	}
 
-	// 判断是批零还是住餐快照
-	hasSales := false
-	hasRevenue := false
+	wrScore := scoreByRequiredHeaders(columns, wrSnapshotRequired)
+	acScore := scoreByRequiredHeaders(columns, acSnapshotRequired)
 
-	for _, col := range columns {
-		if strings.Contains(col, "销售额") || strings.Contains(col, "零售额") {
-			hasSales = true
-		}
-		if strings.Contains(col, "营业额") || strings.Contains(col, "客房") || strings.Contains(col, "餐费") {
-			hasRevenue = true
-		}
-	}
-
-	// 只要出现 “本年-本月/上年-本月” 口径，基本可判定为快照表
-	confidence := 0.95
-	if strings.Contains(sheetName, "批零") || strings.Contains(sheetName, "批发") || strings.Contains(sheetName, "零售") {
-		confidence += 0.2
-	}
-	if strings.Contains(sheetName, "住餐") || strings.Contains(sheetName, "住宿") || strings.Contains(sheetName, "餐饮") {
-		confidence += 0.2
-	}
-	confidence = clampConfidence(confidence)
-
-	// 判断类型
 	sheetType := SheetTypeWRSnapshot
-	// 住餐快照也会包含“商品销售额”，所以只要命中营业额/客房/餐费，就判为 AC 快照
-	if hasRevenue {
+	confidence := wrScore
+	nameBoost := 0.0
+	if acScore > wrScore {
 		sheetType = SheetTypeACSnapshot
-	} else if hasSales {
-		sheetType = SheetTypeWRSnapshot
+		confidence = acScore
+	}
+	if sheetType == SheetTypeWRSnapshot {
+		if strings.Contains(sheetName, "批零") || strings.Contains(sheetName, "批发") || strings.Contains(sheetName, "零售") {
+			nameBoost = 0.2
+		}
+	} else {
+		if strings.Contains(sheetName, "住餐") || strings.Contains(sheetName, "住宿") || strings.Contains(sheetName, "餐饮") {
+			nameBoost = 0.2
+		}
 	}
 
-	// 从 Sheet 名提取年月
 	year, month, found := ExtractYearMonth(sheetName)
 	if found {
 		return SheetRecognitionResult{
 			SheetName:  sheetName,
 			SheetType:  sheetType,
-			Confidence: confidence,
+			Confidence: clampConfidence(confidence + nameBoost),
 			DataYear:   year,
 			DataMonth:  month,
 		}
 	}
-
 	return SheetRecognitionResult{
 		SheetName:  sheetName,
 		SheetType:  sheetType,
-		Confidence: clampConfidence(confidence * 0.8), // 没有年月信息，降低置信度
+		Confidence: clampConfidence(confidence + nameBoost),
 	}
 }
 
@@ -294,37 +239,52 @@ func (r *SheetRecognizer) recognizeSummary(sheetName string, columns []string) S
 		"增速",
 	}
 
-	// Sheet 名称包含汇总关键词
-	nameMatch := false
+	confidence := scoreByRequiredHeaders(columns, summaryRequired)
 	for _, kw := range summaryKeywords {
 		if strings.Contains(sheetName, kw) {
-			nameMatch = true
+			confidence = clampConfidence(confidence + 0.2)
 			break
-		}
-	}
-
-	if nameMatch {
-		return SheetRecognitionResult{
-			SheetName:  sheetName,
-			SheetType:  SheetTypeSummary,
-			Confidence: 0.8,
 		}
 	}
 
 	return SheetRecognitionResult{
 		SheetName:  sheetName,
-		SheetType:  SheetTypeUnknown,
-		Confidence: 0,
+		SheetType:  SheetTypeSummary,
+		Confidence: confidence,
 	}
+}
+
+func normalizeHeaderForRecognition(name string) string {
+	normalized := NormalizeColumnName(name)
+	normalized = yearRangeTokenPattern.ReplaceAllString(normalized, "YEAR_RANGE")
+	normalized = yearMonthTokenPattern.ReplaceAllString(normalized, "YEAR_MONTH")
+	return normalized
+}
+
+func scoreByRequiredHeaders(columns []string, required []string) float64 {
+	if len(required) == 0 {
+		return 0
+	}
+	matchCount := 0
+	for _, field := range required {
+		for _, col := range columns {
+			if MatchPattern(col, field) {
+				matchCount++
+				break
+			}
+		}
+	}
+	return float64(matchCount) / float64(len(required))
 }
 
 // RecognizeIndustryType 根据行业代码识别具体行业类型
 func RecognizeIndustryType(industryCode string) string {
-	if len(industryCode) < 2 {
+	code := normalizeIndustryCode(industryCode)
+	if len(code) < 2 {
 		return "unknown"
 	}
 
-	prefix := industryCode[:2]
+	prefix := code[:2]
 	switch prefix {
 	case "51":
 		return "wholesale"

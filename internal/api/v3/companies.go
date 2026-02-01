@@ -811,7 +811,9 @@ func recalcDerivedFields(st *store.Store, year, month int) error {
 			revenue_cumulative_rate = CASE
 				WHEN revenue_last_year_cumulative = 0 THEN -100
 				ELSE (revenue_current_cumulative - revenue_last_year_cumulative) / revenue_last_year_cumulative * 100
-			END
+			END,
+			retail_current_month = food_current_month + goods_current_month,
+			retail_last_year_month = food_last_year_month + goods_last_year_month
 		WHERE data_year = ? AND data_month = ?
 	`, year, month); err != nil {
 		return err
