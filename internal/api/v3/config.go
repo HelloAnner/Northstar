@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -14,16 +15,16 @@ type ConfigResponse struct {
 	CurrentMonth int `json:"currentMonth"`
 
 	// 社零额(定) 手工输入项
-	SmallMicroRateMonth  float64 `json:"smallMicroRateMonth"`  // 本月小微增速
-	EatWearUseRateMonth  float64 `json:"eatWearUseRateMonth"`  // 本月吃穿用增速
-	SampleRateMonth      float64 `json:"sampleRateMonth"`      // 本月抽样单位增速
-	SmallMicroRatePrev   float64 `json:"smallMicroRatePrev"`   // 上月小微增速
-	EatWearUseRatePrev   float64 `json:"eatWearUseRatePrev"`   // 上月吃穿用增速
-	SampleRatePrev       float64 `json:"sampleRatePrev"`       // 上月抽样单位增速
-	WeightSmallMicro     float64 `json:"weightSmallMicro"`     // 小微权重
-	WeightEatWearUse     float64 `json:"weightEatWearUse"`     // 吃穿用权重
-	WeightSample         float64 `json:"weightSample"`         // 抽样权重
-	ProvinceLimitBelow   float64 `json:"provinceLimitBelow"`   // 全省限下增速变动量
+	SmallMicroRateMonth float64 `json:"smallMicroRateMonth"` // 本月小微增速
+	EatWearUseRateMonth float64 `json:"eatWearUseRateMonth"` // 本月吃穿用增速
+	SampleRateMonth     float64 `json:"sampleRateMonth"`     // 本月抽样单位增速
+	SmallMicroRatePrev  float64 `json:"smallMicroRatePrev"`  // 上月小微增速
+	EatWearUseRatePrev  float64 `json:"eatWearUseRatePrev"`  // 上月吃穿用增速
+	SampleRatePrev      float64 `json:"sampleRatePrev"`      // 上月抽样单位增速
+	WeightSmallMicro    float64 `json:"weightSmallMicro"`    // 小微权重
+	WeightEatWearUse    float64 `json:"weightEatWearUse"`    // 吃穿用权重
+	WeightSample        float64 `json:"weightSample"`        // 抽样权重
+	ProvinceLimitBelow  float64 `json:"provinceLimitBelow"`  // 全省限下增速变动量
 
 	// 历史累计社零额
 	HistorySocialE18 float64 `json:"historySocialE18"`
@@ -40,6 +41,11 @@ type ConfigResponse struct {
 
 	// 限下社零额
 	LastYearLimitBelowCumulative float64 `json:"lastYearLimitBelowCumulative"` // 上年累计限下社零额
+
+	// 大模型配置
+	LlmBaseURL string `json:"llmBaseUrl"`
+	LlmModel   string `json:"llmModel"`
+	LlmApiKey  string `json:"llmApiKey"`
 }
 
 // UpdateConfigRequest 更新配置请求
@@ -77,6 +83,12 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		}
 		return 0
 	}
+	getString := func(key string) string {
+		if val, ok := allConfig[key]; ok {
+			return val
+		}
+		return ""
+	}
 
 	response := ConfigResponse{
 		// 时间配置
@@ -110,6 +122,11 @@ func (h *Handler) GetConfig(c *gin.Context) {
 
 		// 限下社零额
 		LastYearLimitBelowCumulative: getFloat("last_year_limit_below_cumulative"),
+
+		// 大模型配置
+		LlmBaseURL: getString("llm_base_url"),
+		LlmModel:   getString("llm_model"),
+		LlmApiKey:  getString("llm_api_key"),
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -118,14 +135,18 @@ func (h *Handler) GetConfig(c *gin.Context) {
 // UpdateConfig 更新配置
 // PATCH /api/config
 func (h *Handler) UpdateConfig(c *gin.Context) {
-	var req UpdateConfigRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	updates, err := decodeConfigUpdates(c)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
+		return
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "updates 不能为空"})
 		return
 	}
 
 	// 遍历更新项
-	for key, value := range req.Updates {
+	for key, value := range updates {
 		var strValue string
 
 		switch v := value.(type) {
@@ -155,4 +176,20 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "配置更新成功"})
+}
+
+func decodeConfigUpdates(c *gin.Context) (map[string]interface{}, error) {
+	raw, err := c.GetRawData()
+	if err != nil {
+		return nil, err
+	}
+	var req UpdateConfigRequest
+	if err := json.Unmarshal(raw, &req); err == nil && req.Updates != nil {
+		return req.Updates, nil
+	}
+	var updates map[string]interface{}
+	if err := json.Unmarshal(raw, &updates); err != nil {
+		return nil, err
+	}
+	return updates, nil
 }

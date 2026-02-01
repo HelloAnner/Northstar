@@ -46,6 +46,8 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/indicators", h.GetIndicators)
 	// 智能调整
 	router.POST("/optimize", h.Optimize)
+	// LLM 对话
+	router.POST("/llm/chat/stream", h.StreamLLMChat)
 
 	// 数据导出
 	router.POST("/export", h.Export)

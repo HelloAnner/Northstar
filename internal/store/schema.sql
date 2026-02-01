@@ -331,7 +331,12 @@ INSERT OR IGNORE INTO config (key, value, value_type, description) VALUES
 ('negative_growth_count', '0', 'number', '负增长企业数'),
 
 -- 限下社零额
-('last_year_limit_below_cumulative', '0', 'number', '上年累计限下社零额');
+('last_year_limit_below_cumulative', '0', 'number', '上年累计限下社零额'),
+
+-- 大模型配置
+('llm_base_url', '', 'string', '大模型 Base URL'),
+('llm_model', '', 'string', '大模型模型'),
+('llm_api_key', '', 'string', '大模型 API Key');
 
 -- ============================================================================
 -- 7. import_logs - 导入日志表

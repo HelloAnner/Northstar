@@ -66,12 +66,12 @@ export default function HelpDocument() {
               {activeSection === 'flow' && (
                 <Card className="mb-6 border-white/10 bg-[#0D0D0D] p-6">
                   <h2 className="text-lg font-semibold">推荐流程</h2>
-                  <p className="mt-1 text-sm text-[#D4D4D4]">导入 → 仪表盘调整 → 导出</p>
+                  <p className="mt-1 text-sm text-[#D4D4D4]">导入 → Northstar 调整 → 导出</p>
 
                   <div className="mt-6 space-y-4">
                     {[
                       { n: 1, title: '导入 Excel 数据', desc: '上传企业数据 Excel，系统会自动识别表格结构并导入数据。' },
-                      { n: 2, title: '在仪表盘查看与调整', desc: '查看16项指标和企业数据；所有数据均可编辑，任意字段变更后会自动重新计算全部指标并保存。' },
+                      { n: 2, title: '在 Northstar 查看与调整', desc: '查看16项指标和企业数据；所有数据均可编辑，任意字段变更后会自动重新计算全部指标并保存。' },
                       { n: 3, title: '导出数据', desc: '导出包含企业数据与指标汇总的 Excel 文件。' },
                     ].map((it) => (
                       <div key={it.n} className="flex items-start gap-4">
@@ -91,7 +91,7 @@ export default function HelpDocument() {
               {activeSection === 'indicator' && (
                 <Card className="mb-6 border-white/10 bg-[#0D0D0D] p-6">
                   <h2 className="text-lg font-semibold">指标含义（企业层）</h2>
-                  <p className="mt-1 text-sm text-[#D4D4D4]">仪表盘「企业数据微调」表格字段口径与约束</p>
+                  <p className="mt-1 text-sm text-[#D4D4D4]">Northstar「企业数据微调」表格字段口径与约束</p>
 
                   <div className="mt-5 space-y-3 text-sm text-[#D4D4D4]">
                     <div>

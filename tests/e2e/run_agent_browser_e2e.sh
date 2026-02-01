@@ -39,6 +39,10 @@ INDICATORS_BEFORE="$RUN_DIR/indicators_before.json"
 INDICATORS_AFTER="$RUN_DIR/indicators_after.json"
 UI_DAG_BEFORE="$RUN_DIR/ui_companies_before_dag.json"
 UI_DAG_AFTER="$RUN_DIR/ui_companies_after_dag.json"
+LLM_BASE_URL="${DEEPSEEK_BASE_URL:-${LLM_BASE_URL:-}}"
+LLM_MODEL="${DEEPSEEK_MODEL_NAME:-${LLM_MODEL:-}}"
+LLM_API_KEY="${DEEPSEEK_API_KEY:-${LLM_API_KEY:-}}"
+LLM_RESULTS_JSON="$RUN_DIR/llm_results.json"
 STEPS_JSON="$RUN_DIR/steps.json"
 STEPS_JSONL="$RUN_DIR/steps.jsonl"
 SERVER_DIR="$RUN_DIR/server"
@@ -58,6 +62,9 @@ export BASE_URL
 export AGENT_BROWSER_SESSION="$SESSION"
 export RUN_DIR
 export INPUT_XLSX
+export LLM_BASE_URL
+export LLM_MODEL
+export LLM_API_KEY
 
 python3 - <<'PY' >"$META"
 import json, os, datetime
@@ -224,6 +231,33 @@ start_e2e_server() {
 }
 
 start_e2e_server
+
+# LLM 配置（从环境变量写入配置表）
+if [[ -n "${LLM_BASE_URL}" && -n "${LLM_MODEL}" && -n "${LLM_API_KEY}" ]]; then
+  echo ">>> Applying LLM config via /api/config ..." | tee -a "$LOG"
+  if python3 - <<'PY' | tee -a "$LOG"; then
+import json, os, urllib.request, sys
+base_url = os.environ.get("BASE_URL", "").rstrip("/")
+payload = {
+  "updates": {
+    "llm_base_url": os.environ.get("LLM_BASE_URL", ""),
+    "llm_model": os.environ.get("LLM_MODEL", ""),
+    "llm_api_key": os.environ.get("LLM_API_KEY", ""),
+  }
+}
+data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+req = urllib.request.Request(base_url + "/api/config", data=data, method="PATCH", headers={"Content-Type": "application/json"})
+with urllib.request.urlopen(req, timeout=30) as resp:
+  resp.read()
+print("llm config ok")
+PY
+    record_step "llm_config" "pass" "" ""
+  else
+    record_step "llm_config" "fail" "llm config update failed" "检查 LLM_* 环境变量是否正确，并确认 /api/config 可访问"
+  fi
+else
+  record_step "llm_config" "skip" "missing LLM env" "如需执行 LLM 专项测试：设置 LLM_BASE_URL/LLM_MODEL/LLM_API_KEY 或 DEEPSEEK_*"
+fi
 
 # Ensure required browser is available for agent-browser (playwright-core@1.58.1 expects cft v1208).
 if [[ ! -d "$HOME/Library/Caches/ms-playwright/chromium_headless_shell-1208" ]]; then
@@ -432,7 +466,7 @@ if [[ "$RUN_DAG_CASE" == "1" ]]; then
   agent-browser reload | tee -a "$LOG" || true
   agent-browser wait --load networkidle | tee -a "$LOG" || true
 
-  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_BEFORE"; then
+  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center.gap-3') || input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_BEFORE"; then
     record_step "indicator_before" "pass" "" ""
   else
     record_step "indicator_before" "fail" "指标面板抽取失败" "打开首页指标面板，确认 16 项指标可见"
@@ -463,7 +497,7 @@ if [[ "$RUN_DAG_CASE" == "1" ]]; then
   agent-browser wait --load networkidle | tee -a "$LOG" || true
   agent-browser screenshot "$SCREENSHOTS_DIR/13_after_indicator_adjust.png" | tee -a "$LOG" || true
 
-  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_AFTER"; then
+  if agent-browser eval "(() => { const rows = []; const inputs = Array.from(document.querySelectorAll('input.rounded-full')); for (const input of inputs) { const row = input.closest('div.flex.items-center.gap-3') || input.closest('div.flex.items-center') || input.parentElement?.parentElement; const labelEl = row ? (row.querySelector('div.min-w-0') || row.querySelector('div')) : null; const unitEl = row ? row.querySelector('span') : null; const label = labelEl ? (labelEl.textContent || '').trim() : ''; const unit = unitEl ? (unitEl.textContent || '').trim() : ''; rows.push({ label, unit, value: String(input.value || '').trim() }); } return { extractedAt: new Date().toISOString(), count: rows.length, indicators: rows }; })()" --json >"$INDICATORS_AFTER"; then
     record_step "indicator_after" "pass" "" ""
   else
     record_step "indicator_after" "fail" "指标面板抽取失败（调整后）" "确认智能调整完成后指标仍可见"
@@ -476,6 +510,19 @@ if [[ "$RUN_DAG_CASE" == "1" ]]; then
   fi
 else
   record_step "indicator_dag" "skip" "RUN_DAG_CASE=0" "如需执行指标→DAG测试：RUN_DAG_CASE=1 make test-e2e"
+fi
+
+if [[ -n "${LLM_BASE_URL}" && -n "${LLM_MODEL}" && -n "${LLM_API_KEY}" ]]; then
+  echo ">>> LLM chat test suite..." | tee -a "$LOG"
+  agent-browser press "Escape" | tee -a "$LOG" || true
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+  if python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_llm_actions.py" "$BASE_URL" "$LOG" "$SCREENSHOTS_DIR" "$LLM_RESULTS_JSON" | tee -a "$LOG"; then
+    record_step "llm_chat" "pass" "" ""
+  else
+    record_step "llm_chat" "fail" "llm chat test failed" "查看 llm_results.json 与截图排查"
+  fi
+else
+  record_step "llm_chat" "skip" "missing LLM env" "如需执行 LLM 专项测试：设置 LLM_BASE_URL/LLM_MODEL/LLM_API_KEY 或 DEEPSEEK_*"
 fi
 
 echo ">>> Capturing browser console/errors..." | tee -a "$LOG"
@@ -504,6 +551,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --indicators-after "$INDICATORS_AFTER" \
   --ui-dag-before "$UI_DAG_BEFORE" \
   --ui-dag-after "$UI_DAG_AFTER" \
+  --llm-results "$LLM_RESULTS_JSON" \
   --export-alt-xlsx "$EXPORT_ALT_XLSX" \
   --export-param-meta "$EXPORT_PARAM_META" \
   --console "$CONSOLE_LOG" \

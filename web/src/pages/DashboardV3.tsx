@@ -5,10 +5,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Download, RefreshCw, Upload } from 'lucide-react'
+import { Download, MessageCircle, RefreshCw, Settings2, Upload } from 'lucide-react'
 import ImportDialog from '@/components/ImportDialog'
 import ExportDialog from '@/components/ExportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
+import ThemeToggle from '@/components/app/ThemeToggle'
+import NorthstarIcon from '@/components/app/NorthstarIcon'
+import GlobalConfigDialog from '@/components/GlobalConfigDialog'
+import LlmChatDialog from '@/components/LlmChatDialog'
 
 type Indicator = IndicatorGroup['indicators'][number]
 
@@ -41,6 +45,8 @@ export default function DashboardV3() {
   const [months, setMonths] = useState<YearMonthStat[]>([])
   const [monthsLoading, setMonthsLoading] = useState(false)
   const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showConfigDialog, setShowConfigDialog] = useState(false)
+  const [showChatDialog, setShowChatDialog] = useState(false)
 
   const shouldApplyRandomDelay = () => {
     const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
@@ -221,6 +227,10 @@ export default function DashboardV3() {
   }
 
   const handleExport = () => setShowExportDialog(true)
+  const handleChatDataChanged = () => {
+    loadIndicators()
+    setReloadToken((x) => x + 1)
+  }
 
   // 空状态
   if (status && !status.initialized) {
@@ -230,7 +240,10 @@ export default function DashboardV3() {
           <div className="mx-auto w-[520px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/60 p-8 text-left shadow-2xl backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold">仪表盘</h2>
+                <h2 className="flex items-center gap-2 text-2xl font-semibold">
+                  <NorthstarIcon className="h-5 w-5" />
+                  Northstar
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">关键指标总览 + 企业数据微调</p>
               </div>
               <Badge variant="secondary" className="mt-1">
@@ -285,7 +298,10 @@ export default function DashboardV3() {
         {/* 顶部栏 */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">仪表盘</h1>
+            <h1 className="flex items-center gap-2 text-3xl font-semibold tracking-tight">
+              <NorthstarIcon className="h-7 w-7" />
+              Northstar
+            </h1>
             {status && (
               <p className="mt-1 text-sm text-muted-foreground">
                 {status.currentYear}年{status.currentMonth}月 · 共 {status.totalCompanies} 家（批零 {status.wrCount} + 住餐{' '}
@@ -351,10 +367,11 @@ export default function DashboardV3() {
               导出
             </Button>
 
-            <Button onClick={() => loadIndicators()} variant="outline" className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              刷新
+            <Button onClick={() => setShowConfigDialog(true)} variant="outline" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              全局配置
             </Button>
+            <ThemeToggle />
           </div>
         </div>
 
@@ -418,6 +435,14 @@ export default function DashboardV3() {
           reloadToken={reloadToken}
         />
 
+        <Button
+          onClick={() => setShowChatDialog(true)}
+          size="icon"
+          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg transition hover:scale-105"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </Button>
+
         {/* 导入弹窗 */}
         {showImportDialog && (
           <ImportDialog
@@ -436,6 +461,9 @@ export default function DashboardV3() {
             month={status?.currentMonth}
           />
         )}
+
+        <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
+        <LlmChatDialog open={showChatDialog} onOpenChange={setShowChatDialog} onDataChanged={handleChatDataChanged} />
       </div>
     </div>
   )

@@ -969,6 +969,7 @@ def _issues_summary(
     normalization_fail: int,
     dag_fail: int,
     export_param_fail: int,
+    llm_fail: int,
 ) -> str:
     issues: List[str] = []
     action_fail = sum(1 for r in action_results if r.get("ok") is False)
@@ -1010,6 +1011,8 @@ def _issues_summary(
         issues.append(f"DAG 联动覆盖不足：{dag_fail}（见“指标调整与DAG联动覆盖”）")
     if export_param_fail > 0:
         issues.append(f"导出参数化检查失败：{export_param_fail}（见“导出数字参数化”）")
+    if llm_fail > 0:
+        issues.append("LLM 对话专项失败：1（见“LLM 对话专项测试”）")
 
     if not issues:
         return "<p class='ok'>✅ 未发现不符合预期项</p>"
@@ -1568,6 +1571,7 @@ def main() -> None:
     ap.add_argument("--indicators-after", required=False, default="")
     ap.add_argument("--ui-dag-before", required=False, default="")
     ap.add_argument("--ui-dag-after", required=False, default="")
+    ap.add_argument("--llm-results", required=False, default="")
     ap.add_argument("--export-alt-xlsx", required=False, default="")
     ap.add_argument("--export-param-meta", required=False, default="")
     ap.add_argument("--console", required=False, default="")
@@ -1577,6 +1581,11 @@ def main() -> None:
     ap.add_argument("--screenshots", required=False, default="")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
+
+    llm_results = _load_optional_json(args.llm_results) if args.llm_results else {}
+    llm_executed = bool(llm_results.get("executed")) if llm_results else False
+    llm_ok = bool(llm_results.get("ok")) if llm_executed else True
+    llm_fail = 1 if llm_executed and not llm_ok else 0
 
     ui_before = _unwrap_agent_browser_json(_load_json(args.ui_before))
     ui_after = _unwrap_agent_browser_json(_load_json(args.ui_after))
@@ -1922,6 +1931,7 @@ def main() -> None:
         and (not indicator_compare.get("executed") or indicator_compare.get("ok") is True)
         and (not dag_summary.get("executed") or dag_summary.get("ok") is True)
         and (not export_param.get("executed") or export_param.get("ok") is True)
+        and (not llm_executed or llm_ok is True)
         and all(
             (derived_column_coverage.get("sheets") or {}).get(s, {}).get("missingUiColumns", 0) == 0
             for s in ["批发", "零售", "住宿", "餐饮"]
@@ -2338,6 +2348,88 @@ def main() -> None:
             + "</tbody></table></div>"
         )
 
+    def _llm_html() -> str:
+        if not llm_results:
+            return "<p class='warn'>未执行 LLM 专项测试（llm_results.json 不存在）</p>"
+        if not llm_executed:
+            reason = str(llm_results.get("skipReason") or "")
+            return f"<p class='warn'>未执行 LLM 专项测试：{_safe(reason or 'skip')}</p>"
+
+        def _ok_text(v: Any) -> str:
+            return "PASS" if v else "FAIL"
+
+        conf = llm_results.get("config") or {}
+        streaming = llm_results.get("streaming") or {}
+        first = llm_results.get("first") or {}
+        second = llm_results.get("second") or {}
+        updates = llm_results.get("updates") or {}
+        errors = llm_results.get("errors") or []
+
+        rows: List[str] = []
+
+        def add_row(name: str, okv: Any, detail: str) -> None:
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td>{_safe(name)}</td>"
+                f"<td class='{klass}'>{_ok_text(okv)}</td>"
+                f"<td class='mono'>{_safe(detail)}</td>"
+                "</tr>"
+            )
+
+        add_row(
+            "全局配置",
+            bool(conf.get("baseUrlOk") and conf.get("modelOk") and conf.get("apiKeyMasked") and conf.get("showHideOk")),
+            f"baseUrl={conf.get('baseUrl')} model={conf.get('model')} apiKeyType={conf.get('apiKeyType')}",
+        )
+        add_row("流式输出", bool(streaming.get("ok")), "检测到流式指示符")
+
+        first_summary = str(first.get("summaryText") or "")
+        second_summary = str(second.get("summaryText") or "")
+        add_row("首轮对话(含指标目标)", bool((first.get("summary") or {}).get("optimized") is True), first_summary[:200])
+        add_row("二轮对话(无指标目标)", bool((second.get("summary") or {}).get("optimized") is False), second_summary[:200])
+
+        wr = updates.get("wr") or {}
+        ac = updates.get("ac") or {}
+        after_opt = updates.get("afterOptimize") or {}
+        add_row(
+            "数据修改校验(WR)",
+            bool(wr.get("ok")),
+            f"{wr.get('id')} {wr.get('field')} target={wr.get('target')} after={wr.get('after')}",
+        )
+        add_row(
+            "数据修改校验(AC)",
+            bool(ac.get("ok")),
+            f"{ac.get('id')} {ac.get('field')} target={ac.get('target')} after={ac.get('after')}",
+        )
+        if after_opt:
+            wr_opt = after_opt.get("wr") or {}
+            ac_opt = after_opt.get("ac") or {}
+            add_row(
+                "智能调整后(WR保持)",
+                bool(wr_opt.get("ok")),
+                f"target={wr_opt.get('target')} after={wr_opt.get('after')}",
+            )
+            add_row(
+                "智能调整后(AC保持)",
+                bool(ac_opt.get("ok")),
+                f"target={ac_opt.get('target')} after={ac_opt.get('after')}",
+            )
+
+        if errors:
+            add_row("错误详情", False, " | ".join(str(x) for x in errors[:5]))
+
+        status_text = "✅ PASS" if llm_ok else "❌ FAIL"
+        return (
+            f"<p class='{'ok' if llm_ok else 'bad'}'>{status_text}</p>"
+            + "<p class='warn'>完整记录：<a class='mono' href='llm_results.json'>llm_results.json</a></p>"
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>检查项</th><th>结果</th><th>细节</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
     def _input_structure_html() -> str:
         if not isinstance(input_structure, dict) or not input_structure:
             return "<p class='warn'>未生成输入结构检查</p>"
@@ -2604,6 +2696,7 @@ def main() -> None:
       <nav class="side-nav" id="toc">
         <a href="#overview">总览</a>
         <a href="#steps">执行步骤</a>
+        <a href="#llm">LLM 对话</a>
         <div class="group">差距覆盖</div>
         <a href="#dag">指标与DAG</a>
         <a href="#export-param">导出参数化</a>
@@ -2660,6 +2753,7 @@ def main() -> None:
             <li><a class="mono" href="{_safe(args.indicators_before)}">indicators_before.json</a></li>
             <li><a class="mono" href="{_safe(args.indicators_after)}">indicators_after.json</a></li>
             <li><a class="mono" href="{_safe(args.indicator_actions)}">indicator_actions_result.json</a></li>
+            <li><a class="mono" href="{_safe(args.llm_results)}">llm_results.json</a></li>
             <li><a class="mono" href="{_safe(args.ui_dag_before)}">ui_companies_before_dag.json</a></li>
             <li><a class="mono" href="{_safe(args.ui_dag_after)}">ui_companies_after_dag.json</a></li>
             <li><a class="mono" href="{_safe(args.export_alt_xlsx)}">export_alt.xlsx</a></li>
@@ -2685,7 +2779,7 @@ def main() -> None:
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>不符合预期项总览</h2>
-        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail)}
+        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail, llm_fail)}
         <p class="warn">复现入口：打开 <span class="mono">{_safe(args.base_url)}</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
       </div>
       <div class="card" style="margin-top: 12px;">
@@ -2728,6 +2822,18 @@ def main() -> None:
       <div class="card" style="margin-top: 12px;">
         <h2>输入 Excel 结构对标 PRD</h2>
         {_input_structure_html()}
+      </div>
+    </div>
+
+    <div class="section" id="llm">
+      <div class="h3line">
+        <h3>LLM 对话专项测试</h3>
+        <a class="permalink" href="#llm">#</a>
+      </div>
+      <div class="card">
+        <h2>对话与联动校验</h2>
+        <p class="warn">覆盖：全局配置显示/隐藏、流式输出、function call 修改、智能调整触发与多轮会话。</p>
+        {_llm_html()}
       </div>
     </div>
 

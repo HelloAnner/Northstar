@@ -64,6 +64,9 @@ export interface Indicators {
 export interface Config {
   currentMonth: number
   lastYearLimitBelowCumulative: number
+  llmBaseUrl?: string
+  llmModel?: string
+  llmApiKey?: string
 }
 
 // 优化约束

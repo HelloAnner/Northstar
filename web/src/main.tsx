@@ -2,9 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { applyTheme, getInitialTheme } from './lib/theme'
 
-// 全站使用深色主题变量（shadcn/ui：Card / Popover / Dialog 等依赖 CSS 变量）
-document.documentElement.classList.add('dark')
+// 全站使用主题变量（shadcn/ui：Card / Popover / Dialog 等依赖 CSS 变量）
+applyTheme(getInitialTheme())
 
 // 从 2026-02-07 起，前端交互整体“慢一点”：每次请求随机延迟 1000-2000ms（单位：ms）
 {
