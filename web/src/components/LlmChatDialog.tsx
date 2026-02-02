@@ -157,12 +157,12 @@ export default function LlmChatDialog({ open, onOpenChange, onDataChanged }: Llm
   const formatSummary = (summary: StreamEvent['summary']) => {
     if (!summary) return ''
     const parts = [
-      `**已更新企业**：${summary.updatedCompanies} 家`,
-      `**指标目标**：${summary.targetIndicators} 项`,
-      summary.optimized ? '**智能调整**：已触发' : '**智能调整**：未触发',
+      `已更新企业：${summary.updatedCompanies}`,
+      `指标目标：${summary.targetIndicators}`,
+      summary.optimized ? '智能调整：已触发' : '智能调整：未触发',
     ]
     if (summary.warnings && summary.warnings.length > 0) {
-      parts.push(`**提示**：${summary.warnings.join('；')}`)
+      parts.push(`提示：${summary.warnings.join('；')}`)
     }
     return parts.join('  \n')
   }

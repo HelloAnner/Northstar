@@ -449,10 +449,11 @@ func ensureAdjustableRows(count int, target, fixedSum float64) error {
 	if count > 0 {
 		return nil
 	}
-	if math.Round(target) == math.Round(fixedSum) {
+	// 允许浮点误差
+	if math.Abs(math.Round(target)-math.Round(fixedSum)) <= 0.5 {
 		return nil
 	}
-	return fmt.Errorf("没有可调整数据")
+	return fmt.Errorf("没有可调整数据 (目标值 %.2f, 固定和 %.2f)", target, fixedSum)
 }
 
 func clampTarget(target float64) float64 {

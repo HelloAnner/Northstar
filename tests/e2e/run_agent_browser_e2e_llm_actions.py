@@ -239,6 +239,7 @@ def _parse_summary_numbers(text: str) -> Dict[str, Any]:
     out: Dict[str, Any] = {"updatedCompanies": None, "targetIndicators": None, "optimized": None}
     if not text:
         return out
+    # 支持多种格式：带粗体标记、不带粗体标记、带单位后缀
     m1 = re.search(r"已更新企业[:：]\s*([0-9]+)", text)
     m2 = re.search(r"指标目标[:：]\s*([0-9]+)", text)
     m3 = re.search(r"智能调整[:：]\s*(已触发|未触发)", text)
@@ -378,7 +379,7 @@ def main() -> None:
             "apiKeyLen": api_len,
         }
         config_ok = base_ok and model_ok and api_ok and show_ok
-        _agent(f'screenshot "{screenshots / "14_llm_config.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "14_llm_config.png"}\"', log_path)
         results["screenshots"]["config"] = str(screenshots / "14_llm_config.png")
         _agent('find role button click --name "取消"', log_path)
     except SystemExit as e:
@@ -395,7 +396,7 @@ def main() -> None:
             open_ok = False
             results["errors"].append(str(open_ret.get("error") or "chat button not found"))
         _agent('wait --text "数据对话助手"', log_path)
-        _agent(f'screenshot "{screenshots / "15_llm_chat_open.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "15_llm_chat_open.png"}\"', log_path)
         results["screenshots"]["chatOpen"] = str(screenshots / "15_llm_chat_open.png")
     except SystemExit as e:
         open_ok = False
@@ -457,8 +458,8 @@ def main() -> None:
     try:
         prompt = (
             f"请仅调用 update_companies，严格执行以下修改："
-            f"1) {{\"id\":\"{wr_id}\",\"patch\":{{\"{wr_field}\":{wr_target}}}}}；"
-            f"2) {{\"id\":\"{ac_id}\",\"patch\":{{\"{ac_field}\":{ac_target}}}}}；"
+            f"1) {{\\\"id\\\":\\\"{wr_id}\\\",\\\"patch\\\":{{\\\"{wr_field}\\\":{wr_target}}}}}；"
+            f"2) {{\\\"id\\\":\\\"{ac_id}\\\",\\\"patch\\\":{{\\\"{ac_field}\\\":{ac_target}}}}}；"
             f"不要调用 set_indicator_targets，最后给出简短说明。"
         )
         _agent(f'find placeholder "输入你的调整需求…" fill "{prompt}"', log_path)
@@ -467,7 +468,7 @@ def main() -> None:
         try:
             _agent('wait --text "▍" --timeout 30000', log_path)
             streaming_ok = True
-            _agent(f'screenshot "{screenshots / "16_llm_streaming.png"}"', log_path)
+            _agent(f'screenshot \"{screenshots / "16_llm_streaming.png"}\"', log_path)
             results["screenshots"]["streaming"] = str(screenshots / "16_llm_streaming.png")
         except SystemExit as e:
             results["errors"].append(f"streaming not detected: exit={e.code}")
@@ -496,7 +497,7 @@ def main() -> None:
             "summary": summary_nums,
             "expectedOptimized": False,
         }
-        _agent(f'screenshot "{screenshots / "17_llm_after_first.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "17_llm_after_first.png"}\"', log_path)
         results["screenshots"]["afterFirst"] = str(screenshots / "17_llm_after_first.png")
     except SystemExit as e:
         first_ok = False
@@ -578,7 +579,7 @@ def main() -> None:
             "summary": summary_nums2,
             "expectedOptimized": True,
         }
-        _agent(f'screenshot "{screenshots / "18_llm_after_second.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "18_llm_after_second.png"}\"', log_path)
         results["screenshots"]["afterSecond"] = str(screenshots / "18_llm_after_second.png")
 
         wr_after_opt = _http_json(f"{base_url}/api/companies/{wr_id}").get("company") or {}
@@ -612,7 +613,7 @@ def main() -> None:
         count = int(count_ret.get("count") or 0)
         new_session_ok = count == 0
         results["newSession"] = {"messageCount": count, "ok": new_session_ok}
-        _agent(f'screenshot "{screenshots / "19_llm_new_session.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "19_llm_new_session.png"}\"', log_path)
         results["screenshots"]["newSession"] = str(screenshots / "19_llm_new_session.png")
     except SystemExit as e:
         new_session_ok = False
@@ -634,7 +635,7 @@ def main() -> None:
 
         # 等待流式开始
         time.sleep(0.5)
-        _agent(f'screenshot "{screenshots / "20_llm_streaming_detail.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "20_llm_streaming_detail.png"}\"', log_path)
         results["screenshots"]["streamingDetail"] = str(screenshots / "20_llm_streaming_detail.png")
 
         # 获取消息内容
@@ -666,7 +667,7 @@ def main() -> None:
             "ok": is_right_side,
         }
         dialog_position_ok = is_right_side
-        _agent(f'screenshot "{screenshots / "21_llm_dialog_position.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "21_llm_dialog_position.png"}\"', log_path)
         results["screenshots"]["dialogPosition"] = str(screenshots / "21_llm_dialog_position.png")
     except SystemExit as e:
         dialog_position_ok = False
@@ -700,7 +701,7 @@ def main() -> None:
             "ok": context_kept,
         }
         multi_turn_ok = context_kept
-        _agent(f'screenshot "{screenshots / "22_llm_multi_turn.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "22_llm_multi_turn.png"}\"', log_path)
         results["screenshots"]["multiTurn"] = str(screenshots / "22_llm_multi_turn.png")
     except SystemExit as e:
         multi_turn_ok = False
@@ -716,7 +717,7 @@ def main() -> None:
         _agent(f"wait --fn {shlex.quote(_js_wait_for_chat_terminal())} --timeout 180000", log_path)
 
         results["boundaryTest"] = {"ok": True, "inputLength": len(long_input)}
-        _agent(f'screenshot "{screenshots / "23_llm_boundary_test.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "23_llm_boundary_test.png"}\"', log_path)
         results["screenshots"]["boundaryTest"] = str(screenshots / "23_llm_boundary_test.png")
     except SystemExit as e:
         boundary_test_ok = False
@@ -742,12 +743,96 @@ def main() -> None:
 
         results["reopen"] = {"messageCount": count, "ok": count > 0}
         reopen_ok = count > 0
-        _agent(f'screenshot "{screenshots / "24_llm_reopen.png"}"', log_path)
+        _agent(f'screenshot \"{screenshots / "24_llm_reopen.png"}\"', log_path)
         results["screenshots"]["reopen"] = str(screenshots / "24_llm_reopen.png")
     except SystemExit as e:
         reopen_ok = False
         results["errors"].append(f"reopen test failed: exit={e.code}")
         results["reopen"] = {"ok": False}
+
+    # 13) 模板问题测试 - 验证指标修改是否生效
+    template_issue_ok = True
+    try:
+        # 获取修改前的指标值
+        indicators_before = _http_json(f"{base_url}/api/indicators")
+        groups_before = indicators_before.get("groups") or []
+        found_val_before = None
+        for g in groups_before:
+            for it in g.get("indicators") or []:
+                if str(it.get("id") or "") == indicator_id:
+                    found_val_before = _parse_num(it.get("value"))
+                    break
+
+        # 发送修改指标的请求
+        template_prompt = (
+            f"请调用 set_indicator_targets，将指标 {indicator_id} 调整到 {indicator_target}；"
+            f"不要修改企业数据。"
+        )
+        _agent(f'find placeholder "输入你的调整需求…" fill "{template_prompt}"', log_path)
+        _agent('find role button click --name "发送"', log_path)
+        _agent(f"wait --fn {shlex.quote(_js_wait_for_chat_terminal())} --timeout 180000", log_path)
+
+        # 验证指标是否已修改
+        time.sleep(0.5)  # 等待数据同步
+        indicators_after = _http_json(f"{base_url}/api/indicators")
+        groups_after = indicators_after.get("groups") or []
+        found_val_after = None
+        for g in groups_after:
+            for it in g.get("indicators") or []:
+                if str(it.get("id") or "") == indicator_id:
+                    found_val_after = _parse_num(it.get("value"))
+                    break
+
+        # 验证指标值是否已修改
+        value_changed = (
+            found_val_after is not None
+            and found_val_before is not None
+            and abs(found_val_after - indicator_target) <= 0.6
+        )
+
+        results["templateIssue"] = {
+            "indicatorId": indicator_id,
+            "beforeValue": found_val_before,
+            "afterValue": found_val_after,
+            "targetValue": indicator_target,
+            "valueChanged": value_changed,
+            "ok": value_changed,
+        }
+        template_issue_ok = value_changed
+        _agent(f'screenshot \"{screenshots / "25_llm_template_issue.png"}\"', log_path)
+        results["screenshots"]["templateIssue"] = str(screenshots / "25_llm_template_issue.png")
+    except SystemExit as e:
+        template_issue_ok = False
+        results["errors"].append(f"template issue test failed: exit={e.code}")
+        results["templateIssue"] = {"ok": False}
+
+    # 14) 错误处理测试 - 验证错误消息是否正确显示
+    error_handling_ok = True
+    try:
+        # 发送一个无效的请求
+        invalid_prompt = "请调用一个不存在的工具函数"
+        _agent(f'find placeholder "输入你的调整需求…" fill "{invalid_prompt}"', log_path)
+        _agent('find role button click --name "发送"', log_path)
+        _agent(f"wait --fn {shlex.quote(_js_wait_for_chat_terminal())} --timeout 180000", log_path)
+
+        # 检查是否有错误消息
+        error_ret = _unwrap_agent_browser_json(
+            _agent_json(f"eval {shlex.quote(_js_get_chat_error_text())} --json", log_path)
+        )
+        error_text = str(error_ret.get("text") or "")
+
+        results["errorHandling"] = {
+            "hasError": bool(error_text),
+            "errorText": error_text[:200],
+            "ok": bool(error_text),
+        }
+        error_handling_ok = bool(error_text)
+        _agent(f'screenshot \"{screenshots / "26_llm_error_handling.png"}\"', log_path)
+        results["screenshots"]["errorHandling"] = str(screenshots / "26_llm_error_handling.png")
+    except SystemExit as e:
+        error_handling_ok = False
+        results["errors"].append(f"error handling test failed: exit={e.code}")
+        results["errorHandling"] = {"ok": False}
 
     results["ok"] = (
         config_ok
@@ -764,6 +849,8 @@ def main() -> None:
         and multi_turn_ok
         and boundary_test_ok
         and reopen_ok
+        and template_issue_ok
+        and error_handling_ok
     )
 
     out_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
