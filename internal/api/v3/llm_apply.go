@@ -13,9 +13,10 @@ import (
 	"northstar/internal/llm"
 )
 
-func (h *Handler) applyLLMCompanyUpdates(updates []llm.CompanyUpdate, year, month int) (fieldExcludes, int, []string, error) {
+func (h *Handler) applyLLMCompanyUpdates(updates []llm.CompanyUpdate, year, month int) (fieldExcludes, int, []llmAppliedUpdate, []string, error) {
 	excludes := newFieldExcludes()
 	warnings := make([]string, 0)
+	applied := make([]llmAppliedUpdate, 0)
 	updatedCount := 0
 	for _, update := range updates {
 		kind, id, ok := parseCompanyID(update.ID)
@@ -29,15 +30,16 @@ func (h *Handler) applyLLMCompanyUpdates(updates []llm.CompanyUpdate, year, mont
 		}
 		fields, err := h.applyCompanyUpdate(kind, id, update.Patch, year, month)
 		if err != nil {
-			return excludes, updatedCount, warnings, err
+			return excludes, updatedCount, applied, warnings, err
 		}
 		if len(fields) == 0 {
 			continue
 		}
 		addExclude(&excludes, kind, id, fields)
+		applied = append(applied, llmAppliedUpdate{Kind: kind, ID: id, Fields: fields})
 		updatedCount++
 	}
-	return excludes, updatedCount, warnings, nil
+	return excludes, updatedCount, applied, warnings, nil
 }
 
 func (h *Handler) applyCompanyUpdate(kind string, id int64, patch map[string]interface{}, year, month int) ([]string, error) {

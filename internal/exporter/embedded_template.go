@@ -18,6 +18,11 @@ func openEmbeddedMonthReportTemplate() (*excelize.File, error) {
 	return excelize.OpenReader(bytes.NewReader(raw))
 }
 
+// OpenEmbeddedMonthReportTemplate 打开内置月报模板
+func OpenEmbeddedMonthReportTemplate() (*excelize.File, error) {
+	return openEmbeddedMonthReportTemplate()
+}
+
 func decodeEmbeddedTemplateGzipBase64(b64 string) ([]byte, error) {
 	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {

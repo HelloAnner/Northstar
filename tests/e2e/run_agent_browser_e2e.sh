@@ -39,6 +39,7 @@ INDICATORS_BEFORE="$RUN_DIR/indicators_before.json"
 INDICATORS_AFTER="$RUN_DIR/indicators_after.json"
 UI_DAG_BEFORE="$RUN_DIR/ui_companies_before_dag.json"
 UI_DAG_AFTER="$RUN_DIR/ui_companies_after_dag.json"
+LINKAGE_PREVIEW_RESULT="$RUN_DIR/linkage_preview_result.json"
 LLM_BASE_URL="${DEEPSEEK_BASE_URL:-${LLM_BASE_URL:-}}"
 LLM_MODEL="${DEEPSEEK_MODEL_NAME:-${LLM_MODEL:-}}"
 LLM_API_KEY="${DEEPSEEK_API_KEY:-${LLM_API_KEY:-}}"
@@ -52,6 +53,7 @@ SERVER_LOG="$RUN_DIR/server.log"
 KEEP_E2E_SERVER="${KEEP_E2E_SERVER:-0}"
 RUN_DAG_CASE="${RUN_DAG_CASE:-0}"
 RUN_EXPORT_PARAM="${RUN_EXPORT_PARAM:-0}"
+RUN_LLM_CASE="${RUN_LLM_CASE:-0}"
 
 if [[ ! -f "$INPUT_XLSX" ]]; then
   echo "ERROR: INPUT_XLSX not found: $INPUT_XLSX" | tee -a "$LOG" >&2
@@ -331,6 +333,13 @@ agent-browser find role button click --name "完成" | tee -a "$LOG" || true
 agent-browser wait --load networkidle | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/03_after_import.png" | tee -a "$LOG" || true
 
+echo ">>> Linkage preview highlight check..." | tee -a "$LOG"
+if python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_linkage_preview.py" "$LOG" "$SCREENSHOTS_DIR" "$LINKAGE_PREVIEW_RESULT" | tee -a "$LOG"; then
+  record_step "linkage_preview" "pass" "" ""
+else
+  record_step "linkage_preview" "fail" "linkage preview highlight failed" "打开明细表点击任意单元格，确认黄色边框出现"
+fi
+
 echo ">>> Collecting tab row counts..." | tee -a "$LOG"
 TAB_COUNTS_JSONL="$RUN_DIR/tab_counts.jsonl"
 rm -f "$TAB_COUNTS_JSONL" 2>/dev/null || true
@@ -512,7 +521,7 @@ else
   record_step "indicator_dag" "skip" "RUN_DAG_CASE=0" "如需执行指标→DAG测试：RUN_DAG_CASE=1 make test-e2e"
 fi
 
-if [[ -n "${LLM_BASE_URL}" && -n "${LLM_MODEL}" && -n "${LLM_API_KEY}" ]]; then
+if [[ "$RUN_LLM_CASE" == "1" && -n "${LLM_BASE_URL}" && -n "${LLM_MODEL}" && -n "${LLM_API_KEY}" ]]; then
   echo ">>> LLM chat test suite..." | tee -a "$LOG"
   agent-browser press "Escape" | tee -a "$LOG" || true
   agent-browser wait --load networkidle | tee -a "$LOG" || true
@@ -522,7 +531,7 @@ if [[ -n "${LLM_BASE_URL}" && -n "${LLM_MODEL}" && -n "${LLM_API_KEY}" ]]; then
     record_step "llm_chat" "fail" "llm chat test failed" "查看 llm_results.json 与截图排查"
   fi
 else
-  record_step "llm_chat" "skip" "missing LLM env" "如需执行 LLM 专项测试：设置 LLM_BASE_URL/LLM_MODEL/LLM_API_KEY 或 DEEPSEEK_*"
+  record_step "llm_chat" "skip" "RUN_LLM_CASE=0" "如需执行 LLM 专项测试：RUN_LLM_CASE=1 并设置 LLM_BASE_URL/LLM_MODEL/LLM_API_KEY 或 DEEPSEEK_*"
 fi
 
 echo ">>> Capturing browser console/errors..." | tee -a "$LOG"

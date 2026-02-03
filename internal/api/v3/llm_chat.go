@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"northstar/internal/linkage"
 	"northstar/internal/llm"
 )
 
@@ -28,10 +29,15 @@ type llmChatRequest struct {
 }
 
 type llmToolSummary struct {
-	UpdatedCompanies int      `json:"updatedCompanies"`
-	TargetIndicators int      `json:"targetIndicators"`
-	Optimized        bool     `json:"optimized"`
-	Warnings         []string `json:"warnings,omitempty"`
+	UpdatedCompanies     int               `json:"updatedCompanies"`
+	TargetIndicators     int               `json:"targetIndicators"`
+	Optimized            bool              `json:"optimized"`
+	ToolPositionCount    int               `json:"toolPositionCount,omitempty"`
+	ImpactCellCount      int               `json:"impactCellCount,omitempty"`
+	ImpactIndicatorCount int               `json:"impactIndicatorCount,omitempty"`
+	ImpactCells          []linkage.UICoord `json:"impactCells,omitempty"`
+	ImpactIndicators     []string          `json:"impactIndicators,omitempty"`
+	Warnings             []string          `json:"warnings,omitempty"`
 }
 
 type llmStreamEvent struct {
@@ -159,7 +165,7 @@ func (h *Handler) runLLMChat(stream *llmStreamWriter, ctx llmChatContext) error 
 }
 
 func (h *Handler) executeLLMTools(parsed llm.ParsedToolCalls, year, month int) (llmToolSummary, error) {
-	excludes, updated, warnings, err := h.applyLLMCompanyUpdates(parsed.CompanyUpdates, year, month)
+	excludes, updated, applied, warnings, err := h.applyLLMCompanyUpdates(parsed.CompanyUpdates, year, month)
 	if err != nil {
 		return llmToolSummary{}, err
 	}
@@ -170,10 +176,19 @@ func (h *Handler) executeLLMTools(parsed llm.ParsedToolCalls, year, month int) (
 		}
 		optimized = true
 	}
+	impact, err := buildLLMToolImpact(h.store, year, month, applied, parsed.IndicatorTargets)
+	if err != nil {
+		return llmToolSummary{}, err
+	}
 	return llmToolSummary{
-		UpdatedCompanies: updated,
-		TargetIndicators: len(parsed.IndicatorTargets),
-		Optimized:        optimized,
-		Warnings:         warnings,
+		UpdatedCompanies:     updated,
+		TargetIndicators:     len(parsed.IndicatorTargets),
+		Optimized:            optimized,
+		ToolPositionCount:    impact.ToolPositionCount,
+		ImpactCellCount:      impact.ImpactCellCount,
+		ImpactIndicatorCount: impact.ImpactIndicatorCount,
+		ImpactCells:          impact.ImpactCells,
+		ImpactIndicators:     impact.ImpactIndicators,
+		Warnings:             warnings,
 	}, nil
 }

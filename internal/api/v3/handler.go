@@ -44,6 +44,8 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 
 	// 指标查询
 	router.GET("/indicators", h.GetIndicators)
+	// 联动预览
+	router.POST("/linkage/preview", h.PreviewLinkage)
 	// 智能调整
 	router.POST("/optimize", h.Optimize)
 	// LLM 对话

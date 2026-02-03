@@ -47,6 +47,8 @@ export default function DashboardV3() {
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showConfigDialog, setShowConfigDialog] = useState(false)
   const [showChatDialog, setShowChatDialog] = useState(false)
+  const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
+  const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
 
   const shouldApplyRandomDelay = () => {
     const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
@@ -103,6 +105,15 @@ export default function DashboardV3() {
     loadStatus()
     loadIndicators()
     loadMonths()
+  }, [])
+
+  useEffect(() => {
+    const handleClear = () => {
+      setHighlightCells({})
+      setHighlightIndicators({})
+    }
+    document.addEventListener('click', handleClear)
+    return () => document.removeEventListener('click', handleClear)
   }, [])
 
   // 导入完成回调
@@ -230,6 +241,54 @@ export default function DashboardV3() {
   const handleChatDataChanged = () => {
     loadIndicators()
     setReloadToken((x) => x + 1)
+  }
+
+  const handleChatImpact = (impact: { cells: { rowId: string; columnKey: string }[]; indicators: string[] }) => {
+    const nextCells: Record<string, boolean> = {}
+    const nextIndicators: Record<string, boolean> = {}
+    for (const cell of impact.cells) {
+      if (cell?.rowId && cell?.columnKey) {
+        nextCells[`${cell.rowId}|${cell.columnKey}`] = true
+      }
+    }
+    for (const id of impact.indicators) {
+      if (id) {
+        nextIndicators[String(id)] = true
+      }
+    }
+    setHighlightCells(nextCells)
+    setHighlightIndicators(nextIndicators)
+  }
+
+  const previewLinkage = async (anchor: any) => {
+    try {
+      const res = await fetch('/api/linkage/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anchor }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || '联动预览失败')
+      }
+      const nodes = Array.isArray(data.nodes) ? data.nodes : []
+      const nextCells: Record<string, boolean> = {}
+      const nextIndicators: Record<string, boolean> = {}
+      for (const node of nodes) {
+        if (node?.ui?.rowId && node?.ui?.columnKey) {
+          nextCells[`${node.ui.rowId}|${node.ui.columnKey}`] = true
+        }
+        if (node?.indicatorId) {
+          nextIndicators[String(node.indicatorId)] = true
+        }
+      }
+      setHighlightCells(nextCells)
+      setHighlightIndicators(nextIndicators)
+    } catch (err) {
+      console.error(err)
+      setHighlightCells({})
+      setHighlightIndicators({})
+    }
   }
 
   // 空状态
@@ -400,6 +459,8 @@ export default function DashboardV3() {
                 draftTargets={draftTargets}
                 onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
                 onApplySingle={applySingle}
+                onPreviewIndicator={(id) => previewLinkage({ indicatorId: id })}
+                highlightIndicators={highlightIndicators}
                 disabled={optimizing}
               />
             ))}
@@ -412,6 +473,8 @@ export default function DashboardV3() {
           onSavingChange={(s) => {
             setTableSaving(s)
           }}
+          onCellPreview={(rowId, columnKey) => previewLinkage({ ui: { rowId, columnKey } })}
+          highlightCells={highlightCells}
           monthSelector={
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">月份</span>
@@ -463,7 +526,12 @@ export default function DashboardV3() {
         )}
 
         <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
-        <LlmChatDialog open={showChatDialog} onOpenChange={setShowChatDialog} onDataChanged={handleChatDataChanged} />
+        <LlmChatDialog
+          open={showChatDialog}
+          onOpenChange={setShowChatDialog}
+          onDataChanged={handleChatDataChanged}
+          onPreviewImpact={handleChatImpact}
+        />
       </div>
     </div>
   )
@@ -475,6 +543,8 @@ function IndicatorGroupCard(props: {
   draftTargets: Record<string, string>
   onDraftChange: (id: string, value: string) => void
   onApplySingle: (id: string, value: string) => Promise<void>
+  onPreviewIndicator: (id: string) => void
+  highlightIndicators: Record<string, boolean>
 }) {
   return (
     <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
@@ -491,6 +561,8 @@ function IndicatorGroupCard(props: {
             draftTargets={props.draftTargets}
             onDraftChange={props.onDraftChange}
             onApplySingle={props.onApplySingle}
+            onPreviewIndicator={props.onPreviewIndicator}
+            highlightIndicators={props.highlightIndicators}
             disabled={props.disabled}
           />
         ))}
@@ -507,6 +579,8 @@ function MetricRow(props: {
   draftTargets: Record<string, string>
   onDraftChange: (id: string, value: string) => void
   onApplySingle: (id: string, value: string) => Promise<void>
+  onPreviewIndicator: (id: string) => void
+  highlightIndicators: Record<string, boolean>
 }) {
   const value = props.indicator?.value ?? 0
   const type = props.type ?? 'value'
@@ -520,6 +594,12 @@ function MetricRow(props: {
   const draft = id ? props.draftTargets[id] : undefined
   const displayValue = draft !== undefined ? draft : text
   const dirty = draft !== undefined && draft !== text
+  const highlighted = !!(id && props.highlightIndicators[id])
+  const borderTone = highlighted
+    ? 'border-yellow-400 ring-1 ring-yellow-400/50'
+    : dirty
+      ? 'border-orange-400/70 ring-1 ring-orange-400/40'
+      : 'border-border/60'
 
   return (
     <div className="flex items-center gap-3">
@@ -538,9 +618,12 @@ function MetricRow(props: {
             e.preventDefault()
             await props.onApplySingle(id, displayValue)
           }}
-          className={`h-9 w-[150px] rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${tone} ${
-            dirty ? 'border-orange-400/70 ring-1 ring-orange-400/40' : 'border-border/60'
-          }`}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!id) return
+            props.onPreviewIndicator(id)
+          }}
+          className={`h-9 w-[150px] rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${tone} ${borderTone}`}
         />
         <span className="w-10 text-right text-xs text-muted-foreground">{unit}</span>
       </div>

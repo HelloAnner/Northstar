@@ -171,6 +171,8 @@ export default function CompaniesTable(props: {
   onSavingChange: (saving: boolean) => void
   monthSelector?: ReactNode
   reloadToken: number
+  onCellPreview?: (rowId: string, columnKey: ColumnKey) => void
+  highlightCells?: Record<string, boolean>
 }) {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<CompanyRow[]>([])
@@ -352,9 +354,13 @@ export default function CompaniesTable(props: {
                         {columns.map((col) => (
                           <TableCell
                             key={col.key}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              props.onCellPreview?.(row.id, col.key)
+                            }}
                             className={`align-middle whitespace-nowrap ${
                               col.align === 'right' ? 'text-right' : col.align === 'left' ? 'text-left' : 'text-center'
-                            }`}
+                            } ${props.highlightCells?.[`${row.id}|${col.key}`] ? 'ring-2 ring-inset ring-yellow-400/80' : ''}`}
                             style={{ textAlign: col.align ?? 'center' }}
                           >
                             <Cell

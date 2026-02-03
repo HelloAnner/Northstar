@@ -402,10 +402,21 @@ func (c *Calculator) calculateTotalSocial(year, month int, specialIndicators []I
 	if err != nil {
 		return nil, err
 	}
+	acOpts := store.ACQueryOptions{
+		DataYear:  &year,
+		DataMonth: &month,
+	}
+	acRecords, err := c.store.GetACByYearMonth(acOpts)
+	if err != nil {
+		return nil, err
+	}
 
 	var retailLastYearCumulativeSum float64
 	for _, record := range wrRecords {
 		retailLastYearCumulativeSum += record.RetailLastYearCumulative
+	}
+	for _, record := range acRecords {
+		retailLastYearCumulativeSum += record.FoodLastYearCumulative + record.GoodsLastYearCumulative
 	}
 
 	lastYearTotalCumulative := retailLastYearCumulativeSum + lastYearLimitBelowCumulative

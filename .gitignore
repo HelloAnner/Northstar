@@ -108,3 +108,7 @@ tests/e2e-result/
 **/fixtures
 northstar
 **/*.zip
+
+# 前端源代码需要纳入版本控制
+!web/src/lib/
+!web/src/lib/**

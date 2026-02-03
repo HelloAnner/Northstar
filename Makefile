@@ -67,6 +67,12 @@ build-web:
 	@cd $(WEB_DIR) && if [ ! -d "node_modules" ] || [ ! -x "node_modules/.bin/tsc" ]; then \
 		echo ">>> 检测到前端依赖缺失，执行 npm ci..."; \
 		npm ci; \
+	elif [ ! -f "node_modules/.package-lock.json" ] || [ "package-lock.json" -nt "node_modules/.package-lock.json" ]; then \
+		echo ">>> 检测到依赖锁文件更新，执行 npm ci..."; \
+		npm ci; \
+	elif ! npm ls --silent --depth=0 >/dev/null 2>&1; then \
+		echo ">>> 检测到依赖不完整，执行 npm ci..."; \
+		npm ci; \
 	fi
 	cd $(WEB_DIR) && npm run build
 	@echo ">>> 前端构建完成"

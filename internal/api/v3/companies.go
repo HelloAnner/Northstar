@@ -197,6 +197,7 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 				updates[k] = v
 			}
 		}
+		applyWRCumulativeUpdates(*existing, patch, updates)
 
 		if err := h.store.UpdateWR(numericID, updates); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -230,6 +231,7 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 				updates[k] = v
 			}
 		}
+		applyACCumulativeUpdates(*existing, patch, updates)
 
 		if err := h.store.UpdateAC(numericID, updates); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -414,6 +416,86 @@ func buildACRetailDrivenUpdates(existing model.AccommodationCatering, patch map[
 	}
 
 	return out, nil
+}
+
+func applyWRCumulativeUpdates(existing model.WholesaleRetail, patch map[string]interface{}, updates map[string]interface{}) {
+	applyCumulativeUpdate(existing.SalesPrevCumulative, existing.SalesCurrentMonth, patch, updates,
+		"sales_current_month", "salesCurrentMonth",
+		"sales_current_cumulative", "salesCurrentCumulative",
+	)
+	applyCumulativeUpdate(existing.SalesLastYearPrevCumulative, existing.SalesLastYearMonth, patch, updates,
+		"sales_last_year_month", "salesLastYearMonth",
+		"sales_last_year_cumulative", "salesLastYearCumulative",
+	)
+	applyCumulativeUpdate(existing.RetailPrevCumulative, existing.RetailCurrentMonth, patch, updates,
+		"retail_current_month", "retailCurrentMonth",
+		"retail_current_cumulative", "retailCurrentCumulative",
+	)
+	applyCumulativeUpdate(existing.RetailLastYearPrevCumulative, existing.RetailLastYearMonth, patch, updates,
+		"retail_last_year_month", "retailLastYearMonth",
+		"retail_last_year_cumulative", "retailLastYearCumulative",
+	)
+}
+
+func applyACCumulativeUpdates(existing model.AccommodationCatering, patch map[string]interface{}, updates map[string]interface{}) {
+	applyCumulativeUpdate(existing.RevenuePrevCumulative, existing.RevenueCurrentMonth, patch, updates,
+		"revenue_current_month", "revenueCurrentMonth",
+		"revenue_current_cumulative", "revenueCurrentCumulative",
+	)
+	applyCumulativeUpdate(existing.RoomPrevCumulative, existing.RoomCurrentMonth, patch, updates,
+		"room_current_month", "roomCurrentMonth",
+		"room_current_cumulative", "roomCurrentCumulative",
+	)
+	applyCumulativeUpdate(existing.FoodPrevCumulative, existing.FoodCurrentMonth, patch, updates,
+		"food_current_month", "foodCurrentMonth",
+		"food_current_cumulative", "foodCurrentCumulative",
+	)
+	applyCumulativeUpdate(existing.GoodsPrevCumulative, existing.GoodsCurrentMonth, patch, updates,
+		"goods_current_month", "goodsCurrentMonth",
+		"goods_current_cumulative", "goodsCurrentCumulative",
+	)
+}
+
+func applyCumulativeUpdate(
+	prev float64,
+	existingCurrent float64,
+	patch map[string]interface{},
+	updates map[string]interface{},
+	currentKey string,
+	currentAlias string,
+	cumulativeKey string,
+	cumulativeAlias string,
+) {
+	if hasAnyKey(patch, updates, cumulativeKey, cumulativeAlias) {
+		return
+	}
+	if !hasAnyKey(patch, updates, currentKey, currentAlias) {
+		return
+	}
+	current := pickFloatOverrideWithUpdates(existingCurrent, patch, updates, currentAlias, currentKey)
+	updates[cumulativeKey] = math.Round(prev + current)
+}
+
+func hasAnyKey(patch map[string]interface{}, updates map[string]interface{}, keys ...string) bool {
+	if patchHasKey(updates, keys...) {
+		return true
+	}
+	return patchHasKey(patch, keys...)
+}
+
+func pickFloatOverrideWithUpdates(
+	existing float64,
+	patch map[string]interface{},
+	updates map[string]interface{},
+	keys ...string,
+) float64 {
+	if v, ok := parseFloatFromPatch(updates, keys...); ok {
+		return v
+	}
+	if v, ok := parseFloatFromPatch(patch, keys...); ok {
+		return v
+	}
+	return existing
 }
 
 func pickFloatOverride(existing float64, patch map[string]interface{}, keys ...string) float64 {

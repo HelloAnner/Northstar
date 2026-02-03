@@ -10,6 +10,7 @@ interface LlmChatDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onDataChanged: () => void
+  onPreviewImpact?: (impact: { cells: ImpactCell[]; indicators: string[] }) => void
 }
 
 interface ChatMessage {
@@ -26,12 +27,22 @@ interface StreamEvent {
     updatedCompanies: number
     targetIndicators: number
     optimized: boolean
+    toolPositionCount?: number
+    impactCellCount?: number
+    impactIndicatorCount?: number
+    impactCells?: ImpactCell[]
+    impactIndicators?: string[]
     warnings?: string[]
   }
   error?: string
 }
 
-export default function LlmChatDialog({ open, onOpenChange, onDataChanged }: LlmChatDialogProps) {
+interface ImpactCell {
+  rowId: string
+  columnKey: string
+}
+
+export default function LlmChatDialog({ open, onOpenChange, onDataChanged, onPreviewImpact }: LlmChatDialogProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -120,6 +131,11 @@ export default function LlmChatDialog({ open, onOpenChange, onDataChanged }: Llm
     }
     if (event.type === 'tool_result' && event.summary) {
       appendAssistantMessage(formatSummary(event.summary))
+      const cells = event.summary.impactCells ?? []
+      const indicators = event.summary.impactIndicators ?? []
+      if ((cells.length > 0 || indicators.length > 0) && onPreviewImpact) {
+        onPreviewImpact({ cells, indicators })
+      }
       return
     }
     if (event.type === 'error' && event.error) {
@@ -161,6 +177,14 @@ export default function LlmChatDialog({ open, onOpenChange, onDataChanged }: Llm
       `指标目标：${summary.targetIndicators}`,
       summary.optimized ? '智能调整：已触发' : '智能调整：未触发',
     ]
+    if (typeof summary.toolPositionCount === 'number') {
+      parts.push(`工具修改位置：${summary.toolPositionCount}`)
+    }
+    if (typeof summary.impactCellCount === 'number' || typeof summary.impactIndicatorCount === 'number') {
+      const cellCount = summary.impactCellCount ?? 0
+      const indicatorCount = summary.impactIndicatorCount ?? 0
+      parts.push(`影响位置：${cellCount}，指标：${indicatorCount}`)
+    }
     if (summary.warnings && summary.warnings.length > 0) {
       parts.push(`提示：${summary.warnings.join('；')}`)
     }
