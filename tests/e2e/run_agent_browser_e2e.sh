@@ -356,7 +356,7 @@ for tab in "全部" "批发" "零售" "住宿" "餐饮"; do
   fi
   agent-browser wait --load networkidle | tee -a "$LOG" || true
   # Give UI time to load filtered list (requests are async).
-  agent-browser wait --fn "(() => { const t = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(v => v.startsWith('共 ') && v.includes(' 家企业')) || ''; const m = t.match(/共\\s*(\\d+)\\s*家企业/); if (!m) return true; const total = parseInt(m[1], 10); const rows = document.querySelectorAll('tbody tr').length; return rows === 0 || rows === total; })()" | tee -a "$LOG" || true
+  agent-browser wait --fn "(() => { const t = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(v => v.startsWith('共 ') && v.includes(' 家企业')) || ''; const m = t.match(/共\\s*(\\d+)\\s*家企业/); const rows = document.querySelectorAll('tbody tr').length; const loading = Array.from(document.querySelectorAll('tbody tr td')).some(td => (td.textContent||'').includes('加载中')); if (loading) return false; if (!m) return true; const total = parseInt(m[1], 10); return rows === 0 || rows === total; })()" | tee -a "$LOG" || true
 
   agent-browser eval "(() => { const rows = document.querySelectorAll('tbody tr').length; const totalText = Array.from(document.querySelectorAll('span')).map(x => (x.textContent||'').trim()).find(t => t.startsWith('共 ') && t.includes(' 家企业')) || ''; return { rows, totalText }; })()" --json >"$RUN_DIR/tab_count_one.json" || true
 
@@ -560,6 +560,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --indicators-after "$INDICATORS_AFTER" \
   --ui-dag-before "$UI_DAG_BEFORE" \
   --ui-dag-after "$UI_DAG_AFTER" \
+  --linkage-preview "$LINKAGE_PREVIEW_RESULT" \
   --llm-results "$LLM_RESULTS_JSON" \
   --export-alt-xlsx "$EXPORT_ALT_XLSX" \
   --export-param-meta "$EXPORT_PARAM_META" \
@@ -593,6 +594,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --indicators-after "latest/indicators_after.json" \
   --ui-dag-before "latest/ui_companies_before_dag.json" \
   --ui-dag-after "latest/ui_companies_after_dag.json" \
+  --linkage-preview "latest/linkage_preview_result.json" \
   --export-alt-xlsx "latest/export_alt.xlsx" \
   --export-param-meta "latest/export_param_meta.json" \
   --console "latest/browser_console.txt" \

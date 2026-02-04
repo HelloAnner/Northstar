@@ -90,6 +90,16 @@ def _js_get_indicator_value(label: str) -> str:
     )
 
 
+def _js_collect_toasts() -> str:
+    return (
+        "(() => {\n"
+        "  const nodes = Array.from(document.querySelectorAll('[data-sonner-toast]'));\n"
+        "  const texts = nodes.map(n => String(n.textContent || '').trim()).filter(Boolean);\n"
+        "  return { ok: nodes.length > 0, count: nodes.length, texts };\n"
+        "})()"
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 4:
         print(
@@ -108,6 +118,7 @@ def main() -> None:
 
     payload = json.loads(actions_path.read_text(encoding="utf-8"))
     actions = payload.get("actions") or []
+    expect_toast = any(a.get("forceNotice") for a in actions if isinstance(a, dict))
     if not actions:
         print("No indicator actions to execute.")
         (screenshots.parent / "indicator_actions_result.json").write_text(
@@ -172,10 +183,35 @@ def main() -> None:
     # Apply all draft targets via Smart Adjust
     try:
         _agent('find role button click --name "智能调整"', log_path)
-        time.sleep(1.0)
+        time.sleep(0.6)
+        if expect_toast:
+            try:
+                _agent(
+                    "wait --fn \"document.querySelectorAll('[data-sonner-toast]').length > 0\" --timeout 5000",
+                    log_path,
+                )
+            except SystemExit:
+                pass
         _agent("wait --load networkidle", log_path)
     except SystemExit as e:
         results.append({"i": 0, "label": "_smart_adjust", "ok": False, "error": f"smart adjust failed: exit={e.code}"})
+
+    toast_result: Dict[str, Any] = {}
+    if expect_toast:
+        try:
+            toast_ret = _agent_json(f"eval {shlex.quote(_js_collect_toasts())} --json", log_path)
+            toast_result = _unwrap_agent_browser_json(toast_ret)
+        except SystemExit as e:
+            toast_result = {"ok": False, "error": f"toast wait failed: exit={e.code}"}
+        results.append(
+            {
+                "i": 0,
+                "label": "_toast_notice",
+                "ok": bool(toast_result.get("ok")),
+                "reason": "智能调整提示",
+                "toast": toast_result,
+            }
+        )
 
     _agent(f'screenshot "{screenshots / "12_indicator_adjust.png"}"', log_path)
 

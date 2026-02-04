@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 
+	"northstar/internal/dagcalc"
 	"northstar/internal/model"
 	"northstar/internal/store"
 )
@@ -169,11 +170,11 @@ func adjustLimitAboveMonthValueWithExcludes(st *store.Store, year, month int, ta
 }
 
 func adjustLimitAboveMonthRateWithExcludes(st *store.Store, year, month int, targetRate float64, excludes fieldExcludes) error {
-	lastYearSumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_month")
+	lastYearSumWR, _, err := dagcalc.SumAndCountWR(st, year, month, "", "", "retail_last_year_month")
 	if err != nil {
 		return err
 	}
-	lastYearSumAC, _, err := sumAndCountACDerivedRetailMonth(st, year, month, "", true)
+	lastYearSumAC, _, err := dagcalc.SumAndCountACDerivedRetailLastYearMonth(st, year, month, "")
 	if err != nil {
 		return err
 	}
@@ -196,11 +197,11 @@ func adjustLimitAboveCumulativeValueWithExcludes(st *store.Store, year, month in
 }
 
 func adjustLimitAboveCumulativeRateWithExcludes(st *store.Store, year, month int, targetRate float64, excludes fieldExcludes) error {
-	lastYearSumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
+	lastYearSumWR, _, err := dagcalc.SumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
 	if err != nil {
 		return err
 	}
-	lastYearSumAC, _, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", true)
+	lastYearSumAC, _, err := dagcalc.SumAndCountACDerivedRetailLastYearCumulative(st, year, month, "")
 	if err != nil {
 		return err
 	}
@@ -215,7 +216,7 @@ func adjustLimitAboveCumulativeRateWithExcludes(st *store.Store, year, month int
 }
 
 func adjustWRSpecialRateWithExcludes(st *store.Store, year, month int, flagField string, targetRate float64, excludes fieldExcludes) error {
-	lastYearSum, _, err := sumAndCountWR(st, year, month, "", flagField, "retail_last_year_month")
+	lastYearSum, _, err := dagcalc.SumAndCountWR(st, year, month, "", flagField, "retail_last_year_month")
 	if err != nil {
 		return err
 	}
@@ -227,7 +228,7 @@ func adjustWRSpecialRateWithExcludes(st *store.Store, year, month int, flagField
 }
 
 func adjustWRIndustryRateWithExcludes(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64, excludes fieldExcludes) error {
-	lastYearSum, _, err := sumAndCountWR(st, year, month, industryType, "", lastYearField)
+	lastYearSum, _, err := dagcalc.SumAndCountWR(st, year, month, industryType, "", lastYearField)
 	if err != nil {
 		return err
 	}
@@ -239,7 +240,7 @@ func adjustWRIndustryRateWithExcludes(st *store.Store, year, month int, industry
 }
 
 func adjustACIndustryRateWithExcludes(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64, excludes fieldExcludes) error {
-	lastYearSum, _, err := sumAndCountAC(st, year, month, industryType, lastYearField)
+	lastYearSum, _, err := dagcalc.SumAndCountAC(st, year, month, industryType, lastYearField)
 	if err != nil {
 		return err
 	}
@@ -258,7 +259,7 @@ func adjustTotalSocialCumulativeValueWithExcludes(st *store.Store, year, month i
 	if err != nil {
 		limitBelowLastYear = 0
 	}
-	microRate, err := computeMicroSmallRate(st, year, month)
+	microRate, err := dagcalc.ComputeMicroSmallRate(st, year, month)
 	if err != nil {
 		return err
 	}
@@ -277,15 +278,15 @@ func adjustTotalSocialCumulativeRateWithExcludes(st *store.Store, year, month in
 	if err != nil {
 		limitBelowLastYear = 0
 	}
-	microRate, err := computeMicroSmallRate(st, year, month)
+	microRate, err := dagcalc.ComputeMicroSmallRate(st, year, month)
 	if err != nil {
 		return err
 	}
-	retailLastYearCumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
+	retailLastYearCumWR, _, err := dagcalc.SumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
 	if err != nil {
 		return err
 	}
-	retailLastYearCumAC, _, err := sumAndCountACDerivedRetailCumulative(st, year, month, "", true)
+	retailLastYearCumAC, _, err := dagcalc.SumAndCountACDerivedRetailLastYearCumulative(st, year, month, "")
 	if err != nil {
 		return err
 	}
@@ -315,8 +316,8 @@ func scaleWRRowsWithExcludes(st *store.Store, field string, target, fixedSum flo
 	if len(rows) == 0 {
 		return nil
 	}
-	values := randomizeAllocations(adjustTarget, wrFieldBases(rows, field))
-	return updateWRFieldValues(st, field, rows, values)
+	values := dagcalc.RandomizeAllocations(adjustTarget, wrFieldBases(rows, field), wrFieldScales(rows))
+	return dagcalc.UpdateWRFieldValues(st, field, rows, values)
 }
 
 func scaleACFieldWithExcludes(st *store.Store, year, month int, industryType, field string, target float64, excludes fieldExcludes) error {
@@ -335,8 +336,8 @@ func scaleACRowsWithExcludes(st *store.Store, field string, target, fixedSum flo
 	if len(rows) == 0 {
 		return nil
 	}
-	values := randomizeAllocations(adjustTarget, acFieldBases(rows, field))
-	return updateACFieldValues(st, field, rows, values)
+	values := dagcalc.RandomizeAllocations(adjustTarget, acFieldBases(rows, field), acFieldScales(rows))
+	return dagcalc.UpdateACFieldValues(st, field, rows, values)
 }
 
 func scaleAcrossWRAndACDerivedRetailWithExcludes(st *store.Store, year, month int, wrField, foodField, goodsField string, target float64, excludes fieldExcludes) error {
@@ -357,20 +358,21 @@ func scaleAcrossWRAndACDerivedRetailWithExcludes(st *store.Store, year, month in
 		return nil
 	}
 	bases := append(wrFieldBases(wrRows, wrField), acDerivedBases(acRows, foodField, goodsField)...)
-	values := randomizeAllocations(adjustTarget, bases)
+	scales := append(wrFieldScales(wrRows), acFieldScales(acRows)...)
+	values := dagcalc.RandomizeAllocations(adjustTarget, bases, scales)
 	if len(wrRows) > 0 {
-		if err := updateWRFieldValues(st, wrField, wrRows, values[:len(wrRows)]); err != nil {
+		if err := dagcalc.UpdateWRFieldValues(st, wrField, wrRows, values[:len(wrRows)]); err != nil {
 			return err
 		}
 	}
 	if len(acRows) > 0 {
-		return updateACDerivedRetailValues(st, foodField, goodsField, acRows, values[len(wrRows):])
+		return dagcalc.UpdateACDerivedRetailValues(st, foodField, goodsField, acRows, values[len(wrRows):])
 	}
 	return nil
 }
 
 func splitWRRowsForAdjust(st *store.Store, year, month int, industryType, flagField, field string, excludes fieldExcludes) ([]*model.WholesaleRetail, float64, error) {
-	rows, err := loadWRRowsForAdjust(st, year, month, industryType, flagField)
+	rows, err := dagcalc.LoadWRRowsForAdjust(st, year, month, industryType, flagField)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -378,7 +380,7 @@ func splitWRRowsForAdjust(st *store.Store, year, month int, industryType, flagFi
 	fixedSum := 0.0
 	for _, row := range rows {
 		if excludes.wrExcluded(row.ID, field) {
-			fixedSum += pickWRFieldValue(row, field)
+			fixedSum += dagcalc.PickWRFieldValue(row, field)
 			continue
 		}
 		adjustable = append(adjustable, row)
@@ -387,7 +389,7 @@ func splitWRRowsForAdjust(st *store.Store, year, month int, industryType, flagFi
 }
 
 func splitACRowsForAdjust(st *store.Store, year, month int, industryType, field string, excludes fieldExcludes) ([]*model.AccommodationCatering, float64, error) {
-	rows, err := loadACRowsForAdjust(st, year, month, industryType)
+	rows, err := dagcalc.LoadACRowsForAdjust(st, year, month, industryType)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -395,7 +397,7 @@ func splitACRowsForAdjust(st *store.Store, year, month int, industryType, field 
 	fixedSum := 0.0
 	for _, row := range rows {
 		if excludes.acExcluded(row.ID, field) {
-			fixedSum += pickACFieldValue(row, field)
+			fixedSum += dagcalc.PickACFieldValue(row, field)
 			continue
 		}
 		adjustable = append(adjustable, row)
@@ -404,14 +406,14 @@ func splitACRowsForAdjust(st *store.Store, year, month int, industryType, field 
 }
 
 func splitACDerivedRetailRowsForAdjust(st *store.Store, year, month int, industryType, foodField, goodsField string, excludes fieldExcludes) ([]*model.AccommodationCatering, float64, error) {
-	rows, err := loadACRowsForAdjust(st, year, month, industryType)
+	rows, err := dagcalc.LoadACRowsForAdjust(st, year, month, industryType)
 	if err != nil {
 		return nil, 0, err
 	}
 	adjustable := make([]*model.AccommodationCatering, 0, len(rows))
 	fixedSum := 0.0
 	for _, row := range rows {
-		value := pickACFieldValue(row, foodField) + pickACFieldValue(row, goodsField)
+		value := dagcalc.PickACFieldValue(row, foodField) + dagcalc.PickACFieldValue(row, goodsField)
 		if excludes.acDerivedExcluded(row.ID, foodField, goodsField) {
 			fixedSum += value
 			continue
@@ -424,23 +426,39 @@ func splitACDerivedRetailRowsForAdjust(st *store.Store, year, month int, industr
 func wrFieldBases(rows []*model.WholesaleRetail, field string) []float64 {
 	bases := make([]float64, len(rows))
 	for i, row := range rows {
-		bases[i] = pickWRFieldValue(row, field)
+		bases[i] = dagcalc.PickWRFieldValue(row, field)
 	}
 	return bases
+}
+
+func wrFieldScales(rows []*model.WholesaleRetail) []int {
+	scales := make([]int, len(rows))
+	for i, row := range rows {
+		scales[i] = row.CompanyScale
+	}
+	return scales
 }
 
 func acFieldBases(rows []*model.AccommodationCatering, field string) []float64 {
 	bases := make([]float64, len(rows))
 	for i, row := range rows {
-		bases[i] = pickACFieldValue(row, field)
+		bases[i] = dagcalc.PickACFieldValue(row, field)
 	}
 	return bases
+}
+
+func acFieldScales(rows []*model.AccommodationCatering) []int {
+	scales := make([]int, len(rows))
+	for i, row := range rows {
+		scales[i] = row.CompanyScale
+	}
+	return scales
 }
 
 func acDerivedBases(rows []*model.AccommodationCatering, foodField, goodsField string) []float64 {
 	bases := make([]float64, len(rows))
 	for i, row := range rows {
-		bases[i] = pickACFieldValue(row, foodField) + pickACFieldValue(row, goodsField)
+		bases[i] = dagcalc.PickACFieldValue(row, foodField) + dagcalc.PickACFieldValue(row, goodsField)
 	}
 	return bases
 }

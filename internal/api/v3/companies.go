@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"northstar/internal/calculator"
+	"northstar/internal/dagcalc"
 	"northstar/internal/model"
 	"northstar/internal/store"
 )
@@ -28,22 +28,22 @@ type companyRow struct {
 	SourceSheet  string `json:"sourceSheet"`
 
 	// WR
-	SalesPrevMonth              *float64 `json:"salesPrevMonth,omitempty"`
-	SalesCurrentMonth           *float64 `json:"salesCurrentMonth,omitempty"`
-	SalesLastYearMonth          *float64 `json:"salesLastYearMonth,omitempty"`
-	SalesCurrentCumulative      *float64 `json:"salesCurrentCumulative,omitempty"`
-	SalesLastYearCumulative     *float64 `json:"salesLastYearCumulative,omitempty"`
-	SalesMonthRate              *float64 `json:"salesMonthRate,omitempty"`
-	SalesCumulativeRate         *float64 `json:"salesCumulativeRate,omitempty"`
+	SalesPrevMonth          *float64 `json:"salesPrevMonth,omitempty"`
+	SalesCurrentMonth       *float64 `json:"salesCurrentMonth,omitempty"`
+	SalesLastYearMonth      *float64 `json:"salesLastYearMonth,omitempty"`
+	SalesCurrentCumulative  *float64 `json:"salesCurrentCumulative,omitempty"`
+	SalesLastYearCumulative *float64 `json:"salesLastYearCumulative,omitempty"`
+	SalesMonthRate          *float64 `json:"salesMonthRate,omitempty"`
+	SalesCumulativeRate     *float64 `json:"salesCumulativeRate,omitempty"`
 
-	RetailCurrentMonth           *float64 `json:"retailCurrentMonth,omitempty"`
-	RetailLastYearMonth          *float64 `json:"retailLastYearMonth,omitempty"`
-	RetailPrevMonth              *float64 `json:"retailPrevMonth,omitempty"`
-	RetailCurrentCumulative      *float64 `json:"retailCurrentCumulative,omitempty"`
-	RetailLastYearCumulative     *float64 `json:"retailLastYearCumulative,omitempty"`
-	RetailMonthRate              *float64 `json:"retailMonthRate,omitempty"`
-	RetailCumulativeRate         *float64 `json:"retailCumulativeRate,omitempty"`
-	RetailRatio                  *float64 `json:"retailRatio,omitempty"`
+	RetailCurrentMonth       *float64 `json:"retailCurrentMonth,omitempty"`
+	RetailLastYearMonth      *float64 `json:"retailLastYearMonth,omitempty"`
+	RetailPrevMonth          *float64 `json:"retailPrevMonth,omitempty"`
+	RetailCurrentCumulative  *float64 `json:"retailCurrentCumulative,omitempty"`
+	RetailLastYearCumulative *float64 `json:"retailLastYearCumulative,omitempty"`
+	RetailMonthRate          *float64 `json:"retailMonthRate,omitempty"`
+	RetailCumulativeRate     *float64 `json:"retailCumulativeRate,omitempty"`
+	RetailRatio              *float64 `json:"retailRatio,omitempty"`
 
 	// AC
 	RevenuePrevMonth          *float64 `json:"revenuePrevMonth,omitempty"`
@@ -203,7 +203,8 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		if err := recalcDerivedFields(h.store, year, month); err != nil {
+		groups, err := dagcalc.RecalcAll(h.store, year, month)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -212,7 +213,6 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		groups, _ := calculator.NewCalculator(h.store).CalculateAll(year, month)
 		roundIndicatorGroupsInPlace(groups)
 		c.JSON(http.StatusOK, gin.H{"company": toCompanyRowWR(*rec), "groups": groups})
 	case "ac":
@@ -237,7 +237,8 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		if err := recalcDerivedFields(h.store, year, month); err != nil {
+		groups, err := dagcalc.RecalcAll(h.store, year, month)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -246,7 +247,6 @@ func (h *Handler) UpdateCompany(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		groups, _ := calculator.NewCalculator(h.store).CalculateAll(year, month)
 		roundIndicatorGroupsInPlace(groups)
 		c.JSON(http.StatusOK, gin.H{"company": toCompanyRowAC(*rec), "groups": groups})
 	default:
@@ -580,8 +580,7 @@ func (h *Handler) ResetCompanies(c *gin.Context) {
 		}
 	}
 
-	_ = recalcDerivedFields(h.store, year, month)
-	groups, _ := calculator.NewCalculator(h.store).CalculateAll(year, month)
+	groups, _ := dagcalc.RecalcAll(h.store, year, month)
 	roundIndicatorGroupsInPlace(groups)
 	c.JSON(http.StatusOK, gin.H{"groups": groups})
 }
@@ -856,51 +855,7 @@ func pickUpdates(patch map[string]interface{}, allowed map[string]bool, aliases 
 }
 
 func recalcDerivedFields(st *store.Store, year, month int) error {
-	// 复用导入后的 SQL（一次更新，保证指标一致）
-	if err := st.Exec(`
-		UPDATE wholesale_retail SET
-			sales_month_rate = CASE
-				WHEN sales_last_year_month = 0 THEN -100
-				ELSE (sales_current_month - sales_last_year_month) / sales_last_year_month * 100
-			END,
-			sales_cumulative_rate = CASE
-				WHEN sales_last_year_cumulative = 0 THEN -100
-				ELSE (sales_current_cumulative - sales_last_year_cumulative) / sales_last_year_cumulative * 100
-			END,
-			retail_month_rate = CASE
-				WHEN retail_last_year_month = 0 THEN -100
-				ELSE (retail_current_month - retail_last_year_month) / retail_last_year_month * 100
-			END,
-			retail_cumulative_rate = CASE
-				WHEN retail_last_year_cumulative = 0 THEN -100
-				ELSE (retail_current_cumulative - retail_last_year_cumulative) / retail_last_year_cumulative * 100
-			END,
-			retail_ratio = CASE
-				WHEN sales_current_month = 0 THEN NULL
-				ELSE retail_current_month / sales_current_month * 100
-			END
-		WHERE data_year = ? AND data_month = ?
-	`, year, month); err != nil {
-		return err
-	}
-
-	if err := st.Exec(`
-		UPDATE accommodation_catering SET
-			revenue_month_rate = CASE
-				WHEN revenue_last_year_month = 0 THEN -100
-				ELSE (revenue_current_month - revenue_last_year_month) / revenue_last_year_month * 100
-			END,
-			revenue_cumulative_rate = CASE
-				WHEN revenue_last_year_cumulative = 0 THEN -100
-				ELSE (revenue_current_cumulative - revenue_last_year_cumulative) / revenue_last_year_cumulative * 100
-			END,
-			retail_current_month = food_current_month + goods_current_month,
-			retail_last_year_month = food_last_year_month + goods_last_year_month
-		WHERE data_year = ? AND data_month = ?
-	`, year, month); err != nil {
-		return err
-	}
-	return nil
+	return dagcalc.RecalcDerivedFields(st, year, month)
 }
 
 func resetAllForMonth(st *store.Store, year, month int) error {

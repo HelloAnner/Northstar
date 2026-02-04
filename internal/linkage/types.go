@@ -7,31 +7,23 @@
 
 package linkage
 
-import "strconv"
+import (
+	"strconv"
+
+	"northstar/internal/dagcalc"
+)
 
 // NodeID DAG 节点 ID
-type NodeID string
+type NodeID = dagcalc.NodeID
 
 // UICoord UI 坐标（企业表单元格）
-type UICoord struct {
-	RowID     string `json:"rowId"`
-	ColumnKey string `json:"columnKey"`
-}
+type UICoord = dagcalc.UICoord
 
 // ExcelCoord Excel 坐标
-type ExcelCoord struct {
-	Sheet string `json:"sheet"`
-	Cell  string `json:"cell"`
-}
+type ExcelCoord = dagcalc.ExcelCoord
 
 // ImpactNode 影响范围节点
-type ImpactNode struct {
-	NodeID      string       `json:"nodeId"`
-	UICoord     *UICoord     `json:"ui,omitempty"`
-	IndicatorID string       `json:"indicatorId,omitempty"`
-	ExcelCoords []ExcelCoord `json:"excel,omitempty"`
-	Reason      string       `json:"reason,omitempty"`
-}
+type ImpactNode = dagcalc.ImpactNode
 
 // AnchorPreviewRequest 预览请求
 type AnchorPreviewRequest struct {
@@ -40,8 +32,8 @@ type AnchorPreviewRequest struct {
 
 // Anchor 预览锚点
 type Anchor struct {
-	UI          *UICoord   `json:"ui,omitempty"`
-	IndicatorID string     `json:"indicatorId,omitempty"`
+	UI          *UICoord    `json:"ui,omitempty"`
+	IndicatorID string      `json:"indicatorId,omitempty"`
 	Excel       *ExcelCoord `json:"excel,omitempty"`
 }
 

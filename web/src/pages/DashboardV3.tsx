@@ -13,6 +13,7 @@ import ThemeToggle from '@/components/app/ThemeToggle'
 import NorthstarIcon from '@/components/app/NorthstarIcon'
 import GlobalConfigDialog from '@/components/GlobalConfigDialog'
 import LlmChatDialog from '@/components/LlmChatDialog'
+import { toast } from 'sonner'
 
 type Indicator = IndicatorGroup['indicators'][number]
 
@@ -33,6 +34,19 @@ interface YearMonthStat {
   totalCompanies: number
 }
 
+interface OptimizeNotice {
+  indicatorId: string
+  indicatorName: string
+  target: number
+  before: number
+  after: number
+  code: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+  suggestion?: string
+  suggestMin?: number
+}
+
 export default function DashboardV3() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
@@ -49,6 +63,24 @@ export default function DashboardV3() {
   const [showChatDialog, setShowChatDialog] = useState(false)
   const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
   const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
+
+  const showOptimizeNotices = (notices?: OptimizeNotice[]) => {
+    if (!Array.isArray(notices) || notices.length === 0) return
+    for (const notice of notices) {
+      const title = notice.indicatorName
+        ? `${notice.indicatorName}：${notice.message}`
+        : notice.message || '智能调整提示'
+      const description = notice.suggestion || undefined
+      const payload = { description, duration: 3000 }
+      if (notice.level === 'error') {
+        toast.error(title, payload)
+      } else if (notice.level === 'warn') {
+        toast.warning(title, payload)
+      } else {
+        toast(title, payload)
+      }
+    }
+  }
 
   const shouldApplyRandomDelay = () => {
     const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
@@ -157,6 +189,9 @@ export default function DashboardV3() {
         body: JSON.stringify({ targets }),
       })
       const data = await res.json()
+      if (data?.notices) {
+        showOptimizeNotices(data.notices as OptimizeNotice[])
+      }
       if (!res.ok) {
         throw new Error(data?.error || '智能调整失败')
       }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"northstar/internal/calculator"
+	"northstar/internal/dagcalc"
 	"northstar/internal/importer"
 	"northstar/internal/store"
 )
@@ -87,15 +88,14 @@ func TestOptimize_RandomizeLimitAboveMonthValue(t *testing.T) {
 		}
 	}
 
-	originRand := randFloat64
 	seq := []float64{0.1, 0.9, 0.2, 0.8}
 	seqIdx := 0
-	randFloat64 = func() float64 {
+	restoreRand := dagcalc.SetRandFloat64ForTest(func() float64 {
 		v := seq[seqIdx%len(seq)]
 		seqIdx++
 		return v
-	}
-	defer func() { randFloat64 = originRand }()
+	})
+	defer restoreRand()
 
 	if err := applyIndicatorTarget(st, 2025, 12, "limitAbove_month_value", 300); err != nil {
 		t.Fatalf("apply target: %v", err)

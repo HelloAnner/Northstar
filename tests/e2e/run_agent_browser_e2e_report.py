@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# E2E 报告生成脚本
+# @author Anner
+# Updated on 2026/2/4
 import argparse
 import json
 import math
@@ -131,16 +134,69 @@ def _indicator_items(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
-def _compare_indicators(before: List[Dict[str, Any]], after: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _indicator_stats(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    stats = {
+        "total": 0,
+        "eatWearUse": 0,
+        "smallMicro": 0,
+        "industries": {},
+    }
+    for r in rows:
+        code = str(r.get("__creditCode") or "").strip()
+        if not _is_credit_code(code):
+            continue
+        stats["total"] += 1
+        flags = str(r.get("标记") or "").strip()
+        if "吃穿用" in flags:
+            stats["eatWearUse"] = 1
+        if "小微" in flags:
+            stats["smallMicro"] = 1
+        industry = str(r.get("__industry") or "").strip()
+        if industry:
+            stats["industries"][industry] = int(stats["industries"].get(industry, 0)) + 1
+    return stats
+
+
+def _indicator_requires_change(label: str, stats: Dict[str, Any]) -> bool:
+    if not stats or stats.get("total", 0) == 0:
+        return False
+    if "吃穿用" in label and stats.get("eatWearUse", 0) == 0:
+        return False
+    if "小微" in label and stats.get("smallMicro", 0) == 0:
+        return False
+    industries = stats.get("industries") or {}
+    if "批发" in label and industries.get("批发", 0) == 0:
+        return False
+    if "零售" in label and industries.get("零售", 0) == 0:
+        return False
+    if "住宿" in label and industries.get("住宿", 0) == 0:
+        return False
+    if "餐饮" in label and industries.get("餐饮", 0) == 0:
+        return False
+    return True
+
+
+def _compare_indicators(
+    before: List[Dict[str, Any]], after: List[Dict[str, Any]], stats: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     before_map = {str(it.get("label")): it for it in before}
     after_map = {str(it.get("label")): it for it in after}
     changes: List[Dict[str, Any]] = []
+    required = 0
     changed = 0
+    skipped = 0
     for label, b in before_map.items():
         a = after_map.get(label)
         if not a:
             changes.append({"label": label, "before": b.get("value"), "after": None, "ok": False, "reason": "调整后缺失"})
             continue
+        if stats is not None and not _indicator_requires_change(label, stats):
+            skipped += 1
+            changes.append(
+                {"label": label, "before": b.get("value"), "after": a.get("value"), "ok": True, "reason": "无可调整企业"}
+            )
+            continue
+        required += 1
         b_num = _parse_number(b.get("value"))
         a_num = _parse_number(a.get("value"))
         ok = False
@@ -152,7 +208,8 @@ def _compare_indicators(before: List[Dict[str, Any]], after: List[Dict[str, Any]
             changed += 1
         changes.append({"label": label, "before": b.get("value"), "after": a.get("value"), "ok": ok})
     total = len(before_map)
-    return {"total": total, "changed": changed, "items": changes, "ok": total > 0 and changed == total}
+    ok = total > 0 and required == changed
+    return {"total": total, "required": required, "changed": changed, "skipped": skipped, "items": changes, "ok": ok}
 
 
 def _compare_dag_tables(before_rows: List[Dict[str, Any]], after_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -969,6 +1026,7 @@ def _issues_summary(
     normalization_fail: int,
     dag_fail: int,
     export_param_fail: int,
+    linkage_preview_fail: int,
     llm_fail: int,
 ) -> str:
     issues: List[str] = []
@@ -1011,6 +1069,8 @@ def _issues_summary(
         issues.append(f"DAG 联动覆盖不足：{dag_fail}（见“指标调整与DAG联动覆盖”）")
     if export_param_fail > 0:
         issues.append(f"导出参数化检查失败：{export_param_fail}（见“导出数字参数化”）")
+    if linkage_preview_fail > 0:
+        issues.append(f"联动预览高亮失败：{linkage_preview_fail}（见“联动预览高亮”）")
     if llm_fail > 0:
         issues.append("LLM 对话专项失败：1（见“LLM 对话专项测试”）")
 
@@ -1571,6 +1631,7 @@ def main() -> None:
     ap.add_argument("--indicators-after", required=False, default="")
     ap.add_argument("--ui-dag-before", required=False, default="")
     ap.add_argument("--ui-dag-after", required=False, default="")
+    ap.add_argument("--linkage-preview", required=False, default="")
     ap.add_argument("--llm-results", required=False, default="")
     ap.add_argument("--export-alt-xlsx", required=False, default="")
     ap.add_argument("--export-param-meta", required=False, default="")
@@ -1732,6 +1793,10 @@ def main() -> None:
     dag_before_rows = ui_dag_before_payload.get("rows") or []
     dag_after_rows = ui_dag_after_payload.get("rows") or []
 
+    linkage_preview = _load_optional_json(args.linkage_preview) if args.linkage_preview else {}
+    linkage_preview_executed = bool(linkage_preview)
+    linkage_preview_ok = bool(linkage_preview.get("ok")) if linkage_preview_executed else False
+
     out_dir = Path(args.out).parent
     try:
         _write_json(out_dir / "missing_before.json", missing_before)
@@ -1860,9 +1925,10 @@ def main() -> None:
         ui_derived = []
         ui_derived_fail = 0
 
+    indicator_stats = _indicator_stats(before_rows if isinstance(before_rows, list) else [])
     indicator_compare: Dict[str, Any] = {"executed": False, "ok": True, "total": 0, "changed": 0, "items": []}
     if indicators_before_items and indicators_after_items:
-        indicator_compare = _compare_indicators(indicators_before_items, indicators_after_items)
+        indicator_compare = _compare_indicators(indicators_before_items, indicators_after_items, indicator_stats)
         indicator_compare["executed"] = True
         try:
             _write_json(out_dir / "indicator_changes.json", indicator_compare)
@@ -1904,6 +1970,9 @@ def main() -> None:
         export_template_fail = 1
 
     indicator_action_fail = sum(1 for r in indicator_action_results if r.get("ok") is False)
+    linkage_preview_fail = 0
+    if not linkage_preview_ok:
+        linkage_preview_fail = 1
     normalization_fail = len(ui_normalization.get("unknownHeaders") or []) + len(ui_normalization.get("unknownSources") or []) + len(ui_normalization.get("unknownIndustries") or [])
     dag_fail = 0
     if indicator_compare.get("executed") and not indicator_compare.get("ok"):
@@ -1931,6 +2000,7 @@ def main() -> None:
         and (not indicator_compare.get("executed") or indicator_compare.get("ok") is True)
         and (not dag_summary.get("executed") or dag_summary.get("ok") is True)
         and (not export_param.get("executed") or export_param.get("ok") is True)
+        and linkage_preview_ok is True
         and (not llm_executed or llm_ok is True)
         and all(
             (derived_column_coverage.get("sheets") or {}).get(s, {}).get("missingUiColumns", 0) == 0
@@ -2027,6 +2097,69 @@ def main() -> None:
             + "</tbody></table></div>"
         )
 
+    def _linkage_preview_html() -> str:
+        if not linkage_preview:
+            return "<p class='warn'>未执行联动预览高亮（缺少 linkage_preview_result.json）。</p>"
+        okv = bool(linkage_preview.get("ok"))
+        derived = linkage_preview.get("derived") or {}
+        indicator = linkage_preview.get("indicator") or {}
+        d_pick = derived.get("pick") or {}
+        d_check = derived.get("check") or {}
+        i_pick = indicator.get("pick") or {}
+        i_check = indicator.get("check") or {}
+        d_ok = bool(d_check.get("ok"))
+        i_ok = bool(i_check.get("ok"))
+        d_class = "ok" if d_ok else "bad"
+        i_class = "ok" if i_ok else "bad"
+        d_highlight = d_check.get("highlightCount")
+        i_highlight_ind = i_check.get("highlightIndicators")
+        i_highlight_cells = i_check.get("highlightCells")
+
+        parent_rows = []
+        parent_status = d_check.get("parentStatus") or []
+        for p in parent_status:
+            parent_rows.append(
+                "<tr>"
+                f"<td>{_safe(str(p.get('label') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(p.get('idx') or ''))}</td>"
+                f"<td class='{ 'ok' if p.get('highlighted') else 'bad' }'>{'PASS' if p.get('highlighted') else 'FAIL'}</td>"
+                "</tr>"
+            )
+        parent_table = (
+            "<div class='table-wrap'><table><thead><tr>"
+            "<th>父节点列</th><th>列序号</th><th>高亮</th>"
+            "</tr></thead><tbody>"
+            + "".join(parent_rows)
+            + "</tbody></table></div>"
+            if parent_rows
+            else "<p class='warn'>未获取父节点高亮明细。</p>"
+        )
+
+        return (
+            f"<p class='{'ok' if okv else 'bad'}'>"
+            + ("✅ 联动预览高亮通过" if okv else "❌ 联动预览高亮失败")
+            + "</p>"
+            + "<div class='table-wrap'><table><thead><tr>"
+            "<th>类型</th><th>目标</th><th>结果</th><th>备注</th>"
+            "</tr></thead><tbody>"
+            "<tr>"
+            f"<td>派生列点击</td>"
+            f"<td>{_safe(str(d_pick.get('header') or ''))}</td>"
+            f"<td class='{d_class}'>{'PASS' if d_ok else 'FAIL'}</td>"
+            f"<td>父节点高亮 {len(parent_status)} / 总高亮 {d_highlight}</td>"
+            "</tr>"
+            "<tr>"
+            f"<td>指标点击</td>"
+            f"<td>{_safe(str(i_pick.get('label') or ''))}</td>"
+            f"<td class='{i_class}'>{'PASS' if i_ok else 'FAIL'}</td>"
+            f"<td>高亮指标 {i_highlight_ind} / 高亮单元格 {i_highlight_cells}</td>"
+            "</tr>"
+            "</tbody></table></div>"
+            + "<div style='margin-top: 8px;'>"
+            + parent_table
+            + "</div>"
+        )
+
     def _indicator_actions_html() -> str:
         if not indicator_action_results:
             return "<p class='warn'>未执行指标调整动作或未生成 indicator_actions_result.json</p>"
@@ -2065,6 +2198,10 @@ def main() -> None:
             return "<p class='warn'>未执行指标变化校验（缺少 indicators_before/after）。</p>"
         items = indicator_compare.get("items") or []
         fails = [x for x in items if not x.get("ok")]
+        required = int(indicator_compare.get("required") or 0)
+        changed = int(indicator_compare.get("changed") or 0)
+        skipped = int(indicator_compare.get("skipped") or 0)
+        total = int(indicator_compare.get("total") or 0)
         rows = []
         for it in items[:40]:
             okv = bool(it.get("ok"))
@@ -2079,7 +2216,11 @@ def main() -> None:
             )
         return (
             f"<p class='{'ok' if not fails else 'bad'}'>"
-            + ("✅ 16项指标均发生变化" if not fails else f"❌ 未变更：{len(fails)}/{len(items)}")
+            + (
+                f"✅ 指标变更：{changed}/{required}，跳过 {skipped}/{total}"
+                if not fails
+                else f"❌ 未变更：{len(fails)}/{len(items)}"
+            )
             + "</p>"
             + "<div class='table-wrap'><table><thead><tr>"
             "<th>指标</th><th>调整前</th><th>调整后</th><th>结果</th>"
@@ -2779,13 +2920,18 @@ def main() -> None:
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>不符合预期项总览</h2>
-        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail, llm_fail)}
+        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail, linkage_preview_fail, llm_fail)}
         <p class="warn">复现入口：打开 <span class="mono">{_safe(args.base_url)}</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>修改动作覆盖</h2>
         <p class="warn">复现：在首页输入框按信用代码搜索，修改对应字段输入框，失焦（blur）触发自动保存，然后导出检查。</p>
         {_actions_html()}
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>联动预览高亮</h2>
+        <p class="warn">目的：点击派生列/指标后，高亮应覆盖父节点与子节点（包含指标与明细表单元格）。</p>
+        {_linkage_preview_html()}
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>Tab 行数与总数</h2>

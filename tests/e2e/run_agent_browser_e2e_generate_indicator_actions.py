@@ -73,6 +73,27 @@ def _next_value(base: float, label: str, unit: str) -> float:
     return round(base * ratio, 2)
 
 
+def _force_notice_action(actions: List[Dict[str, Any]]) -> bool:
+    def _norm(s: str) -> str:
+        return str(s or "").replace(" ", "").replace("\u3000", "")
+
+    for act in actions:
+        label = _norm(act.get("label") or "")
+        if "限上社零额增速" in label and "累计" in label:
+            act["target"] = -200.0
+            act["reason"] = "智能调整失败提示校验（强制负增速）"
+            act["forceNotice"] = True
+            return True
+
+    for act in actions:
+        if _is_rate(str(act.get("label") or ""), str(act.get("unit") or "")):
+            act["target"] = -200.0
+            act["reason"] = "智能调整失败提示校验（强制负增速）"
+            act["forceNotice"] = True
+            return True
+    return False
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         print(
@@ -123,11 +144,14 @@ def main() -> None:
             }
         )
 
+    forced_notice = _force_notice_action(actions)
+
     out = {
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
         "actions": actions,
         "count": len(actions),
         "expectedCount": 16,
+        "forcedNotice": forced_notice,
     }
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"indicator actions: {len(actions)} -> {out_path}")
