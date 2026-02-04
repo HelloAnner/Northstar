@@ -38,6 +38,7 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 
 	// 企业数据查询
 	router.GET("/companies", h.ListCompanies)
+	router.PATCH("/companies/batch", h.BatchUpdateCompanies)
 	router.GET("/companies/:id", h.GetCompany)
 	router.PATCH("/companies/:id", h.UpdateCompany)
 	router.POST("/companies/reset", h.ResetCompanies)

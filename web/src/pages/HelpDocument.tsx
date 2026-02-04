@@ -184,7 +184,7 @@ export default function HelpDocument() {
                   </Card>
 
                   <Card className="border-white/10 bg-[#0D0D0D] p-6">
-                    <h2 className="text-lg font-semibold">编辑、保存、重置与撤销</h2>
+                    <h2 className="text-lg font-semibold">编辑、保存与撤销</h2>
                     <div className="mt-4 space-y-3 text-sm text-[#D4D4D4]">
                       <div>
                         <span className="font-semibold text-white">实时联动</span>：输入框内容变化后会自动提交（带短暂防抖），并触发后端重新计算指标。
@@ -193,10 +193,7 @@ export default function HelpDocument() {
                         <span className="font-semibold text-white">自动保存</span>：后端以防抖方式持久化（约 1000ms），页面右上角展示“上次保存时间”。
                       </div>
                       <div>
-                        <span className="font-semibold text-white">重置</span>：将企业数据恢复为导入 Excel 的原始值（原始快照）。
-                      </div>
-                      <div>
-                        <span className="font-semibold text-white">撤销</span>：支持多步撤销，恢复到上一版快照。
+                        <span className="font-semibold text-white">撤销</span>：支持多步撤销，恢复到上一步操作前的状态。
                       </div>
                     </div>
                   </Card>

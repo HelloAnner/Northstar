@@ -14,6 +14,8 @@ import NorthstarIcon from '@/components/app/NorthstarIcon'
 import GlobalConfigDialog from '@/components/GlobalConfigDialog'
 import LlmChatDialog from '@/components/LlmChatDialog'
 import { toast } from 'sonner'
+import { buildCompanySnapshot, buildUndoChanges, buildUndoUpdates, type CompanySnapshot } from '@/lib/undo'
+import { useUndoStore } from '@/store/undoStore'
 
 type Indicator = IndicatorGroup['indicators'][number]
 
@@ -58,6 +60,11 @@ export default function DashboardV3() {
   const [draftTargets, setDraftTargets] = useState<Record<string, string>>({})
   const [months, setMonths] = useState<YearMonthStat[]>([])
   const [monthsLoading, setMonthsLoading] = useState(false)
+  const [undoing, setUndoing] = useState(false)
+  const undoStack = useUndoStore((state) => state.stack)
+  const pushUndoStep = useUndoStore((state) => state.push)
+  const popUndoStep = useUndoStore((state) => state.pop)
+  const clearUndo = useUndoStore((state) => state.clear)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showConfigDialog, setShowConfigDialog] = useState(false)
   const [showChatDialog, setShowChatDialog] = useState(false)
@@ -148,6 +155,29 @@ export default function DashboardV3() {
     return () => document.removeEventListener('click', handleClear)
   }, [])
 
+  const fetchCompaniesSnapshot = async (): Promise<CompanySnapshot> => {
+    const q = new URLSearchParams()
+    q.set('page', '1')
+    q.set('pageSize', '2000')
+    const res = await fetch(`/api/companies?${q.toString()}`)
+    if (!res.ok) {
+      throw new Error('加载企业数据失败')
+    }
+    const data = (await res.json()) as { items: any[] }
+    return buildCompanySnapshot(Array.isArray(data.items) ? data.items : [])
+  }
+
+  const pushUndoFromSnapshots = (type: 'indicator' | 'optimize', summary: string, before: CompanySnapshot, after: CompanySnapshot) => {
+    const changes = buildUndoChanges(before, after)
+    if (changes.length === 0) return
+    pushUndoStep({
+      type,
+      summary,
+      changes,
+      createdAt: Date.now(),
+    })
+  }
+
   // 导入完成回调
   const handleImportSuccess = () => {
     setShowImportDialog(false)
@@ -155,30 +185,21 @@ export default function DashboardV3() {
     loadIndicators()
     loadMonths()
     setReloadToken((x) => x + 1)
+    clearUndo()
   }
 
-  const handleResetAll = async () => {
-    try {
-      const res = await fetch('/api/companies/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) throw new Error('重置失败')
-      const data = await res.json()
-      if (data.groups) {
-        setGroups(data.groups)
-      }
-      setDraftTargets({})
-      setReloadToken((x) => x + 1)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const applyOptimize = async (targets: Record<string, number>, clearIds?: string[]) => {
+  const applyOptimize = async (
+    targets: Record<string, number>,
+    clearIds?: string[],
+    undoMeta?: { type: 'indicator' | 'optimize'; summary: string }
+  ) => {
     setOptimizing(true)
+    let beforeSnapshot: CompanySnapshot | null = null
+    let succeeded = false
     try {
+      if (undoMeta) {
+        beforeSnapshot = await fetchCompaniesSnapshot()
+      }
       if (shouldApplyRandomDelay()) {
         await delay(randomDelayMs())
       }
@@ -210,8 +231,18 @@ export default function DashboardV3() {
         })
       }
       setReloadToken((x) => x + 1)
+      succeeded = true
     } finally {
       setOptimizing(false)
+    }
+
+    if (undoMeta && beforeSnapshot && succeeded) {
+      try {
+        const afterSnapshot = await fetchCompaniesSnapshot()
+        pushUndoFromSnapshots(undoMeta.type, undoMeta.summary, beforeSnapshot, afterSnapshot)
+      } catch (err) {
+        console.error(err)
+      }
     }
   }
 
@@ -229,7 +260,7 @@ export default function DashboardV3() {
     if (Object.keys(targets).length === 0) return
 
     try {
-      await applyOptimize(targets)
+      await applyOptimize(targets, undefined, { type: 'optimize', summary: '智能调整' })
     } catch (err) {
       console.error(err)
     }
@@ -267,6 +298,7 @@ export default function DashboardV3() {
       }
       setDraftTargets({})
       setReloadToken((x) => x + 1)
+      clearUndo()
     } catch (err) {
       console.error(err)
     }
@@ -380,9 +412,46 @@ export default function DashboardV3() {
     try {
       const v = Number(String(raw).replaceAll(',', '').trim())
       if (!Number.isFinite(v)) return
-      await applyOptimize({ [id]: v }, [id])
+      await applyOptimize({ [id]: v }, [id], { type: 'indicator', summary: '指标调整' })
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const canUndo = undoStack.length > 0 && !undoing
+
+  const handleUndo = async () => {
+    if (!canUndo) return
+    const step = undoStack[undoStack.length - 1]
+    if (!step) return
+
+    setUndoing(true)
+    try {
+      const updates = buildUndoUpdates(step.changes).filter((item) => Object.keys(item.patch).length > 0)
+      if (updates.length === 0) {
+        popUndoStep()
+        return
+      }
+      const res = await fetch('/api/companies/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || '撤销失败')
+      }
+      if (Array.isArray(data.groups)) {
+        setGroups(data.groups as IndicatorGroup[])
+      }
+      setDraftTargets({})
+      setReloadToken((x) => x + 1)
+      popUndoStep()
+    } catch (err) {
+      console.error(err)
+      toast.error('撤销失败', { description: err instanceof Error ? err.message : '请稍后重试' })
+    } finally {
+      setUndoing(false)
     }
   }
 
@@ -447,8 +516,8 @@ export default function DashboardV3() {
               智能调整
             </Button>
 
-            <Button onClick={handleResetAll} variant="outline" className="gap-2">
-              重置
+            <Button onClick={handleUndo} variant="outline" className="gap-2" disabled={!canUndo}>
+              撤销
             </Button>
 
             <Button onClick={() => setShowImportDialog(true)} variant="outline" className="gap-2">

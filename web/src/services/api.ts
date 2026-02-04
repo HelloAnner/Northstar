@@ -127,8 +127,8 @@ export const companiesApi = {
       body: JSON.stringify(patch),
     }),
 
-  batchUpdate: (updates: { id: string; retailCurrentMonth: number }[]) =>
-    request<{ updatedCount: number; indicators: Indicators }>('/companies/batch', {
+  batchUpdate: (updates: { id: string; patch: Record<string, number> }[]) =>
+    request<{ updatedCount: number; groups: unknown[] }>('/companies/batch', {
       method: 'PATCH',
       body: JSON.stringify({ updates }),
     }),

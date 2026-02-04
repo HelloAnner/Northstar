@@ -158,6 +158,107 @@ func (h *Handler) GetCompany(c *gin.Context) {
 	}
 }
 
+type batchUpdateItem struct {
+	ID    string                 `json:"id"`
+	Patch map[string]interface{} `json:"patch"`
+}
+
+type batchUpdateRequest struct {
+	Updates []batchUpdateItem `json:"updates"`
+}
+
+// BatchUpdateCompanies 批量更新企业数据（一次性重算指标）
+// PATCH /api/companies/batch
+func (h *Handler) BatchUpdateCompanies(c *gin.Context) {
+	year, month, err := h.store.GetCurrentYearMonth()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "system not initialized"})
+		return
+	}
+
+	var req batchUpdateRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+	if len(req.Updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "updates 不能为空"})
+		return
+	}
+
+	for _, item := range req.Updates {
+		if item.ID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		if item.Patch == nil {
+			item.Patch = map[string]interface{}{}
+		}
+		kind, numericID, ok := parseCompanyID(item.ID)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		switch kind {
+		case "wr":
+			existing, err := h.store.GetWRByID(numericID)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+
+			updates := pickWRUpdates(item.Patch)
+			if rateUpdates, err := buildWRRateDrivenUpdates(*existing, item.Patch); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			} else {
+				for k, v := range rateUpdates {
+					updates[k] = v
+				}
+			}
+			applyWRCumulativeUpdates(*existing, item.Patch, updates)
+
+			if err := h.store.UpdateWR(numericID, updates); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		case "ac":
+			existing, err := h.store.GetACByID(numericID)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+
+			updates := pickACUpdates(item.Patch)
+			if rateUpdates, err := buildACRateDrivenUpdates(*existing, item.Patch); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			} else {
+				for k, v := range rateUpdates {
+					updates[k] = v
+				}
+			}
+			applyACCumulativeUpdates(*existing, item.Patch, updates)
+
+			if err := h.store.UpdateAC(numericID, updates); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+	}
+
+	groups, err := dagcalc.RecalcAll(h.store, year, month)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	roundIndicatorGroupsInPlace(groups)
+	c.JSON(http.StatusOK, gin.H{"groups": groups, "updatedCount": len(req.Updates)})
+}
+
 // UpdateCompany 更新企业数据（微调后联动计算）
 // PATCH /api/companies/:id
 func (h *Handler) UpdateCompany(c *gin.Context) {
@@ -797,9 +898,12 @@ func pickACUpdates(patch map[string]interface{}) map[string]interface{} {
 		"revenue_current_cumulative":   true,
 		"revenue_last_year_cumulative": true,
 
-		"room_current_month":  true,
-		"food_current_month":  true,
-		"goods_current_month": true,
+		"room_current_month":       true,
+		"room_current_cumulative":  true,
+		"food_current_month":       true,
+		"food_current_cumulative":  true,
+		"goods_current_month":      true,
+		"goods_current_cumulative": true,
 
 		"retail_current_month":   true,
 		"retail_last_year_month": true,
@@ -813,9 +917,12 @@ func pickACUpdates(patch map[string]interface{}) map[string]interface{} {
 		"revenueCurrentCumulative":  "revenue_current_cumulative",
 		"revenueLastYearCumulative": "revenue_last_year_cumulative",
 
-		"roomCurrentMonth":  "room_current_month",
-		"foodCurrentMonth":  "food_current_month",
-		"goodsCurrentMonth": "goods_current_month",
+		"roomCurrentMonth":       "room_current_month",
+		"roomCurrentCumulative":  "room_current_cumulative",
+		"foodCurrentMonth":       "food_current_month",
+		"foodCurrentCumulative":  "food_current_cumulative",
+		"goodsCurrentMonth":      "goods_current_month",
+		"goodsCurrentCumulative": "goods_current_cumulative",
 
 		"retailCurrentMonth":  "retail_current_month",
 		"retailLastYearMonth": "retail_last_year_month",

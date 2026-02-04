@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2, Save, Search } from 'lucide-react'
+import { buildCompanySnapshot, buildUndoChanges } from '@/lib/undo'
+import { useUndoStore } from '@/store/undoStore'
 
 export interface IndicatorGroup {
   name: string
@@ -188,6 +190,7 @@ export default function CompaniesTable(props: {
 
   const searchTimer = useRef<number | null>(null)
   const [savingCount, setSavingCount] = useState(0)
+  const pushUndoStep = useUndoStore((state) => state.push)
 
   useEffect(() => {
     props.onSavingChange(savingCount > 0)
@@ -232,6 +235,7 @@ export default function CompaniesTable(props: {
   }
 
   const updateCompany = async (id: string, patch: Partial<Record<EditableField, number>>) => {
+    const beforeRow = items.find((row) => row.id === id)
     setSavingCount((c) => c + 1)
     try {
       const res = await fetch(`/api/companies/${encodeURIComponent(id)}`, {
@@ -244,6 +248,19 @@ export default function CompaniesTable(props: {
       setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...data.company } : x)))
       if (Array.isArray(data.groups)) {
         props.onIndicatorsUpdate(data.groups)
+      }
+      if (beforeRow && data?.company) {
+        const beforeSnapshot = buildCompanySnapshot([beforeRow])
+        const afterSnapshot = buildCompanySnapshot([{ ...beforeRow, ...data.company }])
+        const changes = buildUndoChanges(beforeSnapshot, afterSnapshot)
+        if (changes.length > 0) {
+          pushUndoStep({
+            type: 'cell',
+            summary: `编辑 ${beforeRow.name}`,
+            changes,
+            createdAt: Date.now(),
+          })
+        }
       }
     } finally {
       setSavingCount((c) => Math.max(0, c - 1))
