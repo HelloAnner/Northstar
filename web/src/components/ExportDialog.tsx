@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle, Download, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Download, XCircle } from 'lucide-react'
+import { normalizeCompareItems, type CompareItem } from '@/components/exportCompare'
 
 interface ExportDialogProps {
   open: boolean
@@ -25,6 +26,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const [stage, setStage] = useState<string>('等待开始…')
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [compareItems, setCompareItems] = useState<CompareItem[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const delayTimerRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -58,6 +60,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     setStage('等待开始…')
     setDownloadUrl(null)
     setError(null)
+    setCompareItems([])
     displayPercentRef.current = 0
     targetPercentRef.current = 0
     doneRef.current = null
@@ -195,6 +198,10 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
                 setTargetPercent(100)
               }
             }
+            if (event.type === 'compare') {
+              const items = normalizeCompareItems(event.data?.items)
+              setCompareItems(items)
+            }
             if (event.type === 'error') {
               setError(event.message || '导出失败')
               setExporting(false)
@@ -226,6 +233,13 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
 
   const canDownload = completed && percent >= 100 && !!downloadUrl
 
+  const renderCompareIcon = (status: string) => {
+    if (status === 'pass') return <CheckCircle className="h-4 w-4 text-emerald-400" />
+    if (status === 'warn') return <AlertTriangle className="h-4 w-4 text-amber-400" />
+    if (status === 'fail') return <XCircle className="h-4 w-4 text-red-400" />
+    return <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg border-border/60 bg-card/80 backdrop-blur">
@@ -241,6 +255,22 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
               <span className="font-medium tabular-nums">{Math.round(percent)}%</span>
             </div>
             <Progress value={percent} />
+            {compareItems.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                {compareItems.map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex items-start gap-2 rounded-md border border-border/60 bg-background/60 p-2"
+                  >
+                    {renderCompareIcon(item.status)}
+                    <div className="space-y-1">
+                      <div className="text-foreground">{item.label}</div>
+                      <div className="text-muted-foreground">{item.message}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (

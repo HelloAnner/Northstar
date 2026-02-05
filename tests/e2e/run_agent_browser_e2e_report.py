@@ -75,12 +75,116 @@ def _parse_number(v: Any) -> Optional[float]:
         return None
 
 
+def _round_half_up(v: float, digits: int) -> float:
+    if digits < 0:
+        return v
+    scale = 10 ** digits
+    x = v * scale
+    if x >= 0:
+        return math.floor(x + 0.5) / scale
+    return -math.floor(-x + 0.5) / scale
+
+
 def _close(a: Optional[float], b: Optional[float], eps: float = 1e-6) -> bool:
     if a is None and b is None:
         return True
     if a is None or b is None:
         return False
     return abs(a - b) <= eps
+
+
+def _norm_label(s: str) -> str:
+    return re.sub(r"\s+", "", str(s or "").replace("\u3000", ""))
+
+
+def _indicator_export_mapping() -> List[Dict[str, Any]]:
+    return [
+        {"label": "限上社零额（当月值）", "sheet": "汇总表（定）", "cell": "G4"},
+        {"label": "限上社零额增速（当月）", "sheet": "汇总表（定）", "cell": "S4"},
+        {"label": "限上社零额（累计值）", "sheet": "汇总表（定）", "cell": "I4"},
+        {"label": "限上社零额增速（累计）", "sheet": "汇总表（定）", "cell": "T4"},
+        {"label": "批发业销售额增速（当月）", "sheet": "汇总表（定）", "cell": "K4"},
+        {"label": "批发业销售额增速（累计）", "sheet": "汇总表（定）", "cell": "L4"},
+        {"label": "零售业销售额增速（当月）", "sheet": "汇总表（定）", "cell": "M4"},
+        {"label": "零售业销售额增速（累计）", "sheet": "汇总表（定）", "cell": "N4"},
+        {"label": "住宿业营业额增速（当月）", "sheet": "汇总表（定）", "cell": "O4"},
+        {"label": "住宿业营业额增速（累计）", "sheet": "汇总表（定）", "cell": "P4"},
+        {"label": "餐饮业营业额增速（当月）", "sheet": "汇总表（定）", "cell": "Q4"},
+        {"label": "餐饮业营业额增速（累计）", "sheet": "汇总表（定）", "cell": "R4"},
+        {"label": "吃穿用增速（当月）", "sheet": "汇总表（定）", "cell": "U4"},
+        {"label": "小微企业增速（当月）", "sheet": "汇总表（定）", "cell": "V4"},
+        {"label": "社零总额（累计值）", "sheet": "汇总表（定）", "cell": "N10", "scale": "yi"},
+        {"label": "社零总额增速（累计）", "sheet": "汇总表（定）", "cell": "S10"},
+    ]
+
+
+def _indicator_count_check(items: List[Dict[str, Any]], expected: int = 16) -> Dict[str, Any]:
+    labels = [_norm_label(it.get("label") or "") for it in items if isinstance(it, dict)]
+    uniq = [x for x in dict.fromkeys(labels) if x]
+    ok = len(uniq) == expected
+    return {
+        "ok": ok,
+        "count": len(uniq),
+        "expected": expected,
+    }
+
+
+def _compare_indicator_values_to_export(items: List[Dict[str, Any]], export_wb) -> Dict[str, Any]:
+    res = {"executed": False, "ok": True, "total": 0, "mismatch": 0, "items": []}
+    if export_wb is None:
+        return res
+    mapping = _indicator_export_mapping()
+    res["executed"] = True
+    res["total"] = len(mapping)
+    item_map = {_norm_label(it.get("label")): it for it in items if isinstance(it, dict)}
+    mismatches: List[Dict[str, Any]] = []
+    for it in mapping:
+        label = it["label"]
+        key = _norm_label(label)
+        item = item_map.get(key)
+        if not item:
+            mismatches.append({"label": label, "reason": "指标缺失"})
+            continue
+        ui_val = _parse_number(item.get("value"))
+        if ui_val is None:
+            mismatches.append({"label": label, "reason": "指标值为空", "uiValue": item.get("value")})
+            continue
+        expected = ui_val
+        if it.get("scale") == "yi":
+            expected = _round_half_up(ui_val / 10000.0, 2)
+        sheet = it["sheet"]
+        cell = it["cell"]
+        if sheet not in export_wb.sheetnames:
+            mismatches.append({"label": label, "reason": f"导出缺少 sheet: {sheet}"})
+            continue
+        excel_val_raw = export_wb[sheet][cell].value
+        excel_val = _parse_number(excel_val_raw)
+        if excel_val is None:
+            mismatches.append(
+                {
+                    "label": label,
+                    "reason": "导出值为空",
+                    "cell": f"{sheet}!{cell}",
+                    "expected": expected,
+                    "actual": excel_val_raw,
+                }
+            )
+            continue
+        eps = 0.02 if it.get("scale") == "yi" else _field_eps(label)
+        if not _close(expected, excel_val, eps=eps):
+            mismatches.append(
+                {
+                    "label": label,
+                    "reason": "导出值与指标不一致",
+                    "cell": f"{sheet}!{cell}",
+                    "expected": expected,
+                    "actual": excel_val,
+                }
+            )
+    res["items"] = mismatches
+    res["mismatch"] = len(mismatches)
+    res["ok"] = len(mismatches) == 0
+    return res
 
 
 def _field_eps(field: str) -> float:
@@ -192,8 +296,9 @@ def _compare_indicators(
             continue
         if stats is not None and not _indicator_requires_change(label, stats):
             skipped += 1
+            required += 1
             changes.append(
-                {"label": label, "before": b.get("value"), "after": a.get("value"), "ok": True, "reason": "无可调整企业"}
+                {"label": label, "before": b.get("value"), "after": a.get("value"), "ok": False, "reason": "无可调整企业"}
             )
             continue
         required += 1
@@ -397,6 +502,12 @@ def _safe(s: str) -> str:
         .replace('"', "&quot;")
         .replace("'", "&#39;")
     )
+
+
+def _link_or_text(path: str, empty_text: str = "未生成") -> str:
+    if path:
+        return f"<a href=\"{_safe(path)}\">{_safe(path)}</a>"
+    return _safe(empty_text)
 
 
 def _rel(p: str) -> str:
@@ -1014,6 +1125,8 @@ def _issues_summary(
     action_results: List[Dict[str, Any]],
     action_persist: List[Dict[str, Any]],
     indicator_action_fail: int,
+    indicator_count_fail: int,
+    indicator_export_fail: int,
     completeness_failed: int,
     completeness_total: int,
     forbidden_ui_columns_total: int,
@@ -1043,6 +1156,10 @@ def _issues_summary(
         issues.append(f"修改持久化失败：{persist_fail}（见“修改动作覆盖”的 UI(刷新后) 列）")
     if indicator_action_fail:
         issues.append(f"指标调整动作失败：{indicator_action_fail}（见“指标调整与DAG联动覆盖”）")
+    if indicator_count_fail:
+        issues.append("指标数量不满足 16 项（见“指标调整与DAG联动覆盖”）")
+    if indicator_export_fail:
+        issues.append(f"指标与导出不一致：{indicator_export_fail}（见“指标调整与DAG联动覆盖”）")
     if missing_export:
         issues.append(f"导出覆盖缺失：{len(missing_export)}（见“导出一致性/覆盖检查”）")
     if mismatches_export:
@@ -1620,6 +1737,7 @@ def main() -> None:
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--input-xlsx", required=True)
     ap.add_argument("--export-xlsx", required=True)
+    ap.add_argument("--export-dag-xlsx", required=False, default="")
     ap.add_argument("--ui-before", required=True)
     ap.add_argument("--ui-after", required=True)
     ap.add_argument("--import-events", required=False, default="")
@@ -1673,6 +1791,7 @@ def main() -> None:
 
     input_wb_error = ""
     export_wb_error = ""
+    export_dag_wb_error = ""
     export_wb_raw = None
     export_wb_raw_error = ""
     export_alt_wb_raw = None
@@ -1690,6 +1809,13 @@ def main() -> None:
     except Exception as e:
         export_wb = None
         export_wb_error = str(e)
+    export_dag_wb = None
+    if args.export_dag_xlsx and Path(args.export_dag_xlsx).exists():
+        try:
+            export_dag_wb = load_workbook(args.export_dag_xlsx, data_only=True)
+        except Exception as e:
+            export_dag_wb = None
+            export_dag_wb_error = str(e)
     try:
         export_wb_raw = load_workbook(args.export_xlsx, data_only=False)
     except Exception as e:
@@ -1935,6 +2061,29 @@ def main() -> None:
         except Exception:
             pass
 
+    indicator_count_before = _indicator_count_check(indicators_before_items)
+    indicator_count_after = _indicator_count_check(indicators_after_items)
+    try:
+        _write_json(out_dir / "indicator_count_before.json", indicator_count_before)
+        _write_json(out_dir / "indicator_count_after.json", indicator_count_after)
+    except Exception:
+        pass
+
+    indicator_export_before = {"executed": False, "ok": True, "total": 0, "mismatch": 0, "items": []}
+    indicator_export_after = {"executed": False, "ok": True, "total": 0, "mismatch": 0, "items": []}
+    if indicators_before_items and export_wb is not None:
+        indicator_export_before = _compare_indicator_values_to_export(indicators_before_items, export_wb)
+        try:
+            _write_json(out_dir / "indicator_export_before.json", indicator_export_before)
+        except Exception:
+            pass
+    if indicators_after_items and export_dag_wb is not None:
+        indicator_export_after = _compare_indicator_values_to_export(indicators_after_items, export_dag_wb)
+        try:
+            _write_json(out_dir / "indicator_export_after.json", indicator_export_after)
+        except Exception:
+            pass
+
     dag_summary: Dict[str, Any] = {"executed": False, "ok": True, "matchedRows": 0, "changedRows": 0}
     if isinstance(dag_before_rows, list) and isinstance(dag_after_rows, list) and dag_before_rows and dag_after_rows:
         dag_summary = _compare_dag_tables(dag_before_rows, dag_after_rows)
@@ -1970,6 +2119,15 @@ def main() -> None:
         export_template_fail = 1
 
     indicator_action_fail = sum(1 for r in indicator_action_results if r.get("ok") is False)
+    indicator_count_fail = 0
+    if indicators_before_items or indicators_after_items:
+        if not indicator_count_before.get("ok") or not indicator_count_after.get("ok"):
+            indicator_count_fail = 1
+    indicator_export_fail = 0
+    if indicator_export_before.get("executed") and not indicator_export_before.get("ok"):
+        indicator_export_fail += int(indicator_export_before.get("mismatch") or 1)
+    if indicator_export_after.get("executed") and not indicator_export_after.get("ok"):
+        indicator_export_fail += int(indicator_export_after.get("mismatch") or 1)
     linkage_preview_fail = 0
     if not linkage_preview_ok:
         linkage_preview_fail = 1
@@ -1997,6 +2155,8 @@ def main() -> None:
         and export_template_fail == 0
         and export_formula_fail == 0
         and ui_normalization.get("ok") is True
+        and indicator_count_fail == 0
+        and indicator_export_fail == 0
         and (not indicator_compare.get("executed") or indicator_compare.get("ok") is True)
         and (not dag_summary.get("executed") or dag_summary.get("ok") is True)
         and (not export_param.get("executed") or export_param.get("ok") is True)
@@ -2228,6 +2388,75 @@ def main() -> None:
             + "".join(rows)
             + "</tbody></table></div>"
         )
+
+    def _indicator_count_html() -> str:
+        if not indicators_before_items and not indicators_after_items:
+            return "<p class='warn'>未执行指标数量校验（缺少 indicators_before/after）。</p>"
+        rows = []
+        for name, payload in [("调整前", indicator_count_before), ("调整后", indicator_count_after)]:
+            okv = bool(payload.get("ok"))
+            klass = "ok" if okv else "bad"
+            rows.append(
+                "<tr>"
+                f"<td>{_safe(name)}</td>"
+                f"<td class='mono'>{_safe(str(payload.get('count') or 0))}</td>"
+                f"<td class='mono'>{_safe(str(payload.get('expected') or 16))}</td>"
+                f"<td class='{klass}'>{'PASS' if okv else 'FAIL'}</td>"
+                "</tr>"
+            )
+        return (
+            "<div class='table-wrap'><table><thead><tr>"
+            "<th>阶段</th><th>实际指标数</th><th>期望</th><th>结果</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
+    def _indicator_export_block(title: str, result: Dict[str, Any], export_path: str) -> str:
+        if not result.get("executed"):
+            reason = "缺少导出文件或指标抽取结果"
+            return f"<p class='warn'>{_safe(title)}：未执行（{reason}）</p>"
+        mismatches = result.get("items") or []
+        okv = bool(result.get("ok"))
+        klass = "ok" if okv else "bad"
+        rows = []
+        for it in mismatches[:40]:
+            rows.append(
+                "<tr>"
+                f"<td>{_safe(str(it.get('label') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('cell') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('expected') or ''))}</td>"
+                f"<td class='mono'>{_safe(str(it.get('actual') or ''))}</td>"
+                f"<td>{_safe(str(it.get('reason') or ''))}</td>"
+                "</tr>"
+            )
+        summary = (
+            f"<p class='{klass}'>"
+            + (
+                f"✅ {title}：全部一致（{result.get('total')} 项）"
+                if okv
+                else f"❌ {title}：不一致 {result.get('mismatch')}/{result.get('total')}"
+            )
+            + "</p>"
+        )
+        note = ""
+        if export_path:
+            note = f"<p class='warn'>导出文件：{_link_or_text(export_path)}</p>"
+        table = ""
+        if mismatches:
+            table = (
+                "<div class='table-wrap'><table><thead><tr>"
+                "<th>指标</th><th>单元格</th><th>期望</th><th>实际</th><th>原因</th>"
+                "</tr></thead><tbody>"
+                + "".join(rows)
+                + "</tbody></table></div>"
+            )
+        return summary + note + table
+
+    def _indicator_export_html() -> str:
+        return _indicator_export_block("调整前导出", indicator_export_before, args.export_xlsx) + (
+            "<div style='height:10px'></div>"
+        ) + _indicator_export_block("调整后导出", indicator_export_after, args.export_dag_xlsx)
 
     def _dag_table_diff_html() -> str:
         if not dag_summary.get("executed"):
@@ -2880,6 +3109,7 @@ def main() -> None:
             <div class="k">BASE_URL</div><div class="v">{_safe(args.base_url)}</div>
             <div class="k">输入 Excel</div><div class="v"><a href="{_safe(args.input_xlsx)}">{_safe(args.input_xlsx)}</a></div>
             <div class="k">导出 Excel</div><div class="v"><a href="{_safe(args.export_xlsx)}">{_safe(args.export_xlsx)}</a></div>
+            <div class="k">导出 Excel(DAG后)</div><div class="v">{_link_or_text(args.export_dag_xlsx, "未生成")}</div>
             <div class="k">抽取(导入后)</div><div class="v">{_safe(str(started_at))}</div>
             <div class="k">抽取(修改后)</div><div class="v">{_safe(str(ended_at))}</div>
           </div>
@@ -2897,8 +3127,13 @@ def main() -> None:
             <li><a class="mono" href="{_safe(args.llm_results)}">llm_results.json</a></li>
             <li><a class="mono" href="{_safe(args.ui_dag_before)}">ui_companies_before_dag.json</a></li>
             <li><a class="mono" href="{_safe(args.ui_dag_after)}">ui_companies_after_dag.json</a></li>
+            <li><a class="mono" href="{_safe(args.export_dag_xlsx)}">export_dag.xlsx</a></li>
             <li><a class="mono" href="{_safe(args.export_alt_xlsx)}">export_alt.xlsx</a></li>
             <li><a class="mono" href="{_safe(args.export_param_meta)}">export_param_meta.json</a></li>
+            <li><a class="mono" href="indicator_count_before.json">indicator_count_before.json</a></li>
+            <li><a class="mono" href="indicator_count_after.json">indicator_count_after.json</a></li>
+            <li><a class="mono" href="indicator_export_before.json">indicator_export_before.json</a></li>
+            <li><a class="mono" href="indicator_export_after.json">indicator_export_after.json</a></li>
             <li><a class="mono" href="ui_normalization_checks.json">ui_normalization_checks.json</a></li>
             <li><a class="mono" href="{_safe(args.console)}">browser_console.txt</a></li>
             <li><a class="mono" href="{_safe(args.errors)}">browser_errors.txt</a></li>
@@ -2920,7 +3155,7 @@ def main() -> None:
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>不符合预期项总览</h2>
-        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail, linkage_preview_fail, llm_fail)}
+        {_issues_summary(missing_before, mismatches_before, missing_export, mismatches_export, action_results, action_persist, indicator_action_fail, indicator_count_fail, indicator_export_fail, completeness_failed, completeness_total, int(forbidden_ui_columns_report.get("total") or 0), derived_unmapped_cols_total, derived_missing_ui_cols_total, tab_consistency_fail, ui_derived_fail, export_template_fail, export_formula_fail, normalization_fail, dag_fail, export_param_fail, linkage_preview_fail, llm_fail)}
         <p class="warn">复现入口：打开 <span class="mono">{_safe(args.base_url)}</span> → 导入 → 明细表搜索信用代码 → 修改/对照 → 导出后打开 Excel 对照。</p>
       </div>
       <div class="card" style="margin-top: 12px;">
@@ -2959,6 +3194,8 @@ def main() -> None:
           <div class="k">导出 Excel 打开</div><div class="v">{'OK' if export_wb is not None else 'FAIL'}</div>
           <div class="k">导出 Excel(raw) 打开</div><div class="v">{'OK' if export_wb_raw is not None else 'FAIL'}</div>
           <div class="k">导出 raw 错误</div><div class="v">{_safe(str(export_wb_raw_error))}</div>
+          <div class="k">导出 Excel(DAG后) 打开</div><div class="v">{'OK' if export_dag_wb is not None else 'FAIL'}</div>
+          <div class="k">导出 DAG 错误</div><div class="v">{_safe(str(export_dag_wb_error))}</div>
           <div class="k">导出 Excel(alt) 打开</div><div class="v">{'OK' if export_alt_wb_raw is not None else 'FAIL'}</div>
           <div class="k">导出 alt 错误</div><div class="v">{_safe(str(export_alt_wb_raw_error))}</div>
           <div class="k">定稿模板</div><div class="v">{_safe(template_xlsx or '')}</div>
@@ -2997,6 +3234,13 @@ def main() -> None:
         <h2>指标变化校验</h2>
         <p class="warn">期望：16项指标全部发生变化。</p>
         {_indicator_changes_html()}
+      </div>
+      <div class="card" style="margin-top: 12px;">
+        <h2>指标数量与导出一致性</h2>
+        <p class="warn">期望：16 项指标数量正确，且导出汇总表与指标一致。</p>
+        {_indicator_count_html()}
+        <div style="height: 10px;"></div>
+        {_indicator_export_html()}
       </div>
       <div class="card" style="margin-top: 12px;">
         <h2>DAG 下游明细表变化</h2>

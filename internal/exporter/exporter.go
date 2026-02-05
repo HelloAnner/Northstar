@@ -272,60 +272,7 @@ func writeWRRowAt(f *excelize.File, sheet string, row int, r *model.WholesaleRet
 	if creditCode == "" || name == "" {
 		return fmt.Errorf("%s 第 %d 行企业信息为空（统一社会信用代码/单位详细名称）", sheet, row)
 	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), creditCode); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), name); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), math.Round(r.SalesCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("E%d", row), math.Round(r.SalesLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), math.Round(r.SalesCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("H%d", row), math.Round(r.SalesLastYearCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), math.Round(r.RetailCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("K%d", row), math.Round(r.RetailLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), math.Round(r.RetailCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), math.Round(r.RetailLastYearCumulative)); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("F%d", row), ratePercent(r.SalesCurrentMonth, r.SalesLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("I%d", row), ratePercent(r.SalesCurrentCumulative, r.SalesLastYearCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), ratePercent(r.RetailCurrentMonth, r.RetailLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("O%d", row), ratePercent(r.RetailCurrentCumulative, r.RetailLastYearCumulative)); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), r.FirstReportIP); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("Q%d", row), r.FillIP); err != nil {
-		return err
-	}
-
-	return nil
+	return applyRowLogics(f, sheet, row, r, wrRowLogics)
 }
 
 // ---------- 行写入：住餐（住宿/餐饮） ----------
@@ -335,97 +282,13 @@ func writeACRowAt(
 	sheet string,
 	row int,
 	r *model.AccommodationCatering,
-	retailCur float64,
-	retailLast float64,
-	retailCurCum float64,
-	retailLastCum float64,
 ) error {
 	creditCode := strings.TrimSpace(r.CreditCode)
 	name := strings.TrimSpace(r.Name)
 	if creditCode == "" || name == "" {
 		return fmt.Errorf("%s 第 %d 行企业信息为空（统一社会信用代码/单位详细名称）", sheet, row)
 	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("A%d", row), creditCode); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("B%d", row), name); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("D%d", row), math.Round(r.RevenueCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("E%d", row), math.Round(r.RevenueLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("G%d", row), math.Round(r.RevenueCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("H%d", row), math.Round(r.RevenueLastYearCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("F%d", row), ratePercent(r.RevenueCurrentMonth, r.RevenueLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("I%d", row), ratePercent(r.RevenueCurrentCumulative, r.RevenueLastYearCumulative)); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("J%d", row), math.Round(r.RoomCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("K%d", row), math.Round(r.RoomLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("L%d", row), math.Round(r.RoomCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("M%d", row), math.Round(r.RoomLastYearCumulative)); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("N%d", row), math.Round(r.FoodCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("O%d", row), math.Round(r.FoodLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("P%d", row), math.Round(r.FoodCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("Q%d", row), math.Round(r.FoodLastYearCumulative)); err != nil {
-		return err
-	}
-
-	if err := setCellValue(f, sheet, fmt.Sprintf("R%d", row), math.Round(r.GoodsCurrentMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("S%d", row), math.Round(r.GoodsLastYearMonth)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("T%d", row), math.Round(r.GoodsCurrentCumulative)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("U%d", row), math.Round(r.GoodsLastYearCumulative)); err != nil {
-		return err
-	}
-
-	// 模板右侧 V-Y：衍生“零售额”（餐费 + 商品销售）
-	if err := setCellValue(f, sheet, fmt.Sprintf("V%d", row), math.Round(retailCur)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("W%d", row), math.Round(retailLast)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("X%d", row), math.Round(retailCurCum)); err != nil {
-		return err
-	}
-	if err := setCellValue(f, sheet, fmt.Sprintf("Y%d", row), math.Round(retailLastCum)); err != nil {
-		return err
-	}
-
-	return nil
+	return applyRowLogics(f, sheet, row, r, acRowLogics)
 }
 
 func fillWRSheetByIndustryCodeOrder(f *excelize.File, sheet string, records []*model.WholesaleRetail) error {
@@ -511,12 +374,7 @@ func fillACIndustrySheetByIndustryCodeOrder(f *excelize.File, sheet string, reco
 			return fmt.Errorf("%s 第 %d 行无法匹配到企业记录（行业代码=%s）", sheet, row, strings.TrimSpace(code))
 		}
 		next[codeKey] = i + 1
-		r := list[i]
-		retailCur := r.FoodCurrentMonth + r.GoodsCurrentMonth
-		retailLast := r.FoodLastYearMonth + r.GoodsLastYearMonth
-		retailCurCum := r.FoodCurrentCumulative + r.GoodsCurrentCumulative
-		retailLastCum := r.FoodLastYearCumulative + r.GoodsLastYearCumulative
-		if err := writeACRowAt(f, sheet, row, r, retailCur, retailLast, retailCurCum, retailLastCum); err != nil {
+		if err := writeACRowAt(f, sheet, row, list[i]); err != nil {
 			return err
 		}
 	}

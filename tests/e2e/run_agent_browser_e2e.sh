@@ -26,6 +26,7 @@ IMPORT_EVENTS="$RUN_DIR/import_events.json"
 TAB_COUNTS="$RUN_DIR/tab_counts.json"
 EXPORT_XLSX="$RUN_DIR/export.xlsx"
 EXPORT_ALT_XLSX="$RUN_DIR/export_alt.xlsx"
+EXPORT_DAG_XLSX="$RUN_DIR/export_dag.xlsx"
 EXPORT_PARAM_META="$RUN_DIR/export_param_meta.json"
 CONSOLE_LOG="$RUN_DIR/browser_console.txt"
 ERRORS_LOG="$RUN_DIR/browser_errors.txt"
@@ -308,29 +309,39 @@ agent-browser screenshot "$SCREENSHOTS_DIR/01_all_columns.png" | tee -a "$LOG" |
 
 echo ">>> Importing Excel via UI..." | tee -a "$LOG"
 if agent-browser find role button click --name "导入" | tee -a "$LOG"; then
-  record_step "open_import_dialog" "pass" "" ""
+  record_step "open_import_page" "pass" "" ""
 else
-  record_step "open_import_dialog" "fail" "找不到/无法点击 导入 按钮" "打开首页后点击右上角“导入”"
+  record_step "open_import_page" "fail" "找不到/无法点击 导入 按钮" "打开首页后点击右上角“导入”"
 fi
 agent-browser wait --text "导入数据" | tee -a "$LOG" || true
+agent-browser wait --text "选择文件" | tee -a "$LOG" || true
 if agent-browser upload "input[type=file]" "$INPUT_XLSX" | tee -a "$LOG"; then
   record_step "upload_excel" "pass" "" ""
 else
-  record_step "upload_excel" "fail" "上传文件失败" "在导入弹窗中选择文件并点击开始导入"
+  record_step "upload_excel" "fail" "上传文件失败" "在导入页选择文件并点击开始导入"
 fi
 agent-browser find role button click --name "开始导入" | tee -a "$LOG" || true
-if agent-browser wait --text "完成" | tee -a "$LOG"; then
+import_done="false"
+for i in {1..12}; do
+  if agent-browser wait --text "导入完成" | tee -a "$LOG"; then
+    import_done="true"
+    break
+  fi
+  agent-browser wait 5000 | tee -a "$LOG" || true
+done
+if [[ "$import_done" == "true" ]]; then
   record_step "import_done" "pass" "" ""
 else
-  record_step "import_done" "fail" "导入未在预期时间内完成（UI未出现“完成”）" "导入后观察导入弹窗进度与日志"
+  record_step "import_done" "fail" "导入未在预期时间内完成（UI未出现“导入完成”）" "导入后观察导入页进度与提示"
 fi
 agent-browser screenshot "$SCREENSHOTS_DIR/02_import_done.png" | tee -a "$LOG" || true
 
 echo ">>> Capturing import progress events..." | tee -a "$LOG"
-agent-browser eval "(() => { const items = Array.from(document.querySelectorAll('[role=\"dialog\"] [data-radix-scroll-area-viewport] .text-sm')).map(el => el.textContent?.trim()).filter(Boolean); return {count: items.length, items}; })()" --json >"$IMPORT_EVENTS" || true
+agent-browser eval "(() => { const items = Array.from(document.querySelectorAll('header .text-xs')).map(el => el.textContent?.trim()).filter(Boolean); return {count: items.length, items}; })()" --json >"$IMPORT_EVENTS" || true
 
-agent-browser find role button click --name "完成" | tee -a "$LOG" || true
+agent-browser back | tee -a "$LOG" || true
 agent-browser wait --load networkidle | tee -a "$LOG" || true
+agent-browser wait --text "全部" | tee -a "$LOG" || true
 agent-browser screenshot "$SCREENSHOTS_DIR/03_after_import.png" | tee -a "$LOG" || true
 
 echo ">>> Linkage preview highlight check..." | tee -a "$LOG"
@@ -517,6 +528,23 @@ if [[ "$RUN_DAG_CASE" == "1" ]]; then
   else
     record_step "dag_table_after" "fail" "DAG 后明细表抽取失败" "确认智能调整后表格可见"
   fi
+
+  echo ">>> Exporting Excel after indicator adjustments..." | tee -a "$LOG"
+  agent-browser wait --load networkidle | tee -a "$LOG" || true
+  agent-browser find role button click --name "导出" | tee -a "$LOG" || true
+  agent-browser wait --fn "(() => { const btn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('下载 Excel')); return !!btn && !btn.disabled; })()" --timeout 60000 | tee -a "$LOG" || true
+  if agent-browser download "text=下载 Excel" "$EXPORT_DAG_XLSX" 2>>"$LOG"; then
+    record_step "export_dag_download" "pass" "" ""
+  else
+    echo "WARN: download selector failed, fallback to click + wait --download" | tee -a "$LOG"
+    agent-browser find role button click --name "下载 Excel" | tee -a "$LOG" || true
+    if agent-browser wait --download "$EXPORT_DAG_XLSX" --timeout 60000 | tee -a "$LOG"; then
+      record_step "export_dag_download" "pass" "fallback via wait --download" ""
+    else
+      record_step "export_dag_download" "fail" "DAG 导出下载失败（浏览器未捕获下载）" "指标调整后点击“导出”，等待进度完成后点击“下载 Excel”"
+    fi
+  fi
+  agent-browser screenshot "$SCREENSHOTS_DIR/14_after_indicator_export.png" | tee -a "$LOG" || true
 else
   record_step "indicator_dag" "skip" "RUN_DAG_CASE=0" "如需执行指标→DAG测试：RUN_DAG_CASE=1 make test-e2e"
 fi
@@ -549,6 +577,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --base-url "$BASE_URL" \
   --input-xlsx "$INPUT_XLSX" \
   --export-xlsx "$EXPORT_XLSX" \
+  --export-dag-xlsx "$EXPORT_DAG_XLSX" \
   --ui-before "$UI_BEFORE" \
   --ui-after "$UI_AFTER" \
   --import-events "$IMPORT_EVENTS" \
@@ -583,6 +612,7 @@ python3 "$REPO_ROOT/tests/e2e/run_agent_browser_e2e_report.py" \
   --base-url "$BASE_URL" \
   --input-xlsx "$INPUT_XLSX" \
   --export-xlsx "latest/export.xlsx" \
+  --export-dag-xlsx "latest/export_dag.xlsx" \
   --ui-before "latest/ui_companies_before.json" \
   --ui-after "latest/ui_companies_after.json" \
   --import-events "latest/import_events.json" \

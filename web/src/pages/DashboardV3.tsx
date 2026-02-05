@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -6,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, MessageCircle, RefreshCw, Settings2, Upload } from 'lucide-react'
-import ImportDialog from '@/components/ImportDialog'
 import ExportDialog from '@/components/ExportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 import ThemeToggle from '@/components/app/ThemeToggle'
@@ -50,10 +50,10 @@ interface OptimizeNotice {
 }
 
 export default function DashboardV3() {
+  const navigate = useNavigate()
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [showImportDialog, setShowImportDialog] = useState(false)
   const [tableSaving, setTableSaving] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
@@ -176,16 +176,6 @@ export default function DashboardV3() {
       changes,
       createdAt: Date.now(),
     })
-  }
-
-  // 导入完成回调
-  const handleImportSuccess = () => {
-    setShowImportDialog(false)
-    loadStatus()
-    loadIndicators()
-    loadMonths()
-    setReloadToken((x) => x + 1)
-    clearUndo()
   }
 
   const applyOptimize = async (
@@ -384,7 +374,7 @@ export default function DashboardV3() {
             </div>
 
             <div className="mt-6 flex gap-2">
-              <Button onClick={() => setShowImportDialog(true)} size="lg" className="flex-1">
+              <Button onClick={() => navigate('/import')} size="lg" className="flex-1">
                 <Upload className="mr-2 h-4 w-4" />
                 导入数据
               </Button>
@@ -396,13 +386,6 @@ export default function DashboardV3() {
           </div>
         </div>
 
-        {showImportDialog && (
-          <ImportDialog
-            open={showImportDialog}
-            onClose={() => setShowImportDialog(false)}
-            onSuccess={handleImportSuccess}
-          />
-        )}
       </div>
     )
   }
@@ -520,7 +503,7 @@ export default function DashboardV3() {
               撤销
             </Button>
 
-            <Button onClick={() => setShowImportDialog(true)} variant="outline" className="gap-2">
+            <Button onClick={() => navigate('/import')} variant="outline" className="gap-2">
               <Upload className="h-4 w-4" />
               导入
             </Button>
@@ -609,15 +592,6 @@ export default function DashboardV3() {
         >
           <MessageCircle className="h-5 w-5" />
         </Button>
-
-        {/* 导入弹窗 */}
-        {showImportDialog && (
-          <ImportDialog
-            open={showImportDialog}
-            onClose={() => setShowImportDialog(false)}
-            onSuccess={handleImportSuccess}
-          />
-        )}
 
         {/* 导出弹窗 */}
         {showExportDialog && (

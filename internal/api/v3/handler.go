@@ -35,6 +35,8 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 
 	// 数据导入
 	router.POST("/import", h.Import)
+	router.GET("/import/preview", h.GetImportPreview)
+	router.GET("/import/sheet", h.GetImportSheet)
 
 	// 企业数据查询
 	router.GET("/companies", h.ListCompanies)

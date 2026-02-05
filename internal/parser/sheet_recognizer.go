@@ -242,7 +242,9 @@ func (r *SheetRecognizer) recognizeSummary(sheetName string, columns []string) S
 	confidence := scoreByRequiredHeaders(columns, summaryRequired)
 	for _, kw := range summaryKeywords {
 		if strings.Contains(sheetName, kw) {
-			confidence = clampConfidence(confidence + 0.2)
+			if confidence < 0.7 {
+				confidence = 0.7
+			}
 			break
 		}
 	}

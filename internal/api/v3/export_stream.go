@@ -91,6 +91,16 @@ func (h *Handler) ExportStream(c *gin.Context) {
 	}
 	defer file.Close()
 
+	compareSummary, err := buildExportCompareSummary(h.store, file, year, month)
+	if err == nil {
+		send(exportProgressEvent{
+			Type:      "compare",
+			Message:   "三方数据检测对比完成",
+			Data:      compareSummary,
+			Timestamp: time.Now(),
+		})
+	}
+
 	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("northstar_export_%d_%d.xlsx", time.Now().UnixNano(), os.Getpid()))
 	if err := file.SaveAs(tempPath); err != nil {
 		send(exportProgressEvent{

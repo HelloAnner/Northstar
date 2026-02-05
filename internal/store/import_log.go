@@ -1,6 +1,11 @@
 package store
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+
+	"northstar/internal/model"
+)
 
 // CreateImportLog 创建导入日志，返回 import_log_id
 func (s *Store) CreateImportLog(filename, filePath string, fileSize int64, fileHash string) (int64, error) {
@@ -39,3 +44,48 @@ func (s *Store) UpdateImportLog(id int64, totalSheets, importedSheets, skippedSh
 	return nil
 }
 
+// GetLatestImportLog 获取最新导入日志
+func (s *Store) GetLatestImportLog() (*model.ImportLog, error) {
+	row := s.db.QueryRow(`
+		SELECT id, filename, file_path, file_size, file_hash,
+		       total_sheets, imported_sheets, skipped_sheets,
+		       total_rows, imported_rows, error_rows,
+		       status, error_message, started_at, completed_at
+		FROM import_logs
+		ORDER BY id DESC
+		LIMIT 1
+	`)
+
+	var log model.ImportLog
+	var completedAt sql.NullTime
+	var errorMessage sql.NullString
+	if err := row.Scan(
+		&log.ID,
+		&log.Filename,
+		&log.FilePath,
+		&log.FileSize,
+		&log.FileHash,
+		&log.TotalSheets,
+		&log.ImportedSheets,
+		&log.SkippedSheets,
+		&log.TotalRows,
+		&log.ImportedRows,
+		&log.ErrorRows,
+		&log.Status,
+		&errorMessage,
+		&log.StartedAt,
+		&completedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get latest import log: %w", err)
+	}
+	if completedAt.Valid {
+		log.CompletedAt = &completedAt.Time
+	}
+	if errorMessage.Valid {
+		log.ErrorMessage = errorMessage.String
+	}
+	return &log, nil
+}

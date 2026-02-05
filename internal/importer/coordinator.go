@@ -3,10 +3,12 @@ package importer
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -31,11 +33,11 @@ func NewCoordinator(store *store.Store) *Coordinator {
 
 // ImportOptions 导入选项
 type ImportOptions struct {
-	FilePath        string
+	FilePath         string
 	OriginalFilename string
-	ClearExisting   bool // 是否清空现有数据
-	UpdateConfigYM  bool // 是否更新配置中的当前年月
-	CalculateFields bool // 是否计算衍生字段
+	ClearExisting    bool // 是否清空现有数据
+	UpdateConfigYM   bool // 是否更新配置中的当前年月
+	CalculateFields  bool // 是否计算衍生字段
 }
 
 // ProgressEvent 进度事件
@@ -48,19 +50,19 @@ type ProgressEvent struct {
 
 // ImportContext 导入上下文
 type ImportContext struct {
-	FilePath       string
-	File           *excelize.File
-	StartTime      time.Time
-	Report         *parser.ImportReport
-	ProgressChan   chan ProgressEvent
-	CurrentYear    int // 从主表识别出的当前年份
-	CurrentMonth   int // 从主表识别出的当前月份
-	clearedWRYM    map[string]bool
-	clearedACYM    map[string]bool
-	clearedWRSYM   map[string]bool
-	clearedACSYM   map[string]bool
-	importLogID    *int64
-	currentMeta    *sheetMetaDraft
+	FilePath     string
+	File         *excelize.File
+	StartTime    time.Time
+	Report       *parser.ImportReport
+	ProgressChan chan ProgressEvent
+	CurrentYear  int // 从主表识别出的当前年份
+	CurrentMonth int // 从主表识别出的当前月份
+	clearedWRYM  map[string]bool
+	clearedACYM  map[string]bool
+	clearedWRSYM map[string]bool
+	clearedACSYM map[string]bool
+	importLogID  *int64
+	currentMeta  *sheetMetaDraft
 }
 
 // Import 执行导入，返回进度通道
@@ -191,9 +193,9 @@ func (c *Coordinator) doImport(opts ImportOptions, progressChan chan ProgressEve
 
 	// 发送完成事件
 	c.sendProgress(progressChan, ProgressEvent{
-		Type:    "done",
-		Message: "导入完成",
-		Data:    ctx.Report,
+		Type:      "done",
+		Message:   "导入完成",
+		Data:      ctx.Report,
 		Timestamp: time.Now(),
 	})
 }
@@ -210,6 +212,15 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 		},
 		Timestamp: time.Now(),
 	})
+
+	// 先采集原始数据（无论识别结果）
+	if err := c.collectAndStoreRaw(ctx, sheetName); err != nil {
+		c.sendProgress(ctx.ProgressChan, ProgressEvent{
+			Type:      "warning",
+			Message:   fmt.Sprintf("采集原始数据失败: %s (%v)", sheetName, err),
+			Timestamp: time.Now(),
+		})
+	}
 
 	// 读取表头
 	rows, err := ctx.File.GetRows(sheetName)
@@ -249,6 +260,7 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 		TotalColumns: len(headers),
 		Headers:      headers,
 	}
+	ctx.currentMeta.MappingJSON = c.buildColumnMappingJSON(recognition.SheetType, headers, ctx)
 	switch recognition.SheetType {
 	case parser.SheetTypeWholesale, parser.SheetTypeRetail:
 		c.processWholesaleRetail(ctx, sheetName, opts)
@@ -259,17 +271,7 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 	case parser.SheetTypeACSnapshot:
 		c.processACSnapshot(ctx, sheetName, opts)
 	case parser.SheetTypeSummary:
-		c.recordSheetResult(ctx, parser.ParseResult{
-			SheetName: sheetName,
-			SheetType: parser.SheetTypeSummary,
-			Status:    "skipped",
-			Duration:  time.Since(sheetStartTime),
-		})
-		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "info",
-			Message: fmt.Sprintf("跳过汇总表: %s", sheetName),
-			Timestamp: time.Now(),
-		})
+		c.processSummary(ctx, sheetName, sheetStartTime)
 	case parser.SheetTypeUnknown:
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -279,8 +281,8 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 			Duration:  time.Since(sheetStartTime),
 		})
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "warning",
-			Message: fmt.Sprintf("无法识别 Sheet: %s (置信度过低)", sheetName),
+			Type:      "warning",
+			Message:   fmt.Sprintf("无法识别 Sheet: %s (置信度过低)", sheetName),
 			Timestamp: time.Now(),
 		})
 	default:
@@ -293,6 +295,111 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 		})
 	}
 	ctx.currentMeta = nil
+}
+
+// processSummary 处理汇总类 Sheet
+func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheetStartTime time.Time) {
+	year, month := ctx.CurrentYear, ctx.CurrentMonth
+	if year == 0 || month == 0 {
+		if y, m, err := c.store.GetCurrentYearMonth(); err == nil {
+			year, month = y, m
+		}
+	}
+
+	limitAbove, micro, eatWearUse, err := parser.ParseSummarySheet(ctx.File, sheetName, year, month)
+	if err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeSummary,
+			Status:    "error",
+			Errors:    []string{err.Error()},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	for i := range limitAbove {
+		limitAbove[i].ImportLogID = ctx.importLogID
+		limitAbove[i].SourceFile = ctx.Report.Filename
+	}
+	for i := range micro {
+		micro[i].ImportLogID = ctx.importLogID
+		micro[i].SourceFile = ctx.Report.Filename
+	}
+	for i := range eatWearUse {
+		eatWearUse[i].ImportLogID = ctx.importLogID
+		eatWearUse[i].SourceFile = ctx.Report.Filename
+	}
+
+	if err := c.store.BatchInsertSummaryLimitAbove(limitAbove); err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeSummary,
+			Status:    "error",
+			Errors:    []string{fmt.Sprintf("写入限上零售额失败: %v", err)},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+	if err := c.store.BatchInsertSummaryMicroSmall(micro); err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeSummary,
+			Status:    "error",
+			Errors:    []string{fmt.Sprintf("写入小微汇总失败: %v", err)},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+	if err := c.store.BatchInsertSummaryEatWearUse(eatWearUse); err != nil {
+		c.recordSheetResult(ctx, parser.ParseResult{
+			SheetName: sheetName,
+			SheetType: parser.SheetTypeSummary,
+			Status:    "error",
+			Errors:    []string{fmt.Sprintf("写入吃穿用汇总失败: %v", err)},
+			Duration:  time.Since(sheetStartTime),
+		})
+		return
+	}
+
+	importedRows := len(limitAbove) + len(micro) + len(eatWearUse)
+	status := "imported"
+	if importedRows == 0 {
+		status = "skipped"
+	}
+	c.recordSheetResult(ctx, parser.ParseResult{
+		SheetName:    sheetName,
+		SheetType:    parser.SheetTypeSummary,
+		Status:       status,
+		ImportedRows: importedRows,
+		Duration:     time.Since(sheetStartTime),
+	})
+	c.sendProgress(ctx.ProgressChan, ProgressEvent{
+		Type:      "info",
+		Message:   fmt.Sprintf("汇总表已解析: %s", sheetName),
+		Timestamp: time.Now(),
+	})
+}
+
+// collectAndStoreRaw 采集并写入原始 Sheet 数据
+func (c *Coordinator) collectAndStoreRaw(ctx *ImportContext, sheetName string) error {
+	raw, err := collectSheetRaw(ctx.File, sheetName, ctx.importLogID, ctx.Report.Filename)
+	if err != nil {
+		return err
+	}
+	if err := c.store.InsertSheetColumns(raw.columns); err != nil {
+		return err
+	}
+	if err := c.store.InsertSheetRows(raw.rows); err != nil {
+		return err
+	}
+	if err := c.store.BatchInsertSheetCells(raw.cells); err != nil {
+		return err
+	}
+	if err := c.store.InsertSheetMerges(raw.merges); err != nil {
+		return err
+	}
+	return nil
 }
 
 // processWholesaleRetail 处理批零主表
@@ -334,24 +441,7 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 		}
 	}
 
-	// 清空现有数据（可选）
-	if opts.ClearExisting && len(records) > 0 {
-		year := records[0].DataYear
-		month := records[0].DataMonth
-		key := fmt.Sprintf("%d-%02d", year, month)
-		if !ctx.clearedWRYM[key] {
-			ctx.clearedWRYM[key] = true
-			if err := c.store.DeleteWRByYearMonth(year, month); err != nil {
-				c.sendProgress(ctx.ProgressChan, ProgressEvent{
-					Type:      "warning",
-					Message:   fmt.Sprintf("清空批零旧数据失败: %v", err),
-					Timestamp: time.Now(),
-				})
-			}
-		}
-	}
-
-	// 批量插入
+	// 批量插入（按主键覆盖）
 	if err := c.store.BatchInsertWR(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -414,24 +504,7 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 		}
 	}
 
-	// 清空现有数据（可选）
-	if opts.ClearExisting && len(records) > 0 {
-		year := records[0].DataYear
-		month := records[0].DataMonth
-		key := fmt.Sprintf("%d-%02d", year, month)
-		if !ctx.clearedACYM[key] {
-			ctx.clearedACYM[key] = true
-			if err := c.store.DeleteACByYearMonth(year, month); err != nil {
-				c.sendProgress(ctx.ProgressChan, ProgressEvent{
-					Type:      "warning",
-					Message:   fmt.Sprintf("清空住餐旧数据失败: %v", err),
-					Timestamp: time.Now(),
-				})
-			}
-		}
-	}
-
-	// 批量插入
+	// 批量插入（按主键覆盖）
 	if err := c.store.BatchInsertAC(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -568,8 +641,8 @@ func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, op
 // calculateDerivedFields 计算衍生字段
 func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 	c.sendProgress(ctx.ProgressChan, ProgressEvent{
-		Type:    "info",
-		Message: "正在计算衍生字段...",
+		Type:      "info",
+		Message:   "正在计算衍生字段...",
 		Timestamp: time.Now(),
 	})
 
@@ -615,8 +688,8 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 
 	if err != nil {
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "warning",
-			Message: fmt.Sprintf("批零增速计算失败: %v", err),
+			Type:      "warning",
+			Message:   fmt.Sprintf("批零增速计算失败: %v", err),
 			Timestamp: time.Now(),
 		})
 	}
@@ -639,15 +712,15 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 
 	if err != nil {
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "warning",
-			Message: fmt.Sprintf("住餐增速计算失败: %v", err),
+			Type:      "warning",
+			Message:   fmt.Sprintf("住餐增速计算失败: %v", err),
 			Timestamp: time.Now(),
 		})
 	}
 
 	c.sendProgress(ctx.ProgressChan, ProgressEvent{
-		Type:    "info",
-		Message: "衍生字段计算完成",
+		Type:      "info",
+		Message:   "衍生字段计算完成",
 		Timestamp: time.Now(),
 	})
 }
@@ -656,14 +729,14 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 func (c *Coordinator) updateCurrentYearMonth(ctx *ImportContext) {
 	if err := c.store.SetCurrentYearMonth(ctx.CurrentYear, ctx.CurrentMonth); err != nil {
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "warning",
-			Message: fmt.Sprintf("更新当前年月失败: %v", err),
+			Type:      "warning",
+			Message:   fmt.Sprintf("更新当前年月失败: %v", err),
 			Timestamp: time.Now(),
 		})
 	} else {
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:    "info",
-			Message: fmt.Sprintf("当前操作月份已更新为: %d年%d月", ctx.CurrentYear, ctx.CurrentMonth),
+			Type:      "info",
+			Message:   fmt.Sprintf("当前操作月份已更新为: %d年%d月", ctx.CurrentYear, ctx.CurrentMonth),
 			Timestamp: time.Now(),
 		})
 	}
@@ -703,16 +776,17 @@ func (c *Coordinator) recordSheetResult(ctx *ImportContext, result parser.ParseR
 	// 写入 sheets_meta（失败不影响导入流程）
 	if ctx.currentMeta != nil {
 		meta := model.SheetMeta{
-			SheetName:    ctx.currentMeta.SheetName,
-			SheetType:    string(ctx.currentMeta.SheetType),
-			Confidence:   ctx.currentMeta.Confidence,
-			TotalRows:    ctx.currentMeta.TotalRows,
-			TotalColumns: ctx.currentMeta.TotalColumns,
-			ImportedRows: result.ImportedRows,
-			ColumnsJSON:  store.BuildColumnsJSON(ctx.currentMeta.Headers),
-			Status:       result.Status,
-			ErrorMessage: joinErrors(result.Errors),
-			SourceFile:   ctx.Report.Filename,
+			SheetName:         ctx.currentMeta.SheetName,
+			SheetType:         string(ctx.currentMeta.SheetType),
+			Confidence:        ctx.currentMeta.Confidence,
+			TotalRows:         ctx.currentMeta.TotalRows,
+			TotalColumns:      ctx.currentMeta.TotalColumns,
+			ImportedRows:      result.ImportedRows,
+			ColumnsJSON:       store.BuildColumnsJSON(ctx.currentMeta.Headers),
+			ColumnMappingJSON: ctx.currentMeta.MappingJSON,
+			Status:            result.Status,
+			ErrorMessage:      joinErrors(result.Errors),
+			SourceFile:        ctx.Report.Filename,
 		}
 		if ctx.importLogID != nil {
 			meta.ImportLogID = ctx.importLogID
@@ -759,6 +833,7 @@ type sheetMetaDraft struct {
 	TotalRows    int
 	TotalColumns int
 	Headers      []string
+	MappingJSON  string
 }
 
 func statAndHashFile(path string) (int64, string) {
@@ -792,4 +867,54 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (c *Coordinator) buildColumnMappingJSON(sheetType parser.SheetType, headers []string, ctx *ImportContext) string {
+	var mappings map[int]parser.FieldMapping
+	year, month := parser.FindCurrentYearMonth(headers)
+	if year == 0 || month == 0 {
+		if ctx.CurrentYear > 0 && ctx.CurrentMonth > 0 {
+			year, month = ctx.CurrentYear, ctx.CurrentMonth
+		} else if y, m, err := c.store.GetCurrentYearMonth(); err == nil {
+			year, month = y, m
+		}
+	}
+
+	switch sheetType {
+	case parser.SheetTypeWholesale, parser.SheetTypeRetail:
+		mapper := parser.NewFieldMapper(year, month)
+		mappings = mapper.MapWholesaleRetail(headers)
+	case parser.SheetTypeAccommodation, parser.SheetTypeCatering:
+		mapper := parser.NewFieldMapper(year, month)
+		mappings = mapper.MapAccommodationCatering(headers)
+	default:
+		return ""
+	}
+
+	if len(mappings) == 0 {
+		return ""
+	}
+	type mappingItem struct {
+		ColumnIndex int    `json:"columnIndex"`
+		ColumnName  string `json:"columnName"`
+		DBField     string `json:"dbField"`
+		TimeType    int    `json:"timeType"`
+	}
+	items := make([]mappingItem, 0, len(mappings))
+	for _, m := range mappings {
+		items = append(items, mappingItem{
+			ColumnIndex: m.ColumnIndex,
+			ColumnName:  m.ColumnName,
+			DBField:     m.DBField,
+			TimeType:    int(m.TimeType),
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ColumnIndex < items[j].ColumnIndex
+	})
+	b, err := json.Marshal(items)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }

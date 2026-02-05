@@ -17,6 +17,7 @@ const (
 	nodeKindWR        = "wr"
 	nodeKindAC        = "ac"
 	nodeKindIndicator = "indicator"
+	nodeKindSummary   = "summary"
 )
 
 var uiColumnKeys = []string{
@@ -77,6 +78,7 @@ func BuildLinkageGraph(index *TemplateIndex, wrRecords []*model.WholesaleRetail,
 	}
 	attachCompanyEdges(graph, wrRecords, acRecords)
 	attachAggregateEdges(graph, wrRecords, acRecords)
+	attachSummaryEdges(graph)
 	addIndicatorEdges(graph)
 	attachIndicatorCoords(graph, index)
 	attachAggregateCoords(graph, index)
@@ -90,12 +92,22 @@ func indicatorNode(id string) NodeID {
 	return NodeID(nodeKindIndicator + ":" + id)
 }
 
+func summaryNode(kind string, field string) NodeID {
+	return NodeID(nodeKindSummary + ":" + kind + ":" + field)
+}
+
 func industryNode(industry string, field string) NodeID {
 	return NodeID("industry:" + industry + ":" + field)
 }
 
 func aggregateNode(field string) NodeID {
 	return NodeID("aggregate:" + field)
+}
+
+func attachSummaryEdges(g *Graph) {
+	g.AddEdge(summaryNode("micro_small", "rate"), indicatorNode("microSmall_month_rate"))
+	g.AddEdge(summaryNode("eat_wear_use", "rate"), indicatorNode("eatWearUse_month_rate"))
+	g.AddEdge(summaryNode("limit_above", "rate"), indicatorNode("limitAbove_month_rate"))
 }
 
 func addWRFieldEdges(g *Graph, r *model.WholesaleRetail) {

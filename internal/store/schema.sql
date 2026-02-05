@@ -80,6 +80,7 @@ CREATE INDEX IF NOT EXISTS idx_wr_industry_type ON wholesale_retail(industry_typ
 CREATE INDEX IF NOT EXISTS idx_wr_company_scale ON wholesale_retail(company_scale);
 CREATE INDEX IF NOT EXISTS idx_wr_is_small_micro ON wholesale_retail(is_small_micro);
 CREATE INDEX IF NOT EXISTS idx_wr_is_eat_wear_use ON wholesale_retail(is_eat_wear_use);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_wr_key ON wholesale_retail(data_year, data_month, credit_code, industry_type);
 
 -- ============================================================================
 -- 2. accommodation_catering - 住宿餐饮企业表
@@ -166,6 +167,7 @@ CREATE INDEX IF NOT EXISTS idx_ac_data_month ON accommodation_catering(data_year
 CREATE INDEX IF NOT EXISTS idx_ac_credit_code ON accommodation_catering(credit_code);
 CREATE INDEX IF NOT EXISTS idx_ac_industry_type ON accommodation_catering(industry_type);
 CREATE INDEX IF NOT EXISTS idx_ac_company_scale ON accommodation_catering(company_scale);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_ac_key ON accommodation_catering(data_year, data_month, credit_code, industry_type);
 
 -- ============================================================================
 -- 3. wr_snapshot - 批零历史快照表
@@ -289,7 +291,151 @@ CREATE INDEX IF NOT EXISTS idx_sm_sheet_type ON sheets_meta(sheet_type);
 CREATE INDEX IF NOT EXISTS idx_sm_import_log_id ON sheets_meta(import_log_id);
 
 -- ============================================================================
--- 6. config - 系统配置表
+-- 6. sheet_columns - Sheet 列结构
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sheet_columns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_name TEXT NOT NULL,
+    col_idx INTEGER NOT NULL,                    -- 1-based
+    header_text TEXT,                            -- 原始表头文本
+    normalized_header TEXT,                      -- 规范化表头
+    col_width REAL,                              -- 列宽
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sc_sheet_col ON sheet_columns(sheet_name, col_idx);
+CREATE INDEX IF NOT EXISTS idx_sc_import_log_id ON sheet_columns(import_log_id);
+
+-- ============================================================================
+-- 7. sheet_rows - Sheet 行结构
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sheet_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_name TEXT NOT NULL,
+    row_idx INTEGER NOT NULL,                    -- 1-based
+    row_height REAL,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sr_sheet_row ON sheet_rows(sheet_name, row_idx);
+CREATE INDEX IF NOT EXISTS idx_sr_import_log_id ON sheet_rows(import_log_id);
+
+-- ============================================================================
+-- 8. sheet_cells - Sheet 单元格原始数据
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sheet_cells (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_name TEXT NOT NULL,
+    row_idx INTEGER NOT NULL,
+    col_idx INTEGER NOT NULL,
+    a1 TEXT,                                     -- A1 坐标
+    cell_type TEXT,                              -- 单元格类型
+    raw_value TEXT,                              -- 原始值
+    formula TEXT,                                -- 公式
+    calc_value TEXT,                             -- 计算值（data_only）
+    num_format TEXT,                             -- 数字格式
+    style_id INTEGER,                            -- 样式 ID
+    is_merged INTEGER DEFAULT 0,
+    merge_range TEXT,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sc_cell ON sheet_cells(sheet_name, row_idx, col_idx);
+CREATE INDEX IF NOT EXISTS idx_sc_cell_import ON sheet_cells(import_log_id);
+
+-- ============================================================================
+-- 9. sheet_merges - Sheet 合并单元格
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sheet_merges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_name TEXT NOT NULL,
+    merge_range TEXT NOT NULL,                   -- A1:B2
+    start_row INTEGER NOT NULL,
+    start_col INTEGER NOT NULL,
+    end_row INTEGER NOT NULL,
+    end_col INTEGER NOT NULL,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sm_sheet ON sheet_merges(sheet_name);
+CREATE INDEX IF NOT EXISTS idx_sm_import_log_id ON sheet_merges(import_log_id);
+
+-- ============================================================================
+-- 10. summary_limit_above_retail - 限上零售额汇总
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS summary_limit_above_retail (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data_year INTEGER NOT NULL,
+    data_month INTEGER NOT NULL,
+    row_key TEXT,
+    row_no INTEGER,
+    value_current REAL,
+    value_last REAL,
+    rate REAL,
+    source_sheet TEXT,
+    source_cell TEXT,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_slar_month ON summary_limit_above_retail(data_year, data_month);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_slar_key ON summary_limit_above_retail(data_year, data_month, row_key);
+
+-- ============================================================================
+-- 11. summary_micro_small - 小微汇总
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS summary_micro_small (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data_year INTEGER NOT NULL,
+    data_month INTEGER NOT NULL,
+    row_key TEXT,
+    row_no INTEGER,
+    value_current REAL,
+    value_last REAL,
+    rate REAL,
+    source_sheet TEXT,
+    source_cell TEXT,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sms_month ON summary_micro_small(data_year, data_month);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_sms_key ON summary_micro_small(data_year, data_month, row_key);
+
+-- ============================================================================
+-- 12. summary_eat_wear_use - 吃穿用汇总
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS summary_eat_wear_use (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data_year INTEGER NOT NULL,
+    data_month INTEGER NOT NULL,
+    row_key TEXT,
+    row_no INTEGER,
+    value_current REAL,
+    value_last REAL,
+    rate REAL,
+    source_sheet TEXT,
+    source_cell TEXT,
+    import_log_id INTEGER,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sewu_month ON summary_eat_wear_use(data_year, data_month);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_sewu_key ON summary_eat_wear_use(data_year, data_month, row_key);
+
+-- ============================================================================
+-- 13. config - 系统配置表
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
