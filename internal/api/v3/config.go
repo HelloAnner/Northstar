@@ -2,6 +2,7 @@ package v3
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -145,6 +146,8 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 		return
 	}
 
+	log.Printf("config update: keys=%v", sortedConfigKeys(updates))
+
 	// 遍历更新项
 	for key, value := range updates {
 		var strValue string
@@ -192,4 +195,22 @@ func decodeConfigUpdates(c *gin.Context) (map[string]interface{}, error) {
 		return nil, err
 	}
 	return updates, nil
+}
+
+func sortedConfigKeys(updates map[string]interface{}) []string {
+	keys := make([]string, 0, len(updates))
+	for k := range updates {
+		keys = append(keys, k)
+	}
+	if len(keys) == 0 {
+		return keys
+	}
+	for i := 0; i < len(keys)-1; i++ {
+		for j := i + 1; j < len(keys); j++ {
+			if keys[j] < keys[i] {
+				keys[i], keys[j] = keys[j], keys[i]
+			}
+		}
+	}
+	return keys
 }

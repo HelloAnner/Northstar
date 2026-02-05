@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+	"northstar/internal/exporter"
 	"northstar/internal/model"
 	"northstar/internal/store"
 )
@@ -39,6 +40,28 @@ func TestBuildExportCompareSummary(t *testing.T) {
 	for _, item := range summary.Items {
 		if item.Status != "pass" {
 			t.Fatalf("status not pass: %s", item.Status)
+		}
+	}
+}
+
+func TestBuildExportCompareSummary_WithEmbeddedTemplate(t *testing.T) {
+	st := createCompareStore(t)
+	defer func() { _ = st.Close() }()
+
+	f, err := exporter.OpenEmbeddedMonthReportTemplate()
+	if err != nil {
+		t.Fatalf("open template failed: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	summary, err := buildExportCompareSummary(st, f, 2025, 12)
+	if err != nil {
+		t.Fatalf("build compare summary failed: %v", err)
+	}
+
+	for _, item := range summary.Items {
+		if item.Key == "export" && item.Status != "pass" {
+			t.Fatalf("unexpected export status: %s", item.Status)
 		}
 	}
 }

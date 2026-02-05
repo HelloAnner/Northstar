@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -68,13 +69,16 @@ func (h *Handler) StreamLLMChat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
 		return
 	}
+	log.Printf("llm chat start: session=%s messages=%d", req.SessionID, len(req.Messages))
 	chatCtx, err := h.buildLLMChatContext(c.Request.Context(), req)
 	if err != nil {
+		log.Printf("llm chat context error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	stream := newLLMStreamWriter(c)
 	if err := h.runLLMChat(stream, chatCtx); err != nil {
+		log.Printf("llm chat run error: %v", err)
 		stream.SendError(err)
 		return
 	}
@@ -101,7 +105,7 @@ func (h *Handler) buildLLMChatContext(ctx context.Context, req llmChatRequest) (
 	prompt := llm.BuildSystemPrompt(llm.PromptContext{Year: year, Month: month})
 	client, err := llm.NewClient(cfg, prompt)
 	if err != nil {
-		return llmChatContext{}, fmt.Errorf("初始化模型失败")
+		return llmChatContext{}, fmt.Errorf("初始化模型失败: %v", err)
 	}
 	return llmChatContext{ctx: ctx, request: req, year: year, month: month, client: client}, nil
 }

@@ -71,7 +71,11 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
       }
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败')
+      if (err instanceof Error && err.message === 'Failed to fetch') {
+        setError('保存失败：后端不可达或请求被拦截（Failed to fetch）')
+      } else {
+        setError(err instanceof Error ? err.message : '保存失败')
+      }
     } finally {
       setSaving(false)
     }
@@ -86,34 +90,34 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="llm-base-url">Base URL</Label>
+            <Label htmlFor="llm-base-url">接口地址</Label>
             <Input
               id="llm-base-url"
               value={form.baseUrl}
               onChange={(e) => updateField('baseUrl', e.target.value)}
-              placeholder="https://api.openai.com/v1"
+              placeholder="例如：https://api.openai.com/v1"
               disabled={loading}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="llm-model">Model</Label>
+            <Label htmlFor="llm-model">模型名称</Label>
             <Input
               id="llm-model"
               value={form.model}
               onChange={(e) => updateField('model', e.target.value)}
-              placeholder="gpt-4o-mini"
+              placeholder="例如：gpt-4o-mini"
               disabled={loading}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="llm-api-key">API Key</Label>
+            <Label htmlFor="llm-api-key">API 密钥</Label>
             <div className="flex gap-2">
               <Input
                 id="llm-api-key"
                 type={showApiKey ? 'text' : 'password'}
                 value={form.apiKey}
                 onChange={(e) => updateField('apiKey', e.target.value)}
-                placeholder="sk-..."
+                placeholder="例如：sk-..."
                 disabled={loading}
               />
               <Button

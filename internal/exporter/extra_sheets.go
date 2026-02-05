@@ -3,6 +3,7 @@ package exporter
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -142,7 +143,10 @@ func fillSocialRetailSheetAndMaterialize(
 	indicators indicatorIndex,
 ) error {
 	ctx := newSocialContext(st, year, month, indicators)
-	return applyCellLogics(f, ctx, socialSheetLogics())
+	if err := applyCellLogics(f, ctx, socialSheetLogics()); err != nil {
+		return err
+	}
+	return rewriteSocialRetailFormulaYear(f, year)
 }
 
 func rewriteFixedSummarySheet(
@@ -166,6 +170,108 @@ func prevYearMonth(year, month int) (int, int) {
 		return year - 1, 12
 	}
 	return year, month - 1
+}
+
+var socialRetailYearPattern = regexp.MustCompile(`(20[0-9]{2})年`)
+
+// rewriteSocialRetailFormulaYear 将社零额（定）中的固定年份公式替换为当前导出年份。
+func rewriteSocialRetailFormulaYear(f *excelize.File, year int) error {
+	const sheet = "社零额（定）"
+	maxCol, maxRow, err := getSheetMaxColRow(f, sheet)
+	if err != nil {
+		return fmt.Errorf("读取 %s 维度失败: %w", sheet, err)
+	}
+	years := map[int]struct{}{}
+	for r := 1; r <= maxRow; r++ {
+		for c := 1; c <= maxCol; c++ {
+			cell, err := excelize.CoordinatesToCellName(c, r)
+			if err != nil {
+				return err
+			}
+			formula, err := f.GetCellFormula(sheet, cell)
+			if err != nil {
+				return err
+			}
+			for _, match := range socialRetailYearPattern.FindAllStringSubmatch(formula, -1) {
+				if len(match) < 2 {
+					continue
+				}
+				v, err := strconv.Atoi(match[1])
+				if err != nil {
+					continue
+				}
+				years[v] = struct{}{}
+			}
+		}
+	}
+	if len(years) == 0 {
+		return nil
+	}
+	yearMapping := map[int]int{}
+	if len(years) == 1 {
+		for v := range years {
+			yearMapping[v] = year
+		}
+	} else {
+		maxYear := 0
+		for v := range years {
+			if v > maxYear {
+				maxYear = v
+			}
+		}
+		if maxYear > 0 {
+			yearMapping[maxYear] = year
+			if _, ok := years[maxYear-1]; ok {
+				yearMapping[maxYear-1] = year - 1
+			}
+		}
+	}
+	if len(yearMapping) == 0 {
+		return nil
+	}
+	for r := 1; r <= maxRow; r++ {
+		for c := 1; c <= maxCol; c++ {
+			cell, err := excelize.CoordinatesToCellName(c, r)
+			if err != nil {
+				return err
+			}
+			formula, err := f.GetCellFormula(sheet, cell)
+			if err != nil {
+				return err
+			}
+			formula = strings.TrimSpace(formula)
+			if formula == "" {
+				continue
+			}
+			updated, changed := replaceFormulaYear(formula, yearMapping)
+			if !changed {
+				continue
+			}
+			if err := f.SetCellFormula(sheet, cell, updated); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// replaceFormulaYear 按模板中出现的年份格式替换公式里的年份文本。
+func replaceFormulaYear(formula string, mapping map[int]int) (string, bool) {
+	if len(mapping) == 0 {
+		return formula, false
+	}
+	keys := make([]int, 0, len(mapping))
+	for k := range mapping {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
+	updated := formula
+	for _, k := range keys {
+		from := fmt.Sprintf("%d年", k)
+		to := fmt.Sprintf("%d年", mapping[k])
+		updated = strings.ReplaceAll(updated, from, to)
+	}
+	return updated, updated != formula
 }
 
 func getSheetMaxColRow(f *excelize.File, sheet string) (int, int, error) {

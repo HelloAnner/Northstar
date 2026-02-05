@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Download, MessageCircle, RefreshCw, Settings2, Upload } from 'lucide-react'
+import { Download, MessageCircle, Settings2, Upload } from 'lucide-react'
 import ExportDialog from '@/components/ExportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 import ThemeToggle from '@/components/app/ThemeToggle'
@@ -350,44 +350,7 @@ export default function DashboardV3() {
 
   // 空状态
   if (status && !status.initialized) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-b from-background via-background to-muted/20">
-        <div className="text-center space-y-4">
-          <div className="mx-auto w-[520px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/60 p-8 text-left shadow-2xl backdrop-blur">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="flex items-center gap-2 text-2xl font-semibold">
-                  <NorthstarIcon className="h-5 w-5" />
-                  Northstar
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">关键指标总览 + 企业数据微调</p>
-              </div>
-              <Badge variant="secondary" className="mt-1">
-                未导入
-              </Badge>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <p className="text-sm text-muted-foreground">
-                请选择日常使用的预估表 Excel（例如：<span className="font-mono">12月月报（预估）_补全企业名称社会代码_20260129.xlsx</span>）。
-              </p>
-            </div>
-
-            <div className="mt-6 flex gap-2">
-              <Button onClick={() => navigate('/import')} size="lg" className="flex-1">
-                <Upload className="mr-2 h-4 w-4" />
-                导入数据
-              </Button>
-              <Button variant="outline" size="lg" onClick={() => loadStatus()}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                刷新
-              </Button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    )
+    return <Navigate to="/import" replace />
   }
 
   const hasDraft = Object.keys(draftTargets).length > 0

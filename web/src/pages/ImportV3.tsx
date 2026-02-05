@@ -1,5 +1,5 @@
 /**
- * 导入全屏页面（左右对比）
+ * 导入全屏页面（进度看板 + 日志追踪）
  *
  * @author Anner
  * Created on 2026/2/5
@@ -14,11 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Upload, RefreshCw, AlertTriangle } from 'lucide-react'
 import { type ColumnMappingItem } from './importMapping'
 import { applyImportEvent, type ImportTask, type ImportEvent } from './importProgress'
-import { applyPreviewUpdate } from './importPreview'
 
 type PreviewSheet = {
   sheetName: string
@@ -43,38 +41,25 @@ type ImportPreview = {
   sheets: PreviewSheet[]
 }
 
-type SheetColumn = {
-  colIdx: number
-  headerText: string
+type ImportLogLevel = 'info' | 'success' | 'warn' | 'error'
+
+type ImportLogLine = {
+  id: string
+  time: string
+  level: ImportLogLevel
+  message: string
 }
 
-type SheetRow = {
-  rowIdx: number
-}
-
-type SheetCell = {
-  rowIdx: number
-  colIdx: number
-  rawValue: string
-  calcValue: string
-  formula: string
-  isMerged: number
-  mergeRange: string
-}
-
-type SheetPreview = {
+type ProgressItem = {
   sheetName: string
-  columns: SheetColumn[]
-  rows: SheetRow[]
-  cells: SheetCell[]
+  status?: string
+  progress?: number
+  message?: string
+  sheetType?: string
 }
 
 export default function ImportV3() {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
-  const [selectedSheet, setSelectedSheet] = useState('')
-  const [sheetPreview, setSheetPreview] = useState<SheetPreview | null>(null)
-  const [loadingPreview, setLoadingPreview] = useState(false)
-  const [loadingSheet, setLoadingSheet] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
@@ -83,11 +68,10 @@ export default function ImportV3() {
   const [doneSheets, setDoneSheets] = useState(0)
   const [importTasks, setImportTasks] = useState<ImportTask[]>([])
   const [importCompleted, setImportCompleted] = useState(false)
-  const [previewRefreshToken, setPreviewRefreshToken] = useState(0)
+  const [importLogs, setImportLogs] = useState<ImportLogLine[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
-  const selectedSheetRef = useRef('')
-  const previewTokenRef = useRef(0)
+  const logEndRef = useRef<HTMLDivElement>(null)
   const sheets = preview?.sheets ?? []
   const importLog = preview?.importLog
   const totalSheets = importLog?.totalSheets ?? sheets.length
@@ -97,85 +81,42 @@ export default function ImportV3() {
   const progressValue = totalSheets > 0 ? Math.round((importedSheets / totalSheets) * 100) : 0
   const errorSheets = sheets.filter((sheet) => sheet.status === 'error').length
 
-  const activeSheet = useMemo(
-    () => sheets.find((sheet) => sheet.sheetName === selectedSheet),
-    [sheets, selectedSheet]
-  )
-
-  useEffect(() => {
-    selectedSheetRef.current = selectedSheet
-  }, [selectedSheet])
-
-  useEffect(() => {
-    previewTokenRef.current = previewRefreshToken
-  }, [previewRefreshToken])
+  const liveSummary = useMemo(() => {
+    if (importing || importTotalSheets !== null || importTasks.length > 0) {
+      const total = importTotalSheets ?? Math.max(importTasks.length, 0)
+      const imported = importTasks.filter((task) => task.status === 'imported').length
+      const warn = importTasks.filter((task) => task.status === 'skipped' || task.status === 'error').length
+      const errors = importTasks.filter((task) => task.status === 'error').length
+      return { total, imported, warn, errors, live: true }
+    }
+    return { total: totalSheets, imported: importedSheets, warn: warnSheets, errors: errorSheets, live: false }
+  }, [importing, importTotalSheets, importTasks, totalSheets, importedSheets, warnSheets, errorSheets])
 
   const loadPreview = useCallback(async () => {
-    setLoadingPreview(true)
     try {
       const res = await fetch('/api/import/preview')
       const data = (await res.json()) as ImportPreview
       setPreview(data)
-      const selection = applyPreviewUpdate(
-        selectedSheetRef.current,
-        previewTokenRef.current,
-        data.sheets ?? []
-      )
-      setSelectedSheet(selection.selectedSheet)
-      setPreviewRefreshToken(selection.refreshToken)
-      if (!selection.selectedSheet) {
-        setSheetPreview(null)
-      }
     } catch (err) {
       console.error(err)
-    } finally {
-      setLoadingPreview(false)
     }
   }, [])
 
   useEffect(() => {
-    loadPreview()
-  }, [loadPreview])
-
-  useEffect(() => {
-    const fetchSheet = async () => {
-      if (!selectedSheet) return
-      setLoadingSheet(true)
-      try {
-        const res = await fetch(`/api/import/sheet?name=${encodeURIComponent(selectedSheet)}&limitRows=50&limitCols=40`)
-        const data = (await res.json()) as SheetPreview
-        setSheetPreview(data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoadingSheet(false)
-      }
+    setPreview(null)
+    setSelectedFile(null)
+    setImporting(false)
+    setImportError(null)
+    setImportStage('等待选择文件')
+    setImportTotalSheets(null)
+    setDoneSheets(0)
+    setImportTasks([])
+    setImportCompleted(false)
+    setImportLogs([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
-    fetchSheet()
-  }, [selectedSheet, previewRefreshToken])
-
-  const previewHeaders = useMemo(() => {
-    if (!sheetPreview?.columns?.length) return []
-    return sheetPreview.columns.map((col) => col.headerText || `列${col.colIdx}`)
-  }, [sheetPreview])
-
-  const previewRows = useMemo(() => {
-    if (!sheetPreview?.rows?.length || !sheetPreview?.columns?.length) return []
-    const columns = sheetPreview.columns
-    const cellMap = new Map<string, SheetCell>()
-    for (const cell of sheetPreview.cells) {
-      cellMap.set(`${cell.rowIdx}:${cell.colIdx}`, cell)
-    }
-    const rows = sheetPreview.rows.filter((row) => row.rowIdx > 1).slice(0, 20)
-    return rows.map((row) => {
-      return columns.map((col) => {
-        const cell = cellMap.get(`${row.rowIdx}:${col.colIdx}`)
-        if (!cell) return ''
-        const value = cell.rawValue || cell.calcValue || cell.formula || ''
-        return cell.isMerged ? `${value} (合并)` : value
-      })
-    })
-  }, [sheetPreview])
+  }, [])
 
   const importPercent = useMemo(() => {
     if (!importTotalSheets || importTotalSheets <= 0) return 0
@@ -184,6 +125,21 @@ export default function ImportV3() {
   }, [doneSheets, importTotalSheets])
 
   const displayProgress = importing ? importPercent : progressValue
+
+  const appendLog = useCallback((line: ImportLogLine) => {
+    setImportLogs((prev) => {
+      const next = [...prev, line]
+      if (next.length > 600) {
+        return next.slice(next.length - 600)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!logEndRef.current) return
+    logEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [importLogs])
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null
@@ -210,6 +166,13 @@ export default function ImportV3() {
     setDoneSheets(0)
     setImportTasks([])
     setImportCompleted(false)
+    setImportLogs([])
+    appendLog({
+      id: String(Date.now()),
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      level: 'info',
+      message: `开始导入：${selectedFile.name}`,
+    })
 
     try {
       const formData = new FormData()
@@ -245,6 +208,47 @@ export default function ImportV3() {
           const jsonStr = line.slice(6)
           try {
             const event = JSON.parse(jsonStr) as ImportEvent
+            const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+            if (event.type === 'sheet_start') {
+              const sheetName = String(event.data?.sheet_name || '')
+              appendLog({
+                id: `${now}-${Math.random()}`,
+                time: now,
+                level: 'info',
+                message: sheetName ? `开始解析 Sheet：${sheetName}` : (event.message || '开始解析 Sheet'),
+              })
+            } else if (event.type === 'sheet_done') {
+              const sheetName = String(event.data?.sheetName || '')
+              const status = String(event.data?.status || '')
+              const level: ImportLogLevel = status === 'error' ? 'error' : status === 'skipped' ? 'warn' : 'success'
+              appendLog({
+                id: `${now}-${Math.random()}`,
+                time: now,
+                level,
+                message: sheetName ? `完成 Sheet：${sheetName}（${status || 'imported'}）` : (event.message || 'Sheet 完成'),
+              })
+            } else if (event.type === 'error') {
+              appendLog({
+                id: `${now}-${Math.random()}`,
+                time: now,
+                level: 'error',
+                message: event.message || '导入失败',
+              })
+            } else if (event.type === 'done') {
+              appendLog({
+                id: `${now}-${Math.random()}`,
+                time: now,
+                level: 'success',
+                message: event.message || '导入完成',
+              })
+            } else if (event.message) {
+              appendLog({
+                id: `${now}-${Math.random()}`,
+                time: now,
+                level: 'info',
+                message: event.message,
+              })
+            }
             if (event.message) {
               setImportStage(event.message)
             }
@@ -280,12 +284,26 @@ export default function ImportV3() {
             }
           } catch (err) {
             console.error('Failed to parse import event:', err)
+            const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+            appendLog({
+              id: `${now}-${Math.random()}`,
+              time: now,
+              level: 'warn',
+              message: '解析导入日志失败，已跳过一条消息',
+            })
           }
         }
       }
     } catch (err) {
       setImportError(err instanceof Error ? err.message : '导入失败')
       setImporting(false)
+      const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+      appendLog({
+        id: `${now}-${Math.random()}`,
+        time: now,
+        level: 'error',
+        message: err instanceof Error ? err.message : '导入失败',
+      })
     }
   }
 
@@ -312,6 +330,10 @@ export default function ImportV3() {
 
   const statusLabel = (status?: string) => {
     switch (status) {
+      case 'pending':
+        return '等待'
+      case 'running':
+        return '进行中'
       case 'imported':
         return '已导入'
       case 'skipped':
@@ -328,7 +350,52 @@ export default function ImportV3() {
   const statusVariant = (status?: string) => {
     if (status === 'error') return 'destructive'
     if (status === 'warn') return 'secondary'
+    if (status === 'running') return 'secondary'
+    if (status === 'pending') return 'outline'
     if (status === 'skipped') return 'outline'
+    return 'secondary'
+  }
+
+  const progressItems = useMemo<ProgressItem[]>(() => {
+    if (importTasks.length > 0) {
+      return importTasks.map((task) => ({
+        sheetName: task.sheetName,
+        status: task.status,
+        progress: task.progress,
+        message: task.message,
+        sheetType: task.sheetType,
+      }))
+    }
+    if (sheets.length > 0) {
+      return sheets.map((sheet) => ({
+        sheetName: sheet.sheetName,
+        status: sheet.status,
+        progress:
+          sheet.status === 'imported' || sheet.status === 'skipped'
+            ? 100
+            : sheet.status === 'warn'
+              ? 70
+              : 30,
+        message: sheet.errors,
+        sheetType: sheet.sheetType,
+      }))
+    }
+    return []
+  }, [importTasks, sheets])
+
+  const importStatusText = useMemo(() => {
+    if (importing) return '导入中'
+    if (importCompleted) return '已完成'
+    if (selectedFile) return '待导入'
+    return '未开始'
+  }, [importing, importCompleted, selectedFile])
+
+  const importStatusVariant = importing ? 'secondary' : importCompleted ? 'outline' : 'secondary'
+
+  const logLevelBadge = (level: ImportLogLevel) => {
+    if (level === 'error') return 'destructive'
+    if (level === 'warn') return 'secondary'
+    if (level === 'success') return 'outline'
     return 'secondary'
   }
 
@@ -340,7 +407,7 @@ export default function ImportV3() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-lg font-semibold text-foreground">导入数据</h1>
-              <p className="text-sm text-muted-foreground">全量解析 · 左右对比 · 100% 高度展示</p>
+              <p className="text-sm text-muted-foreground">全量解析 · 进度看板 · 日志追踪</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="gap-2" onClick={loadPreview}>
@@ -382,17 +449,11 @@ export default function ImportV3() {
           </div>
           <div className="mt-4 grid grid-cols-4 gap-3">
             <Card className="p-3">
-              <div className="text-xs text-muted-foreground">文件</div>
-              <div className="mt-1 text-sm font-medium">
-                {loadingPreview ? '加载中...' : importLog?.filename ?? '暂无导入记录'}
-              </div>
-            </Card>
-            <Card className="p-3">
               <div className="text-xs text-muted-foreground">识别结果</div>
               <div className="mt-1 flex items-center gap-2 text-sm">
-                <Badge variant="secondary">{totalSheets} 个 Sheet</Badge>
-                <Badge variant="secondary">{importedSheets} 正常</Badge>
-                <Badge variant="secondary">{warnSheets} 警告</Badge>
+                <Badge variant="secondary">{liveSummary.total} 个 Sheet</Badge>
+                <Badge variant="secondary">{liveSummary.imported} 正常</Badge>
+                <Badge variant="secondary">{liveSummary.warn} 警告</Badge>
               </div>
             </Card>
             <Card className="p-3">
@@ -405,7 +466,7 @@ export default function ImportV3() {
               <div className="text-xs text-muted-foreground">异常</div>
               <div className="mt-1 flex items-center gap-2 text-sm">
                 <AlertTriangle className="h-4 w-4 text-amber-400" />
-                {errorSheets > 0 ? `${errorSheets} 个 Sheet 需关注` : '暂无异常'}
+                {liveSummary.errors > 0 ? `${liveSummary.errors} 个 Sheet 需关注` : '暂无异常'}
               </div>
             </Card>
           </div>
@@ -419,84 +480,76 @@ export default function ImportV3() {
             <div className="shrink-0 border-b border-border/60 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-foreground">原始预览</h2>
-                  <p className="text-xs text-muted-foreground">多 Sheet 结构 + 列宽 + 合并提示</p>
+                  <h2 className="text-sm font-semibold text-foreground">导入进度</h2>
+                  <p className="text-xs text-muted-foreground">实时进度 + Sheet 执行状态</p>
                 </div>
-                <Input className="h-8 w-40" placeholder="搜索 Sheet" />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {sheets.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">暂无 Sheet</span>
-                ) : (
-                  sheets.map((sheet) => (
-                    <button
-                      key={sheet.sheetName}
-                      onClick={() => setSelectedSheet(sheet.sheetName)}
-                      className={`rounded-full border px-3 py-1 text-xs transition ${
-                        selectedSheet === sheet.sheetName
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border/60 text-muted-foreground'
-                      }`}
-                    >
-                      {sheet.sheetName}
-                    </button>
-                  ))
-                )}
+                <Badge variant="secondary">{progressItems.length} 项</Badge>
               </div>
             </div>
 
             <ScrollArea className="h-full">
-              <div className="p-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <Badge variant="secondary">{sheetTypeLabel(activeSheet?.sheetType)}</Badge>
-                  <Badge variant={statusVariant(activeSheet?.status)}>
-                    {statusLabel(activeSheet?.status)}
-                  </Badge>
-                  <Badge variant="secondary">
-                    {Math.round((activeSheet?.confidence ?? 0) * 100)}%
-                  </Badge>
-                </div>
-                <Card className="overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {previewHeaders.length > 0 ? (
-                          previewHeaders.map((header) => (
-                            <TableHead key={header} className="whitespace-nowrap">
-                              {header}
-                            </TableHead>
-                          ))
-                        ) : (
-                          <TableHead className="whitespace-nowrap">暂无预览数据</TableHead>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingSheet ? (
-                        <TableRow>
-                          <TableCell colSpan={Math.max(previewHeaders.length, 1)}>
-                            加载中...
-                          </TableCell>
-                        </TableRow>
-                      ) : previewRows.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={Math.max(previewHeaders.length, 1)}>
-                            暂无预览数据
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        previewRows.map((row, idx) => (
-                          <TableRow key={idx}>
-                            {row.map((cell, cellIdx) => (
-                              <TableCell key={cellIdx} className="whitespace-nowrap">
-                                {cell}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+              <div className="p-6 space-y-4">
+                <Card className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-muted-foreground">当前阶段</div>
+                    <Badge variant={importStatusVariant}>{importStatusText}</Badge>
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-foreground">
+                    {importStage}
+                  </div>
+                  <div className="mt-3">
+                    <Progress value={displayProgress} className="h-2" />
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>已完成 {liveSummary.imported + liveSummary.warn}/{liveSummary.total} 个 Sheet</span>
+                      <span>异常 {liveSummary.errors} 个</span>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-muted-foreground">Sheet 任务</div>
+                    <Badge variant="secondary">{progressItems.length} 项</Badge>
+                  </div>
+                  <Separator className="my-3" />
+                  {progressItems.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">暂无进度</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {progressItems.map((item) => (
+                        <div
+                          key={item.sheetName}
+                          className="rounded-md border border-border/60 bg-background/60 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-foreground">
+                                {item.sheetName}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{sheetTypeLabel(item.sheetType)}</span>
+                                <span>·</span>
+                                <span>{statusLabel(item.status)}</span>
+                              </div>
+                            </div>
+                            <Badge variant={statusVariant(item.status)}>
+                              {statusLabel(item.status)}
+                            </Badge>
+                          </div>
+                          {typeof item.progress === 'number' && (
+                            <div className="mt-2">
+                              <Progress value={item.progress} className="h-2" />
+                            </div>
+                          )}
+                          {item.message && (
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              {item.message}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Card>
               </div>
             </ScrollArea>
@@ -509,47 +562,37 @@ export default function ImportV3() {
             <div className="shrink-0 border-b border-border/60 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-foreground">导入进度</h2>
-                  <p className="text-xs text-muted-foreground">逐 Sheet 展示实时进度</p>
+                  <h2 className="text-sm font-semibold text-foreground">导入日志</h2>
+                  <p className="text-xs text-muted-foreground">实时滚动输出 · 自动跟随</p>
                 </div>
-                <Badge variant="secondary">{importTasks.length} 项</Badge>
+                <Badge variant="secondary">{importLogs.length} 条</Badge>
               </div>
             </div>
 
             <ScrollArea className="h-full">
               <div className="p-6">
                 <Card className="p-4">
-                  <div className="text-xs font-medium text-muted-foreground">进度详情</div>
+                  <div className="text-xs font-medium text-muted-foreground">详细日志</div>
                   <Separator className="my-3" />
-                  {importTasks.length === 0 ? (
-                    <div className="text-xs text-muted-foreground">暂无进度</div>
+                  {importLogs.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">暂无日志</div>
                   ) : (
-                    <div className="space-y-3">
-                      {importTasks.map((task) => (
+                    <div className="space-y-2">
+                      {importLogs.map((line) => (
                         <div
-                          key={task.sheetName}
-                          className="rounded-md border border-border/60 p-3"
+                          key={line.id}
+                          className="flex items-start gap-3 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-xs"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium text-foreground">
-                              {task.sheetName}
-                            </div>
-                            <Badge
-                              variant={task.status === 'error' ? 'destructive' : 'secondary'}
-                            >
-                              {task.status}
-                            </Badge>
-                          </div>
-                          <div className="mt-2">
-                            <Progress value={task.progress} className="h-2" />
-                          </div>
-                          {task.message && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              {task.message}
-                            </div>
-                          )}
+                          <span className="w-[70px] shrink-0 font-mono text-muted-foreground">
+                            {line.time}
+                          </span>
+                          <Badge variant={logLevelBadge(line.level)} className="h-5 px-2 text-[10px]">
+                            {line.level.toUpperCase()}
+                          </Badge>
+                          <span className="text-foreground">{line.message}</span>
                         </div>
                       ))}
+                      <div ref={logEndRef} />
                     </div>
                   )}
                 </Card>

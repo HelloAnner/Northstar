@@ -420,6 +420,9 @@ func (c *socialContext) platformRetailCurOrZero(year, month int) float64 {
 
 func socialSheetLogics() []cellLogic[socialContext] {
 	return []cellLogic[socialContext]{
+		{sheet: "社零额（定）", cell: "A1", key: "{{social.title}}", desc: "标题", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
+			return valueOf(fmt.Sprintf("社零额计算举例（%d年%d月数据）", ctx.year, ctx.month)), nil
+		}},
 		{sheet: "社零额（定）", cell: "J2", key: "{{social.month}}", desc: "月份", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
 			return valueOf(ctx.month), nil
 		}},

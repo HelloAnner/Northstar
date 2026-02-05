@@ -62,16 +62,26 @@ func ParseSummarySheet(file *excelize.File, sheetName string, year, month int) (
 		return nil, nil, nil, nil
 	}
 	maxRow, maxCol, err := parseDimension(dim)
-	if err != nil || (maxRow == 1 && maxCol == 1) {
-		rows, readErr := file.GetRows(sheetName)
+	rows, readErr := file.GetRows(sheetName)
+	if err != nil || (maxRow == 1 && maxCol == 1) || readErr == nil {
 		if readErr != nil {
 			return nil, nil, nil, err
 		}
-		maxRow = len(rows)
-		maxCol = 0
+		actualRow := len(rows)
+		actualCol := 0
 		for _, row := range rows {
-			if len(row) > maxCol {
-				maxCol = len(row)
+			if len(row) > actualCol {
+				actualCol = len(row)
+			}
+		}
+		if actualRow > 0 {
+			if maxRow == 0 || actualRow < maxRow {
+				maxRow = actualRow
+			}
+		}
+		if actualCol > 0 {
+			if maxCol == 0 || actualCol < maxCol {
+				maxCol = actualCol
 			}
 		}
 	}

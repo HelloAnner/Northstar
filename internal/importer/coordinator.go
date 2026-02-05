@@ -38,6 +38,7 @@ type ImportOptions struct {
 	ClearExisting    bool // 是否清空现有数据
 	UpdateConfigYM   bool // 是否更新配置中的当前年月
 	CalculateFields  bool // 是否计算衍生字段
+	SkipRaw          bool // 是否跳过原始数据采集
 }
 
 // ProgressEvent 进度事件
@@ -140,6 +141,15 @@ func (c *Coordinator) doImport(opts ImportOptions, progressChan chan ProgressEve
 		},
 	}
 
+	if opts.SkipRaw {
+		c.sendProgress(progressChan, ProgressEvent{
+			Type:      "info",
+			Message:   "已关闭原始数据采集（导入提速）",
+			Data:      map[string]bool{"skip_raw": true},
+			Timestamp: time.Now(),
+		})
+	}
+
 	// 获取所有 Sheet
 	sheetList := file.GetSheetList()
 	ctx.Report.TotalSheets = len(sheetList)
@@ -214,16 +224,32 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 	})
 
 	// 先采集原始数据（无论识别结果）
-	if err := c.collectAndStoreRaw(ctx, sheetName); err != nil {
-		c.sendProgress(ctx.ProgressChan, ProgressEvent{
-			Type:      "warning",
-			Message:   fmt.Sprintf("采集原始数据失败: %s (%v)", sheetName, err),
-			Timestamp: time.Now(),
-		})
+	if !opts.SkipRaw {
+		rawStart := c.logStageStart(ctx.ProgressChan, sheetName, "原始数据采集", nil)
+		if err := c.collectAndStoreRaw(ctx, sheetName); err != nil {
+			c.sendProgress(ctx.ProgressChan, ProgressEvent{
+				Type:      "warning",
+				Message:   fmt.Sprintf("采集原始数据失败: %s (%v)", sheetName, err),
+				Timestamp: time.Now(),
+			})
+		} else {
+			c.logStageDone(ctx.ProgressChan, sheetName, "原始数据采集", rawStart, nil)
+		}
 	}
 
 	// 读取表头
+	rowsStart := c.logStageStart(ctx.ProgressChan, sheetName, "读取 Sheet 行", nil)
 	rows, err := ctx.File.GetRows(sheetName)
+	if err != nil {
+		c.sendProgress(ctx.ProgressChan, ProgressEvent{
+			Type:      "warning",
+			Message:   fmt.Sprintf("[%s] 读取 Sheet 行失败: %v", sheetName, err),
+			Timestamp: time.Now(),
+		})
+	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "读取 Sheet 行", rowsStart, map[string]interface{}{
+		"rows": len(rows),
+	})
 	if err != nil || len(rows) < 1 {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -238,7 +264,14 @@ func (c *Coordinator) processSheet(ctx *ImportContext, sheetName string, opts Im
 	headers := rows[0]
 
 	// 识别 Sheet 类型
+	recStart := c.logStageStart(ctx.ProgressChan, sheetName, "识别 Sheet 类型", map[string]interface{}{
+		"headers": len(headers),
+	})
 	recognition := c.recognizer.Recognize(sheetName, headers)
+	c.logStageDone(ctx.ProgressChan, sheetName, "识别 Sheet 类型", recStart, map[string]interface{}{
+		"sheet_type": recognition.SheetType,
+		"confidence": recognition.Confidence,
+	})
 
 	c.sendProgress(ctx.ProgressChan, ProgressEvent{
 		Type:    "info",
@@ -306,7 +339,16 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 		}
 	}
 
+	parseStart := c.logStageStart(ctx.ProgressChan, sheetName, "解析汇总表", map[string]interface{}{
+		"year":  year,
+		"month": month,
+	})
 	limitAbove, micro, eatWearUse, err := parser.ParseSummarySheet(ctx.File, sheetName, year, month)
+	c.logStageDone(ctx.ProgressChan, sheetName, "解析汇总表", parseStart, map[string]interface{}{
+		"limit_above": len(limitAbove),
+		"micro_small": len(micro),
+		"eat_wear":    len(eatWearUse),
+	})
 	if err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -331,6 +373,9 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 		eatWearUse[i].SourceFile = ctx.Report.Filename
 	}
 
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入限上零售额", map[string]interface{}{
+		"rows": len(limitAbove),
+	})
 	if err := c.store.BatchInsertSummaryLimitAbove(limitAbove); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -341,6 +386,11 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入限上零售额", insertStart, nil)
+
+	insertStart = c.logStageStart(ctx.ProgressChan, sheetName, "写入小微汇总", map[string]interface{}{
+		"rows": len(micro),
+	})
 	if err := c.store.BatchInsertSummaryMicroSmall(micro); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -351,6 +401,11 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入小微汇总", insertStart, nil)
+
+	insertStart = c.logStageStart(ctx.ProgressChan, sheetName, "写入吃穿用汇总", map[string]interface{}{
+		"rows": len(eatWearUse),
+	})
 	if err := c.store.BatchInsertSummaryEatWearUse(eatWearUse); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -361,6 +416,7 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入吃穿用汇总", insertStart, nil)
 
 	importedRows := len(limitAbove) + len(micro) + len(eatWearUse)
 	status := "imported"
@@ -383,22 +439,56 @@ func (c *Coordinator) processSummary(ctx *ImportContext, sheetName string, sheet
 
 // collectAndStoreRaw 采集并写入原始 Sheet 数据
 func (c *Coordinator) collectAndStoreRaw(ctx *ImportContext, sheetName string) error {
+	collectStart := time.Now()
 	raw, err := collectSheetRaw(ctx.File, sheetName, ctx.importLogID, ctx.Report.Filename)
 	if err != nil {
 		return err
 	}
+	collectCost := time.Since(collectStart)
+
+	insertStart := time.Now()
 	if err := c.store.InsertSheetColumns(raw.columns); err != nil {
 		return err
 	}
+	colCost := time.Since(insertStart)
+
+	insertStart = time.Now()
 	if err := c.store.InsertSheetRows(raw.rows); err != nil {
 		return err
 	}
+	rowCost := time.Since(insertStart)
+
+	insertStart = time.Now()
 	if err := c.store.BatchInsertSheetCells(raw.cells); err != nil {
 		return err
 	}
+	cellCost := time.Since(insertStart)
+
+	insertStart = time.Now()
 	if err := c.store.InsertSheetMerges(raw.merges); err != nil {
 		return err
 	}
+	mergeCost := time.Since(insertStart)
+	writeCost := colCost + rowCost + cellCost + mergeCost
+
+	c.sendProgress(ctx.ProgressChan, ProgressEvent{
+		Type:    "info",
+		Message: fmt.Sprintf("原始数据采集完成: %s (列%d 行%d 单元格%d 合并%d)", sheetName, len(raw.columns), len(raw.rows), len(raw.cells), len(raw.merges)),
+		Data: map[string]interface{}{
+			"sheet_name":    sheetName,
+			"columns":       len(raw.columns),
+			"rows":          len(raw.rows),
+			"cells":         len(raw.cells),
+			"merges":        len(raw.merges),
+			"collect_ms":    collectCost.Milliseconds(),
+			"write_ms":      writeCost.Milliseconds(),
+			"write_columns": colCost.Milliseconds(),
+			"write_rows":    rowCost.Milliseconds(),
+			"write_cells":   cellCost.Milliseconds(),
+			"write_merges":  mergeCost.Milliseconds(),
+		},
+		Timestamp: time.Now(),
+	})
 	return nil
 }
 
@@ -408,7 +498,11 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 
 	// 解析 Sheet
 	wrParser := parser.NewWRParser(ctx.File)
+	parseStart := c.logStageStart(ctx.ProgressChan, sheetName, "解析批零主表", nil)
 	records, err := wrParser.ParseSheet(sheetName)
+	c.logStageDone(ctx.ProgressChan, sheetName, "解析批零主表", parseStart, map[string]interface{}{
+		"rows": len(records),
+	})
 	if err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -442,6 +536,9 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 	}
 
 	// 批量插入（按主键覆盖）
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入批零主表", map[string]interface{}{
+		"rows": len(records),
+	})
 	if err := c.store.BatchInsertWR(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -454,6 +551,7 @@ func (c *Coordinator) processWholesaleRetail(ctx *ImportContext, sheetName strin
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入批零主表", insertStart, nil)
 
 	// 记录成功
 	c.recordSheetResult(ctx, parser.ParseResult{
@@ -471,7 +569,11 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 
 	// 解析 Sheet
 	acParser := parser.NewACParser(ctx.File)
+	parseStart := c.logStageStart(ctx.ProgressChan, sheetName, "解析住餐主表", nil)
 	records, err := acParser.ParseSheet(sheetName)
+	c.logStageDone(ctx.ProgressChan, sheetName, "解析住餐主表", parseStart, map[string]interface{}{
+		"rows": len(records),
+	})
 	if err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -505,6 +607,9 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 	}
 
 	// 批量插入（按主键覆盖）
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入住餐主表", map[string]interface{}{
+		"rows": len(records),
+	})
 	if err := c.store.BatchInsertAC(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -517,6 +622,7 @@ func (c *Coordinator) processAccommodationCatering(ctx *ImportContext, sheetName
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入住餐主表", insertStart, nil)
 
 	// 记录成功
 	c.recordSheetResult(ctx, parser.ParseResult{
@@ -533,7 +639,11 @@ func (c *Coordinator) processWRSnapshot(ctx *ImportContext, sheetName string, op
 	sheetStartTime := time.Now()
 
 	parserImpl := parser.NewWRSnapshotParser(ctx.File)
+	parseStart := c.logStageStart(ctx.ProgressChan, sheetName, "解析批零快照", nil)
 	records, err := parserImpl.ParseSheet(sheetName)
+	c.logStageDone(ctx.ProgressChan, sheetName, "解析批零快照", parseStart, map[string]interface{}{
+		"rows": len(records),
+	})
 	if err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -561,6 +671,9 @@ func (c *Coordinator) processWRSnapshot(ctx *ImportContext, sheetName string, op
 		}
 	}
 
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入批零快照", map[string]interface{}{
+		"rows": len(records),
+	})
 	if err := c.store.BatchInsertWRSnapshot(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -573,6 +686,7 @@ func (c *Coordinator) processWRSnapshot(ctx *ImportContext, sheetName string, op
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入批零快照", insertStart, nil)
 
 	c.recordSheetResult(ctx, parser.ParseResult{
 		SheetName:    sheetName,
@@ -588,7 +702,11 @@ func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, op
 	sheetStartTime := time.Now()
 
 	parserImpl := parser.NewACSnapshotParser(ctx.File)
+	parseStart := c.logStageStart(ctx.ProgressChan, sheetName, "解析住餐快照", nil)
 	records, err := parserImpl.ParseSheet(sheetName)
+	c.logStageDone(ctx.ProgressChan, sheetName, "解析住餐快照", parseStart, map[string]interface{}{
+		"rows": len(records),
+	})
 	if err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName: sheetName,
@@ -616,6 +734,9 @@ func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, op
 		}
 	}
 
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入住餐快照", map[string]interface{}{
+		"rows": len(records),
+	})
 	if err := c.store.BatchInsertACSnapshot(records); err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
@@ -628,6 +749,7 @@ func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, op
 		})
 		return
 	}
+	c.logStageDone(ctx.ProgressChan, sheetName, "写入住餐快照", insertStart, nil)
 
 	c.recordSheetResult(ctx, parser.ParseResult{
 		SheetName:    sheetName,
@@ -647,6 +769,10 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 	})
 
 	// 当导入的“本月金额”为 0/空时，用累计差自动补齐（优先保留导入的非 0 值）
+	backfillStart := c.logStageStart(ctx.ProgressChan, "衍生字段", "本月金额回填", map[string]interface{}{
+		"year":  ctx.CurrentYear,
+		"month": ctx.CurrentMonth,
+	})
 	if err := c.backfillCalculableFields(ctx.CurrentYear, ctx.CurrentMonth); err != nil {
 		c.sendProgress(ctx.ProgressChan, ProgressEvent{
 			Type:      "warning",
@@ -654,8 +780,13 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 			Timestamp: time.Now(),
 		})
 	}
+	c.logStageDone(ctx.ProgressChan, "衍生字段", "本月金额回填", backfillStart, nil)
 
 	// 批零增速计算
+	wrRateStart := c.logStageStart(ctx.ProgressChan, "衍生字段", "批零增速计算", map[string]interface{}{
+		"year":  ctx.CurrentYear,
+		"month": ctx.CurrentMonth,
+	})
 	err := c.store.Exec(`
 		UPDATE wholesale_retail SET
 			sales_month_rate = CASE
@@ -693,8 +824,13 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 			Timestamp: time.Now(),
 		})
 	}
+	c.logStageDone(ctx.ProgressChan, "衍生字段", "批零增速计算", wrRateStart, nil)
 
 	// 住餐增速计算
+	acRateStart := c.logStageStart(ctx.ProgressChan, "衍生字段", "住餐增速计算", map[string]interface{}{
+		"year":  ctx.CurrentYear,
+		"month": ctx.CurrentMonth,
+	})
 	err = c.store.Exec(`
 		UPDATE accommodation_catering SET
 			revenue_month_rate = CASE
@@ -717,6 +853,7 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 			Timestamp: time.Now(),
 		})
 	}
+	c.logStageDone(ctx.ProgressChan, "衍生字段", "住餐增速计算", acRateStart, nil)
 
 	c.sendProgress(ctx.ProgressChan, ProgressEvent{
 		Type:      "info",
@@ -834,6 +971,40 @@ type sheetMetaDraft struct {
 	TotalColumns int
 	Headers      []string
 	MappingJSON  string
+}
+
+func (c *Coordinator) logStageStart(ch chan ProgressEvent, sheetName, stage string, data map[string]interface{}) time.Time {
+	payload := map[string]interface{}{
+		"sheet_name": sheetName,
+		"stage":      stage,
+	}
+	for k, v := range data {
+		payload[k] = v
+	}
+	c.sendProgress(ch, ProgressEvent{
+		Type:      "info",
+		Message:   fmt.Sprintf("[%s] %s 开始", sheetName, stage),
+		Data:      payload,
+		Timestamp: time.Now(),
+	})
+	return time.Now()
+}
+
+func (c *Coordinator) logStageDone(ch chan ProgressEvent, sheetName, stage string, start time.Time, data map[string]interface{}) {
+	payload := map[string]interface{}{
+		"sheet_name": sheetName,
+		"stage":      stage,
+		"cost_ms":    time.Since(start).Milliseconds(),
+	}
+	for k, v := range data {
+		payload[k] = v
+	}
+	c.sendProgress(ch, ProgressEvent{
+		Type:      "info",
+		Message:   fmt.Sprintf("[%s] %s 完成 (耗时 %dms)", sheetName, stage, payload["cost_ms"]),
+		Data:      payload,
+		Timestamp: time.Now(),
+	})
 }
 
 func statAndHashFile(path string) (int64, string) {

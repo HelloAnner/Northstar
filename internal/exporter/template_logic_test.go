@@ -9,6 +9,7 @@ package exporter
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -112,6 +113,74 @@ func TestFillSocialRetailSheet_PlatformRetailInputs(t *testing.T) {
 	}
 	if k6 != 78 {
 		t.Fatalf("K6 mismatch: %v", k6)
+	}
+}
+
+func TestFillSocialRetailSheet_TitleUsesYearMonth(t *testing.T) {
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "northstar.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	f, err := OpenEmbeddedMonthReportTemplate()
+	if err != nil {
+		t.Fatalf("open template failed: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	year := 2025
+	month := 12
+	if err := fillSocialRetailSheetAndMaterialize(f, st, year, month, indicatorIndex{}); err != nil {
+		t.Fatalf("fill social retail failed: %v", err)
+	}
+
+	title, _ := getCellString(f, "社零额（定）", "A1")
+	expect := "社零额计算举例（" + strconv.Itoa(year) + "年" + strconv.Itoa(month) + "月数据）"
+	if title != expect {
+		t.Fatalf("unexpected title: %q", title)
+	}
+}
+
+func TestFillSocialRetailSheet_RewriteFormulaYear(t *testing.T) {
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "northstar.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	f, err := OpenEmbeddedMonthReportTemplate()
+	if err != nil {
+		t.Fatalf("open template failed: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	year := 2026
+	month := 3
+	if err := fillSocialRetailSheetAndMaterialize(f, st, year, month, indicatorIndex{}); err != nil {
+		t.Fatalf("fill social retail failed: %v", err)
+	}
+
+	j3, err := f.GetCellFormula("社零额（定）", "J3")
+	if err != nil {
+		t.Fatalf("get J3 formula failed: %v", err)
+	}
+	expectJ3 := "\"2026年\"&J2-1&\"月社零额（当月累计-上月累计）\""
+	if j3 != expectJ3 {
+		t.Fatalf("unexpected J3 formula: %q", j3)
+	}
+
+	j5, err := f.GetCellFormula("社零额（定）", "J5")
+	if err != nil {
+		t.Fatalf("get J5 formula failed: %v", err)
+	}
+	expectJ5 := "\"2025年\"&J2-1&\"月社零额（当月累计-上月累计）\""
+	if j5 != expectJ5 {
+		t.Fatalf("unexpected J5 formula: %q", j5)
 	}
 }
 

@@ -68,6 +68,7 @@ func (h *Handler) Import(c *gin.Context) {
 		ClearExisting:     clearExisting,
 		UpdateConfigYM:    updateConfigYM,
 		CalculateFields:   true,
+		SkipRaw:           true,
 	})
 
 	// 流式发送进度事件
