@@ -106,14 +106,16 @@ func updateNoticeValues(n *OptimizeNotice, before indicatorSnapshot, after indic
 }
 
 func noticeNoData(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeNoData, "没有可调整的企业数据，无法反推该指标。")
-	n.Suggestion = "请先导入企业数据或补齐行业/分类标记。"
+	n := newNotice(meta, id, target, noticeCodeNoData,
+		"根据可调整数据规则无法调整该指标数据，建议先导入企业数据或补齐行业/分类标记。")
+	n.Suggestion = "建议先导入企业数据或补齐行业/分类标记。"
 	return n
 }
 
 func noticeLastYearZero(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeLastYearZero, "上年同期合计为 0，增速无法反推。")
-	n.Suggestion = "请补齐上年同期数据，或改调对应的当月值/累计值指标。"
+	n := newNotice(meta, id, target, noticeCodeLastYearZero,
+		"根据同比基数规则无法调整该指标数据，建议补齐上年同期数据或改调对应的当月值/累计值指标。")
+	n.Suggestion = "建议补齐上年同期数据，或改调对应的当月值/累计值指标。"
 	return n
 }
 
@@ -123,7 +125,8 @@ func noticeInvalidTarget(id string, target float64) *OptimizeNotice {
 		Target:      target,
 		Code:        noticeCodeInvalidTarget,
 		Level:       noticeLevel(noticeCodeInvalidTarget),
-		Message:     "目标值非法，已跳过调整。",
+		Message:     "根据目标值合法性规则无法调整该指标数据，建议输入有效数字后重试。",
+		Suggestion:  "建议输入有效数字后重试。",
 	}
 }
 
@@ -133,28 +136,35 @@ func noticeUnsupported(id string, target float64) *OptimizeNotice {
 		Target:      target,
 		Code:        noticeCodeUnsupported,
 		Level:       noticeLevel(noticeCodeUnsupported),
-		Message:     "不支持的指标，已跳过调整。",
+		Message:     "根据指标支持范围规则无法调整该指标数据，建议选择当前版本支持的指标。",
+		Suggestion:  "建议选择当前版本支持的指标。",
 	}
 }
 
 func noticeTargetSame(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	return newNotice(meta, id, target, noticeCodeTargetSame, "目标值与当前值一致，未触发调整。")
+	n := newNotice(meta, id, target, noticeCodeTargetSame,
+		"根据目标差异规则无法调整该指标数据，建议输入与当前值不同的目标。")
+	n.Suggestion = "建议输入与当前值不同的目标。"
+	return n
 }
 
 func noticeSmallDelta(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeSmallDelta, "目标变化过小，四舍五入后无变化。")
-	n.Suggestion = "建议调整幅度 ≥ 1。"
+	n := newNotice(meta, id, target, noticeCodeSmallDelta,
+		"根据整数取整规则无法调整该指标数据，建议调整幅度至少为 1。")
+	n.Suggestion = "建议调整幅度至少为 1。"
 	return n
 }
 
 func noticeNoChange(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeNoChange, "调整后未生效，请检查是否存在可调数据。")
+	n := newNotice(meta, id, target, noticeCodeNoChange,
+		"根据可调范围规则无法调整该指标数据，建议刷新后重试或检查数据范围设置。")
 	n.Suggestion = "建议刷新后重试，或检查数据范围设置。"
 	return n
 }
 
 func noticeBelowMin(meta indicatorSnapshot, id string, target float64, minValue float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeBelowMin, "目标低于历史累计下限，系统已按可达下限调整。")
+	n := newNotice(meta, id, target, noticeCodeBelowMin,
+		"根据历史累计下限规则无法调整该指标数据，建议提高目标到可达下限以上。")
 	rounded := roundValue(minValue)
 	n.SuggestMin = &rounded
 	n.Suggestion = fmt.Sprintf("建议调整到 ≥ %.0f", rounded)
@@ -162,7 +172,8 @@ func noticeBelowMin(meta indicatorSnapshot, id string, target float64, minValue 
 }
 
 func noticeBelowMinRate(meta indicatorSnapshot, id string, target float64, minRate float64) *OptimizeNotice {
-	n := newNotice(meta, id, target, noticeCodeBelowMin, "目标增速低于可达下限，系统已按最小增速调整。")
+	n := newNotice(meta, id, target, noticeCodeBelowMin,
+		"根据增速下限规则无法调整该指标数据，建议提高目标增速到可达下限以上。")
 	rounded := roundValue(minRate)
 	n.SuggestMin = &rounded
 	n.Suggestion = fmt.Sprintf("建议调整到 ≥ %.0f%%", rounded)
@@ -170,7 +181,10 @@ func noticeBelowMinRate(meta indicatorSnapshot, id string, target float64, minRa
 }
 
 func noticeNotReached(meta indicatorSnapshot, id string, target float64) *OptimizeNotice {
-	return newNotice(meta, id, target, noticeCodeNotReached, "目标未完全达成，已按可达范围调整。")
+	n := newNotice(meta, id, target, noticeCodeNotReached,
+		"根据当前可达范围规则无法调整该指标数据，建议分步调整或放宽约束后重试。")
+	n.Suggestion = "建议分步调整或放宽约束后重试。"
+	return n
 }
 
 func snapshotForID(before map[string]indicatorSnapshot, after map[string]indicatorSnapshot, id string) (indicatorSnapshot, indicatorSnapshot, bool) {

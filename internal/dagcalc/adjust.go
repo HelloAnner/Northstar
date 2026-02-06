@@ -211,18 +211,11 @@ func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target f
 	if err != nil {
 		return err
 	}
-
-	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
-	if err != nil {
-		limitBelowLastYear = 0
-	}
-
-	microRate, err := computeMicroSmallRate(st, year, month)
+	limitBelowEstimate, err := estimateLimitBelowCumulative(st, year, month)
 	if err != nil {
 		return err
 	}
-
-	limitBelowEstimated := limitBelowLastYear * (1 + microRate/100)
+	limitBelowEstimated := limitBelowEstimate.CurrentCumulative
 	currentTotal := currentLimitAbove + limitBelowEstimated
 	delta := target - currentTotal
 
@@ -231,7 +224,7 @@ func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target f
 		limitBelowTarget = 0
 	}
 
-	if err := updateLimitBelowConfig(st, microRate, limitBelowTarget); err != nil {
+	if err := updateLimitBelowConfig(st, limitBelowEstimate.GrowthFactor, limitBelowTarget); err != nil {
 		return err
 	}
 
@@ -243,13 +236,7 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 	if err != nil {
 		return err
 	}
-
-	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
-	if err != nil {
-		limitBelowLastYear = 0
-	}
-
-	microRate, err := computeMicroSmallRate(st, year, month)
+	limitBelowEstimate, err := estimateLimitBelowCumulative(st, year, month)
 	if err != nil {
 		return err
 	}
@@ -265,8 +252,8 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 	retailLastYearCumulativeSum := retailLastYearCumWR + retailLastYearCumAC
 
 	targetFraction := targetRate / 100
-	desiredTotal := (retailLastYearCumulativeSum + limitBelowLastYear) * (1 + targetFraction)
-	limitBelowEstimated := limitBelowLastYear * (1 + microRate/100)
+	desiredTotal := (retailLastYearCumulativeSum + limitBelowEstimate.LastYearCumulative) * (1 + targetFraction)
+	limitBelowEstimated := limitBelowEstimate.CurrentCumulative
 	currentTotal := currentLimitAbove + limitBelowEstimated
 	delta := desiredTotal - currentTotal
 
@@ -275,7 +262,7 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 		limitBelowTarget = 0
 	}
 
-	if err := updateLimitBelowConfig(st, microRate, limitBelowTarget); err != nil {
+	if err := updateLimitBelowConfig(st, limitBelowEstimate.GrowthFactor, limitBelowTarget); err != nil {
 		return err
 	}
 
@@ -314,8 +301,8 @@ func splitDelta(delta, currentLimitAbove, currentLimitBelow float64) (float64, f
 	return clampTarget(currentLimitAbove + half), clampTarget(currentLimitBelow + half)
 }
 
-func updateLimitBelowConfig(st *store.Store, microRate float64, targetLimitBelow float64) error {
-	denom := 1 + microRate/100
+func updateLimitBelowConfig(st *store.Store, growthFactor float64, targetLimitBelow float64) error {
+	denom := growthFactor
 	if denom <= 0 {
 		return st.SetConfigFloat("last_year_limit_below_cumulative", 0)
 	}

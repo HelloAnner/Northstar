@@ -40,6 +40,11 @@ func ComputeMicroSmallRate(st *store.Store, year, month int) (float64, error) {
 	return computeMicroSmallRate(st, year, month)
 }
 
+// EstimateLimitBelowCumulative 对外封装
+func EstimateLimitBelowCumulative(st *store.Store, year, month int) (LimitBelowEstimate, error) {
+	return estimateLimitBelowCumulative(st, year, month)
+}
+
 // LoadWRRowsForAdjust 对外封装
 func LoadWRRowsForAdjust(st *store.Store, year, month int, industryType, flagField string) ([]*model.WholesaleRetail, error) {
 	return loadWRRowsForAdjust(st, year, month, industryType, flagField)

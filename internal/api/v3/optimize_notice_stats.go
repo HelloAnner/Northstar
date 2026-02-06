@@ -33,6 +33,9 @@ func precheckIndicatorTarget(st *store.Store, year, month int, id string, target
 	if !ok {
 		return noticeUnsupported(id, target), nil
 	}
+	if roundValue(target) == roundValue(meta.Value) {
+		return noticeTargetSame(meta, id, target), nil
+	}
 	if needsData(id) && stats.Eligible == 0 {
 		return noticeNoData(meta, id, target), nil
 	}

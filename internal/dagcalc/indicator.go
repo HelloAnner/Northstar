@@ -354,14 +354,11 @@ func (c *IndicatorCalculator) calculateTotalSocial(year, month int, specialIndic
 
 	limitAboveCumulativeValue := limitAboveIndicators[2].Value
 
-	lastYearLimitBelowCumulative, err := c.store.GetConfigFloat("last_year_limit_below_cumulative")
+	limitBelowEstimate, err := estimateLimitBelowCumulative(c.store, year, month)
 	if err != nil {
-		lastYearLimitBelowCumulative = 0
+		return nil, err
 	}
-
-	microSmallRate := specialIndicators[1].Value
-
-	estimatedLimitBelowCumulative := lastYearLimitBelowCumulative * (1 + microSmallRate/100)
+	estimatedLimitBelowCumulative := limitBelowEstimate.CurrentCumulative
 
 	totalSocialCumulative := limitAboveCumulativeValue + estimatedLimitBelowCumulative
 
@@ -390,7 +387,7 @@ func (c *IndicatorCalculator) calculateTotalSocial(year, month int, specialIndic
 		retailLastYearCumulativeSum += record.FoodLastYearCumulative + record.GoodsLastYearCumulative
 	}
 
-	lastYearTotalCumulative := retailLastYearCumulativeSum + lastYearLimitBelowCumulative
+	lastYearTotalCumulative := retailLastYearCumulativeSum + limitBelowEstimate.LastYearCumulative
 
 	totalSocialRate := 0.0
 	if lastYearTotalCumulative != 0 {

@@ -255,15 +255,11 @@ func adjustTotalSocialCumulativeValueWithExcludes(st *store.Store, year, month i
 	if target < 0 {
 		target = 0
 	}
-	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
-	if err != nil {
-		limitBelowLastYear = 0
-	}
-	microRate, err := dagcalc.ComputeMicroSmallRate(st, year, month)
+	limitBelowEstimate, err := dagcalc.EstimateLimitBelowCumulative(st, year, month)
 	if err != nil {
 		return err
 	}
-	limitBelowEstimated := limitBelowLastYear * (1 + microRate/100)
+	limitBelowEstimated := limitBelowEstimate.CurrentCumulative
 	desiredLimitAbove := target - limitBelowEstimated
 	if desiredLimitAbove < 0 {
 		desiredLimitAbove = 0
@@ -274,11 +270,7 @@ func adjustTotalSocialCumulativeValueWithExcludes(st *store.Store, year, month i
 }
 
 func adjustTotalSocialCumulativeRateWithExcludes(st *store.Store, year, month int, targetRate float64, excludes fieldExcludes) error {
-	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
-	if err != nil {
-		limitBelowLastYear = 0
-	}
-	microRate, err := dagcalc.ComputeMicroSmallRate(st, year, month)
+	limitBelowEstimate, err := dagcalc.EstimateLimitBelowCumulative(st, year, month)
 	if err != nil {
 		return err
 	}
@@ -291,7 +283,8 @@ func adjustTotalSocialCumulativeRateWithExcludes(st *store.Store, year, month in
 		return err
 	}
 	targetFraction := targetRate / 100
-	desiredLimitAbove := (retailLastYearCumWR+retailLastYearCumAC)*(1+targetFraction) + limitBelowLastYear*(targetFraction-microRate/100)
+	desiredTotal := (retailLastYearCumWR + retailLastYearCumAC + limitBelowEstimate.LastYearCumulative) * (1 + targetFraction)
+	desiredLimitAbove := desiredTotal - limitBelowEstimate.CurrentCumulative
 	if desiredLimitAbove < 0 {
 		desiredLimitAbove = 0
 	}
