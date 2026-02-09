@@ -42,10 +42,10 @@ func TestOptimize_AdjustLimitAboveCumulativeRate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("calculate indicators: %v", err)
 	}
-	before := findIndicatorValue(groups, "limitAbove_cumulative_rate")
+	before := findIndicatorValue(groups, "限上社零额增速_累计")
 
 	target := before + 0.5
-	if err := applyIndicatorTarget(st, year, month, "limitAbove_cumulative_rate", target); err != nil {
+	if err := applyIndicatorTarget(st, year, month, "限上社零额增速_累计", target); err != nil {
 		t.Fatalf("apply target: %v", err)
 	}
 	if err := recalcDerivedFields(st, year, month); err != nil {
@@ -56,7 +56,7 @@ func TestOptimize_AdjustLimitAboveCumulativeRate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("calculate indicators after: %v", err)
 	}
-	after := findIndicatorValue(afterGroups, "limitAbove_cumulative_rate")
+	after := findIndicatorValue(afterGroups, "限上社零额增速_累计")
 
 	if diff := abs(after - target); diff > 0.05 {
 		t.Fatalf("rate not reached: before=%.4f target=%.4f after=%.4f diff=%.4f", before, target, after, diff)
@@ -97,7 +97,7 @@ func TestOptimize_RandomizeLimitAboveMonthValue(t *testing.T) {
 	})
 	defer restoreRand()
 
-	if err := applyIndicatorTarget(st, 2025, 12, "limitAbove_month_value", 300); err != nil {
+	if err := applyIndicatorTarget(st, 2025, 12, "限上社零额_当月值", 300); err != nil {
 		t.Fatalf("apply target: %v", err)
 	}
 

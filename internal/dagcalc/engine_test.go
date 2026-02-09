@@ -45,9 +45,9 @@ func TestEngineReverseAdjustReturnsImpact(t *testing.T) {
 	}
 
 	g := NewGraph()
-	g.AddIndicatorID("indicator:limitAbove_month_value", "limitAbove_month_value")
+	g.AddIndicatorID("indicator:限上社零额_当月值", "限上社零额_当月值")
 	eng := NewEngine(g, st, 2025, 12)
-	plan, err := eng.ReverseAdjust("indicator:limitAbove_month_value", 0)
+	plan, err := eng.ReverseAdjust("indicator:限上社零额_当月值", 0)
 	if err != nil {
 		t.Fatalf("reverse adjust: %v", err)
 	}

@@ -35,12 +35,12 @@ CREATE TABLE IF NOT EXISTS wholesale_retail (
     retail_prev_month REAL DEFAULT 0,            -- 上月零售额
     retail_current_month REAL DEFAULT 0,         -- 本月零售额 ★可调整
     retail_last_year_month REAL DEFAULT 0,       -- 上年同期
-    retail_month_rate REAL,                      -- 当月零售额增速 (计算)
+    零售业销售额增速_当月 REAL,                      -- 当月零售额增速 (计算)
     retail_prev_cumulative REAL DEFAULT 0,       -- 本年累计到上月
     retail_last_year_prev_cumulative REAL DEFAULT 0, -- 上年累计到上月
     retail_current_cumulative REAL DEFAULT 0,    -- 本年累计
     retail_last_year_cumulative REAL DEFAULT 0,  -- 上年累计
-    retail_cumulative_rate REAL,                 -- 累计增速 (计算)
+    零售业销售额增速_累计 REAL,                 -- 累计增速 (计算)
     retail_ratio REAL,                           -- 零售额占比 (零销比)
 
     -- === 商品分类销售额 ===
@@ -435,7 +435,199 @@ CREATE INDEX IF NOT EXISTS idx_sewu_month ON summary_eat_wear_use(data_year, dat
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_sewu_key ON summary_eat_wear_use(data_year, data_month, row_key);
 
 -- ============================================================================
--- 13. config - 系统配置表
+-- 13. indicator_definitions - 指标定义
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS indicator_definitions (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    group_code TEXT NOT NULL,
+    group_name TEXT NOT NULL,
+    group_order INTEGER DEFAULT 0,
+    description TEXT,
+    formula TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    float_min REAL DEFAULT -999,
+    float_max REAL DEFAULT 999,
+    display_order INTEGER DEFAULT 0,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_indicator_group ON indicator_definitions(group_order, display_order);
+
+INSERT OR IGNORE INTO indicator_definitions (
+    code, name, group_code, group_name, group_order, description, formula, unit, float_min, float_max, display_order, enabled
+) VALUES
+    ('限上社零额_当月值', '限上社零额（当月值）', 'limit_above', '限上社零额', 1, '批零零售额 + 住餐折算零售额（当月）',
+        'wr_retail_current_month_sum + ac_derived_retail_current_month_sum', '万元', -5, 15, 10, 1),
+    ('限上社零额增速_当月', '限上社零额增速（当月）', 'limit_above', '限上社零额', 1, '限上社零额当月同比',
+        'percent_diff(限上社零额_当月值, wr_retail_last_year_month_sum + ac_derived_retail_last_year_month_sum)', '%', -10, 20, 20, 1),
+    ('限上社零额_累计值', '限上社零额（累计值）', 'limit_above', '限上社零额', 1, '批零零售额 + 住餐折算零售额（累计）',
+        'wr_retail_current_cumulative_sum + ac_derived_retail_current_cumulative_sum', '万元', -5, 15, 30, 1),
+    ('限上社零额增速_累计', '限上社零额增速（累计）', 'limit_above', '限上社零额', 1, '限上社零额累计同比',
+        'percent_diff(限上社零额_累计值, wr_retail_last_year_cumulative_sum + ac_derived_retail_last_year_cumulative_sum)', '%', -10, 20, 40, 1),
+
+    ('吃穿用增速_当月', '吃穿用增速（当月）', 'special_rate', '专项增速', 2, '筛选 is_eat_wear_use=1 后按同比口径计算',
+        'percent_diff(wr_eat_wear_use_current_month_sum, wr_eat_wear_use_last_year_month_sum)', '%', -8, 12, 50, 1),
+    ('小微企业增速_当月', '小微企业增速（当月）', 'special_rate', '专项增速', 2, '筛选 is_small_micro=1 后按同比口径计算',
+        'percent_diff(wr_micro_small_current_month_sum, wr_micro_small_last_year_month_sum)', '%', -5, 18, 60, 1),
+
+    ('批发业销售额增速_当月', '批发业销售额增速（当月）', 'industry_rate', '四大行业增速', 3, '批发行业当月销售额同比',
+        'percent_diff(wr_wholesale_sales_current_month_sum, wr_wholesale_sales_last_year_month_sum)', '%', -20, 30, 70, 1),
+    ('批发业销售额增速_累计', '批发业销售额增速（累计）', 'industry_rate', '四大行业增速', 3, '批发行业累计销售额同比',
+        'percent_diff(wr_wholesale_sales_current_cumulative_sum, wr_wholesale_sales_last_year_cumulative_sum)', '%', -20, 30, 80, 1),
+    ('零售业销售额增速_当月', '零售业销售额增速（当月）', 'industry_rate', '四大行业增速', 3, '零售行业当月销售额同比',
+        'percent_diff(wr_retail_sales_current_month_sum, wr_retail_sales_last_year_month_sum)', '%', -20, 30, 90, 1),
+    ('零售业销售额增速_累计', '零售业销售额增速（累计）', 'industry_rate', '四大行业增速', 3, '零售行业累计销售额同比',
+        'percent_diff(wr_retail_sales_current_cumulative_sum, wr_retail_sales_last_year_cumulative_sum)', '%', -20, 30, 100, 1),
+    ('住宿业营业额增速_当月', '住宿业营业额增速（当月）', 'industry_rate', '四大行业增速', 3, '住宿行业当月营业额同比',
+        'percent_diff(ac_accommodation_revenue_current_month_sum, ac_accommodation_revenue_last_year_month_sum)', '%', -20, 30, 110, 1),
+    ('住宿业营业额增速_累计', '住宿业营业额增速（累计）', 'industry_rate', '四大行业增速', 3, '住宿行业累计营业额同比',
+        'percent_diff(ac_accommodation_revenue_current_cumulative_sum, ac_accommodation_revenue_last_year_cumulative_sum)', '%', -20, 30, 120, 1),
+    ('餐饮业营业额增速_当月', '餐饮业营业额增速（当月）', 'industry_rate', '四大行业增速', 3, '餐饮行业当月营业额同比',
+        'percent_diff(ac_catering_revenue_current_month_sum, ac_catering_revenue_last_year_month_sum)', '%', -20, 30, 130, 1),
+    ('餐饮业营业额增速_累计', '餐饮业营业额增速（累计）', 'industry_rate', '四大行业增速', 3, '餐饮行业累计营业额同比',
+        'percent_diff(ac_catering_revenue_current_cumulative_sum, ac_catering_revenue_last_year_cumulative_sum)', '%', -20, 30, 140, 1),
+
+    ('限下增速_上月', '限下增速（上月）', 'limit_below_model', '限下估算过程指标', 4, '按小微/吃穿用/抽样增速与权重计算上月限下增速',
+        'small_micro_rate_prev*weight_small_micro + eat_wear_use_rate_prev*weight_eat_wear_use + sample_rate_prev*weight_sample', '%', -30, 30, 145, 1),
+    ('限下增速变动量_本月', '限下增速变动量（本月）', 'limit_below_model', '限下估算过程指标', 4, '本月-上月增速变化叠加全省变动量',
+        '(small_micro_rate_month-small_micro_rate_prev)*weight_small_micro + (eat_wear_use_rate_month-eat_wear_use_rate_prev)*weight_eat_wear_use + (sample_rate_month-sample_rate_prev)*weight_sample + province_limit_below_rate_change', '%', -30, 30, 146, 1),
+    ('限下增速_本月', '限下增速（本月）', 'limit_below_model', '限下估算过程指标', 4, '本月限下增速 = 上月限下增速 + 本月变动量',
+        '限下增速_上月 + 限下增速变动量_本月', '%', -30, 30, 147, 1),
+    ('限下累计估算值_累计', '限下累计估算值（累计）', 'limit_below_model', '限下估算过程指标', 4, '本月限下累计 = 上年限下累计 * (1 + 本月限下增速/100)',
+        'limit_below_last_cumulative * (1 + 限下增速_本月 / 100)', '万元', -5, 15, 148, 1),
+    ('社零总额_累计值', '社零总额（累计值）', 'total_social', '社零总额', 5, '限上累计 + 限下累计估算值',
+        '限上社零额_累计值 + 限下累计估算值_累计', '万元', -5, 15, 150, 1),
+    ('社零总额增速_累计', '社零总额增速（累计）', 'total_social', '社零总额', 5, '社零总额累计同比',
+        'percent_diff(社零总额_累计值, wr_retail_last_year_cumulative_sum + ac_derived_retail_last_year_cumulative_sum + limit_below_last_cumulative)', '%', -10, 20, 160, 1);
+
+-- ============================================================================
+-- 14. rule_definitions - 规则定义
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS rule_definitions (
+    rule_code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    expression TEXT,
+    severity TEXT DEFAULT 'warn',
+    suggestion TEXT,
+    preference_json TEXT DEFAULT '{}',
+    display_order INTEGER DEFAULT 0,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_rule_order ON rule_definitions(display_order);
+
+INSERT OR IGNORE INTO rule_definitions (
+    rule_code, name, description, expression, severity, suggestion, preference_json, display_order, enabled
+) VALUES
+    ('rule_phase2_industry_growth_limit', '规则P2-1 行业增速区间与差异约束', '四大行业当月/累计增速控制在±30%，企业间差异控制在1%浮动区间',
+        'abs(industry_month_rate) <= rule_growth_abs_limit && abs(industry_cumulative_rate) <= rule_growth_abs_limit', 'warn',
+        '超限时优先回调行业样本企业并控制增速离散度', '{"abs_limit":30,"jitter_limit":1}', 90, 1),
+    ('rule_phase2_wholesale_ratio_limit', '规则P2-2 批发业零销比约束', '批发业零销比一般不超过40%，大个体不超过30%，且小数位不雷同',
+        'wholesale_retail_ratio <= rule_wholesale_ratio_limit', 'warn',
+        '重点检查大个体企业零销比与零售额占比', '{"ratio_limit":0.4,"big_ratio_limit":0.3,"unique_decimal":true}', 100, 1),
+    ('rule_phase2_retail_ratio_limit', '规则P2-3 零售业零销比约束', '乡镇加油站零销比约50%，其他企业销售额约等于零售额，大个体增速不超过20%',
+        'retail_growth_rate <= rule_retail_big_growth_limit', 'warn',
+        '异常时优先校验乡镇加油站与大个体企业', '{"gas_station_ratio_target":0.5,"big_growth_limit":20}', 110, 1),
+    ('rule_phase2_accommodation_room_food_relation', '规则P2-4 住宿业客房与餐费关系', '有餐饮的住宿企业客房收入需高于餐费收入',
+        '(has_food == 0) || (room_income > food_income)', 'warn',
+        '优先调节客房收入并保持营业额口径一致', '{"relation":"room_gt_food"}', 120, 1),
+    ('rule_phase2_catering_room_food_relation', '规则P2-5 餐饮业客房与餐费关系', '有住宿的餐饮企业客房收入需低于餐费收入，纯住餐营业额需等于客房或餐费',
+        '(has_room == 0) || (room_income < food_income)', 'warn',
+        '出现冲突时按企业类型分别校准客房与餐费字段', '{"relation":"room_lt_food","pure_business_equal":true}', 130, 1),
+    ('rule_phase2_hotel_catering_decimal_stability', '规则P2-6 住餐增速小数稳定约束', '住宿/餐饮销售额与零售额增速上下浮动个位保持不变，小数后一位变化≤1%',
+        'abs(rate_decimal_delta) <= rule_room_food_delta_limit', 'warn',
+        '优先进行微调，避免打破原有小数分布', '{"decimal_delta_limit":1}', 140, 1),
+    ('rule_phase2_big_individual_limit', '规则P2-7 大个体增速约束', '大个体增速不超过法人增速；乡镇超市当月≤100万；当月增速≤20%',
+        'big_individual_growth_rate <= 20', 'warn',
+        '对大个体企业采用更保守的分配系数', '{"max_month_value":1000000,"max_growth":20}', 150, 1),
+    ('rule_phase2_wholesale_decimal_stability', '规则P2-8 批发业增速小数稳定约束', '批发业销售额、零售额增速上下浮动个位保持不变，小数后一位变化≤1%',
+        'abs(wholesale_rate_decimal_delta) <= 1', 'warn',
+        '优先调整批发行业头部企业的本期值', '{"decimal_delta_limit":1}', 160, 1),
+    ('rule_phase2_new_company_caps', '规则P2-9 新进企业同期累计上限', '新进企业同期累计上限：批发≤2000万、零售≤500万、住餐≤200万',
+        'new_company_cap_check == 1', 'warn',
+        '新进企业数据异常时先校验同期累计基数', '{"wholesale_cap":2000,"retail_cap":500,"accommodation_catering_cap":200}', 170, 1),
+    ('rule_phase2_priority_maximize', '规则P2-10 小微与吃穿用优先策略', '小微与吃穿用增速优先最大化，目标靠近30%',
+        'priority_target >= rule_priority_target', 'info',
+        '智能调整时优先分配到小微与吃穿用相关企业', '{"priority_target":30,"priority_items":["小微企业增速_当月","吃穿用增速_当月"]}', 180, 1);
+
+-- ============================================================================
+-- 15. rule_indicator_links - 规则与指标联动关系
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS rule_indicator_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_code TEXT NOT NULL,
+    indicator_code TEXT NOT NULL,
+    relation_label TEXT,
+    weight REAL DEFAULT 0,
+    display_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(rule_code, indicator_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rule_indicator_links_rule ON rule_indicator_links(rule_code, display_order);
+CREATE INDEX IF NOT EXISTS idx_rule_indicator_links_indicator ON rule_indicator_links(indicator_code);
+
+INSERT OR IGNORE INTO rule_indicator_links (rule_code, indicator_code, relation_label, weight, display_order) VALUES
+    ('rule_phase2_industry_growth_limit', '批发业销售额增速_当月', '批发当月增速区间约束', 0.16, 60),
+    ('rule_phase2_industry_growth_limit', '批发业销售额增速_累计', '批发累计增速区间约束', 0.16, 70),
+    ('rule_phase2_industry_growth_limit', '零售业销售额增速_当月', '零售当月增速区间约束', 0.17, 80),
+    ('rule_phase2_industry_growth_limit', '零售业销售额增速_累计', '零售累计增速区间约束', 0.17, 90),
+    ('rule_phase2_industry_growth_limit', '住宿业营业额增速_当月', '住宿当月增速区间约束', 0.17, 100),
+    ('rule_phase2_industry_growth_limit', '住宿业营业额增速_累计', '住宿累计增速区间约束', 0.17, 110),
+    ('rule_phase2_industry_growth_limit', '餐饮业营业额增速_当月', '餐饮当月增速区间约束', 0.17, 120),
+    ('rule_phase2_industry_growth_limit', '餐饮业营业额增速_累计', '餐饮累计增速区间约束', 0.17, 130),
+
+    ('rule_phase2_wholesale_ratio_limit', '批发业销售额增速_当月', '批发零销比联动约束', 1, 140),
+    ('rule_phase2_retail_ratio_limit', '零售业销售额增速_当月', '零售零销比联动约束', 1, 150),
+    ('rule_phase2_accommodation_room_food_relation', '住宿业营业额增速_当月', '住宿客房/餐费约束', 1, 160),
+    ('rule_phase2_catering_room_food_relation', '餐饮业营业额增速_当月', '餐饮客房/餐费约束', 1, 170),
+    ('rule_phase2_hotel_catering_decimal_stability', '住宿业营业额增速_当月', '住宿增速小数稳定', 0.5, 180),
+    ('rule_phase2_hotel_catering_decimal_stability', '餐饮业营业额增速_当月', '餐饮增速小数稳定', 0.5, 190),
+    ('rule_phase2_big_individual_limit', '小微企业增速_当月', '大个体与小微增速约束', 1, 200),
+    ('rule_phase2_wholesale_decimal_stability', '批发业销售额增速_当月', '批发增速小数稳定', 1, 210),
+    ('rule_phase2_new_company_caps', '限上社零额_当月值', '新进企业累计上限影响限上值', 1, 220),
+    ('rule_phase2_priority_maximize', '小微企业增速_当月', '小微优先最大化目标', 0.5, 230),
+    ('rule_phase2_priority_maximize', '吃穿用增速_当月', '吃穿用优先最大化目标', 0.5, 240);
+
+
+DELETE FROM rule_indicator_links WHERE rule_code IN (
+    'rule_limit_above_sum',
+    'rule_rate_formula',
+    'rule_limit_below_08_1',
+    'rule_limit_below_08_2',
+    'rule_limit_below_08_3',
+    'rule_limit_below_08_4',
+    'rule_total_social',
+    'rule_optimize_notice'
+);
+
+DELETE FROM rule_definitions WHERE rule_code IN (
+    'rule_limit_above_sum',
+    'rule_rate_formula',
+    'rule_limit_below_08_1',
+    'rule_limit_below_08_2',
+    'rule_limit_below_08_3',
+    'rule_limit_below_08_4',
+    'rule_total_social',
+    'rule_optimize_notice'
+);
+
+UPDATE rule_definitions SET expression = '(has_food == 0) || (room_income > food_income)' WHERE rule_code = 'rule_phase2_accommodation_room_food_relation';
+UPDATE rule_definitions SET expression = '(has_room == 0) || (room_income < food_income)' WHERE rule_code = 'rule_phase2_catering_room_food_relation';
+UPDATE rule_definitions SET expression = 'new_company_cap_check == 1' WHERE rule_code = 'rule_phase2_new_company_caps';
+UPDATE rule_definitions SET expression = 'priority_target >= rule_priority_target' WHERE rule_code = 'rule_phase2_priority_maximize';
+
+UPDATE indicator_definitions SET formula = '限上社零额_累计值 + 限下累计估算值_累计', group_order = 5 WHERE code = '社零总额_累计值';
+UPDATE indicator_definitions SET group_order = 5 WHERE code = '社零总额增速_累计';
+
+-- ============================================================================
+-- 16. config - 系统配置表
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
@@ -478,6 +670,19 @@ INSERT OR IGNORE INTO config (key, value, value_type, description) VALUES
 
 -- 限下社零额
 ('last_year_limit_below_cumulative', '0', 'number', '上年累计限下社零额'),
+
+-- 规则默认阈值
+('rule_growth_abs_limit', '30', 'number', '行业增速绝对值上限（%）'),
+('rule_growth_jitter_limit', '1', 'number', '行业增速离散浮动阈值（%）'),
+('rule_wholesale_ratio_limit', '0.4', 'number', '批发业零销比上限'),
+('rule_wholesale_big_ratio_limit', '0.3', 'number', '批发业大个体零销比上限'),
+('rule_retail_gas_station_ratio_target', '0.5', 'number', '乡镇加油站零销比目标'),
+('rule_retail_big_growth_limit', '20', 'number', '零售业大个体增速上限（%）'),
+('rule_room_food_delta_limit', '1', 'number', '住餐增速小数位变化阈值（%）'),
+('rule_new_company_wholesale_year_cap', '2000', 'number', '新进企业批发累计上限（万）'),
+('rule_new_company_retail_year_cap', '500', 'number', '新进企业零售累计上限（万）'),
+('rule_new_company_ac_year_cap', '200', 'number', '新进企业住餐累计上限（万）'),
+('rule_priority_target', '30', 'number', '小微与吃穿用优先目标增速（%）'),
 
 -- 大模型配置
 ('llm_base_url', '', 'string', '大模型 Base URL'),
@@ -590,4 +795,20 @@ FOR EACH ROW
 BEGIN
     UPDATE config SET updated_at = CURRENT_TIMESTAMP
     WHERE key = NEW.key;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_indicator_definitions_timestamp
+AFTER UPDATE ON indicator_definitions
+FOR EACH ROW
+BEGIN
+    UPDATE indicator_definitions SET updated_at = CURRENT_TIMESTAMP
+    WHERE code = NEW.code;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_rule_definitions_timestamp
+AFTER UPDATE ON rule_definitions
+FOR EACH ROW
+BEGIN
+    UPDATE rule_definitions SET updated_at = CURRENT_TIMESTAMP
+    WHERE rule_code = NEW.rule_code;
 END;

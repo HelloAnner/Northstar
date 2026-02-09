@@ -14,11 +14,11 @@ func RecalcDerivedFields(st *store.Store, year, month int) error {
 				WHEN sales_last_year_cumulative = 0 THEN -100
 				ELSE (sales_current_cumulative - sales_last_year_cumulative) / sales_last_year_cumulative * 100
 			END,
-			retail_month_rate = CASE
+			零售业销售额增速_当月 = CASE
 				WHEN retail_last_year_month = 0 THEN -100
 				ELSE (retail_current_month - retail_last_year_month) / retail_last_year_month * 100
 			END,
-			retail_cumulative_rate = CASE
+			零售业销售额增速_累计 = CASE
 				WHEN retail_last_year_cumulative = 0 THEN -100
 				ELSE (retail_current_cumulative - retail_last_year_cumulative) / retail_last_year_cumulative * 100
 			END,

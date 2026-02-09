@@ -49,7 +49,7 @@ func TestApplyIndicatorTargetRandomizesValues(t *testing.T) {
 	}
 	defer func() { randFloat64 = originRand }()
 
-	if err := ApplyIndicatorTarget(st, 2025, 12, "limitAbove_month_value", 300); err != nil {
+	if err := ApplyIndicatorTarget(st, 2025, 12, "限上社零额_当月值", 300); err != nil {
 		t.Fatalf("apply target: %v", err)
 	}
 
@@ -103,7 +103,7 @@ func TestApplyIndicatorTarget_NoAdjustDataNoError(t *testing.T) {
 		t.Fatalf("insert wr: %v", err)
 	}
 
-	if err := ApplyIndicatorTarget(st, 2025, 12, "microSmall_month_rate", 5); err != nil {
+	if err := ApplyIndicatorTarget(st, 2025, 12, "小微企业增速_当月", 5); err != nil {
 		t.Fatalf("apply target should ignore empty dataset: %v", err)
 	}
 }

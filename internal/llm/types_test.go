@@ -36,7 +36,7 @@ func TestParseToolCalls(t *testing.T) {
 				{
 					FunctionCall: &llms.FunctionCall{
 						Name:      ToolSetIndicatorTargets,
-						Arguments: `{"targets": {"limitAbove_month_rate": 7.5, "microSmall_month_rate": 30.0}}`,
+						Arguments: `{"targets": {"限上社零额增速_当月": 7.5, "小微企业增速_当月": 30.0}}`,
 					},
 				},
 			},
@@ -64,7 +64,7 @@ func TestParseToolCalls(t *testing.T) {
 				{
 					FunctionCall: &llms.FunctionCall{
 						Name:      ToolSetIndicatorTargets,
-						Arguments: `{"targets": {"limitAbove_cumulative_rate": 8.0}}`,
+						Arguments: `{"targets": {"限上社零额增速_累计": 8.0}}`,
 					},
 				},
 				{
@@ -190,10 +190,10 @@ func TestParseToolCallsIndicatorValues(t *testing.T) {
 				Name: ToolSetIndicatorTargets,
 				Arguments: `{
 					"targets": {
-						"limitAbove_month_rate": 7.5,
-						"limitAbove_cumulative_rate": 8.0,
-						"microSmall_month_rate": 25.5,
-						"eatWearUse_month_rate": 15.0
+						"限上社零额增速_当月": 7.5,
+						"限上社零额增速_累计": 8.0,
+						"小微企业增速_当月": 25.5,
+						"吃穿用增速_当月": 15.0
 					}
 				}`,
 			},
@@ -207,10 +207,10 @@ func TestParseToolCallsIndicatorValues(t *testing.T) {
 
 	// 验证具体值
 	expected := map[string]float64{
-		"limitAbove_month_rate":      7.5,
-		"limitAbove_cumulative_rate": 8.0,
-		"microSmall_month_rate":      25.5,
-		"eatWearUse_month_rate":      15.0,
+		"限上社零额增速_当月":      7.5,
+		"限上社零额增速_累计": 8.0,
+		"小微企业增速_当月":      25.5,
+		"吃穿用增速_当月":      15.0,
 	}
 
 	for key, val := range expected {

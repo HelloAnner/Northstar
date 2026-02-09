@@ -31,10 +31,10 @@ func TestExport_PreserveTemplateFormulas(t *testing.T) {
 	// 回归：导出流程在写入关键输入值时，不能把模板公式“物化”为数值（否则定稿表失真）
 	// 这里只验证“可能清公式”的两个关键步骤：社零额（定）输入写入、汇总表（定）输入写入。
 	idx := indicatorIndex{
-		"microSmall_month_rate":  calculator.Indicator{ID: "microSmall_month_rate", Value: 0},
-		"eatWearUse_month_rate":  calculator.Indicator{ID: "eatWearUse_month_rate", Value: 0},
-		"totalSocial_cumulative_value": calculator.Indicator{ID: "totalSocial_cumulative_value", Value: 0},
-		"totalSocial_cumulative_rate":  calculator.Indicator{ID: "totalSocial_cumulative_rate", Value: 0},
+		"小微企业增速_当月":  calculator.Indicator{ID: "小微企业增速_当月", Value: 0},
+		"吃穿用增速_当月":  calculator.Indicator{ID: "吃穿用增速_当月", Value: 0},
+		"社零总额_累计值": calculator.Indicator{ID: "社零总额_累计值", Value: 0},
+		"社零总额增速_累计":  calculator.Indicator{ID: "社零总额增速_累计", Value: 0},
 	}
 	if err := fillSocialRetailSheetAndMaterialize(f, st, 2025, 12, idx); err != nil {
 		t.Fatalf("fill social retail: %v", err)

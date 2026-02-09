@@ -33,10 +33,10 @@ func TestDAG_IncludesSummaryNodes(t *testing.T) {
 		t.Fatalf("build graph: %v", err)
 	}
 
-	if !hasEdge(graph, "summary:micro_small:rate", "indicator:microSmall_month_rate") {
+	if !hasEdge(graph, "summary:micro_small:rate", "indicator:小微企业增速_当月") {
 		t.Fatalf("missing micro_small summary edge")
 	}
-	if !hasEdge(graph, "summary:eat_wear_use:rate", "indicator:eatWearUse_month_rate") {
+	if !hasEdge(graph, "summary:eat_wear_use:rate", "indicator:吃穿用增速_当月") {
 		t.Fatalf("missing eat_wear_use summary edge")
 	}
 }

@@ -28,7 +28,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const [error, setError] = useState<string | null>(null)
   const [compareItems, setCompareItems] = useState<CompareItem[]>([])
   const abortRef = useRef<AbortController | null>(null)
-  const delayTimerRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
   const displayPercentRef = useRef(0)
   const targetPercentRef = useRef(0)
@@ -39,19 +38,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     if (!year || !month) return '当前月份'
     return `${year} 年 ${String(month).padStart(2, '0')} 月`
   }, [year, month])
-
-  // 让进度条“慢一点”：每增加 1% 需要 10ms，总计额外 ~1s（0% -> 100%）
-  const perPercentMs = 10
-
-  const shouldApplyDelay = () => {
-    const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
-    return new Date().getTime() >= start.getTime()
-  }
-
-  const randomDelayMs = () => {
-    // 3000..6000 ms
-    return Math.floor(3000 + Math.random() * 3001)
-  }
 
   const resetState = () => {
     setExporting(false)
@@ -70,10 +56,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const stop = () => {
     abortRef.current?.abort()
     abortRef.current = null
-    if (delayTimerRef.current !== null) {
-      window.clearTimeout(delayTimerRef.current)
-      delayTimerRef.current = null
-    }
     if (rafRef.current !== null) {
       window.cancelAnimationFrame(rafRef.current)
       rafRef.current = null
@@ -105,12 +87,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
 
   const ensureAnimating = () => {
     if (rafRef.current !== null) return
-
-    let last = performance.now()
-    const step = (now: number) => {
-      const deltaMs = now - last
-      last = now
-
+    const step = () => {
       const display = displayPercentRef.current
       const target = targetPercentRef.current
       if (display >= target) {
@@ -119,8 +96,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
         return
       }
 
-      const inc = deltaMs / perPercentMs
-      const next = Math.min(target, display + inc)
+      const next = target
       displayPercentRef.current = next
       setPercent(next)
 
@@ -187,16 +163,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
               }
 
               doneRef.current = { url, message: event.message || '导出完成' }
-              if (shouldApplyDelay()) {
-                setStage('导出完成，准备下载…')
-                setTargetPercent(99)
-                delayTimerRef.current = window.setTimeout(() => {
-                  delayTimerRef.current = null
-                  setTargetPercent(100)
-                }, randomDelayMs())
-              } else {
-                setTargetPercent(100)
-              }
+              setTargetPercent(100)
             }
             if (event.type === 'compare') {
               const items = normalizeCompareItems(event.data?.items)

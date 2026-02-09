@@ -102,13 +102,13 @@ func applyIndicatorTargetWithExcludes(st *store.Store, year, month int, id strin
 
 func applyLimitAboveWithExcludes(st *store.Store, year, month int, id string, target float64, excludes fieldExcludes) (bool, error) {
 	switch id {
-	case "limitAbove_month_value":
+	case "限上社零额_当月值":
 		return true, adjustLimitAboveMonthValueWithExcludes(st, year, month, target, excludes)
-	case "limitAbove_month_rate":
+	case "限上社零额增速_当月":
 		return true, adjustLimitAboveMonthRateWithExcludes(st, year, month, target, excludes)
-	case "limitAbove_cumulative_value":
+	case "限上社零额_累计值":
 		return true, adjustLimitAboveCumulativeValueWithExcludes(st, year, month, target, excludes)
-	case "limitAbove_cumulative_rate":
+	case "限上社零额增速_累计":
 		return true, adjustLimitAboveCumulativeRateWithExcludes(st, year, month, target, excludes)
 	default:
 		return false, nil
@@ -117,9 +117,9 @@ func applyLimitAboveWithExcludes(st *store.Store, year, month int, id string, ta
 
 func applySpecialWithExcludes(st *store.Store, year, month int, id string, target float64, excludes fieldExcludes) (bool, error) {
 	switch id {
-	case "eatWearUse_month_rate":
+	case "吃穿用增速_当月":
 		return true, adjustWRSpecialRateWithExcludes(st, year, month, "is_eat_wear_use", target, excludes)
-	case "microSmall_month_rate":
+	case "小微企业增速_当月":
 		return true, adjustWRSpecialRateWithExcludes(st, year, month, "is_small_micro", target, excludes)
 	default:
 		return false, nil
@@ -128,21 +128,21 @@ func applySpecialWithExcludes(st *store.Store, year, month int, id string, targe
 
 func applyIndustryWithExcludes(st *store.Store, year, month int, id string, target float64, excludes fieldExcludes) (bool, error) {
 	switch id {
-	case "wholesale_month_rate":
+	case "批发业销售额增速_当月":
 		return true, adjustWRIndustryRateWithExcludes(st, year, month, "wholesale", "sales_current_month", "sales_last_year_month", target, excludes)
-	case "wholesale_cumulative_rate":
+	case "批发业销售额增速_累计":
 		return true, adjustWRIndustryRateWithExcludes(st, year, month, "wholesale", "sales_current_cumulative", "sales_last_year_cumulative", target, excludes)
-	case "retail_month_rate":
+	case "零售业销售额增速_当月":
 		return true, adjustWRIndustryRateWithExcludes(st, year, month, "retail", "sales_current_month", "sales_last_year_month", target, excludes)
-	case "retail_cumulative_rate":
+	case "零售业销售额增速_累计":
 		return true, adjustWRIndustryRateWithExcludes(st, year, month, "retail", "sales_current_cumulative", "sales_last_year_cumulative", target, excludes)
-	case "accommodation_month_rate":
+	case "住宿业营业额增速_当月":
 		return true, adjustACIndustryRateWithExcludes(st, year, month, "accommodation", "revenue_current_month", "revenue_last_year_month", target, excludes)
-	case "accommodation_cumulative_rate":
+	case "住宿业营业额增速_累计":
 		return true, adjustACIndustryRateWithExcludes(st, year, month, "accommodation", "revenue_current_cumulative", "revenue_last_year_cumulative", target, excludes)
-	case "catering_month_rate":
+	case "餐饮业营业额增速_当月":
 		return true, adjustACIndustryRateWithExcludes(st, year, month, "catering", "revenue_current_month", "revenue_last_year_month", target, excludes)
-	case "catering_cumulative_rate":
+	case "餐饮业营业额增速_累计":
 		return true, adjustACIndustryRateWithExcludes(st, year, month, "catering", "revenue_current_cumulative", "revenue_last_year_cumulative", target, excludes)
 	default:
 		return false, nil
@@ -151,9 +151,9 @@ func applyIndustryWithExcludes(st *store.Store, year, month int, id string, targ
 
 func applyTotalSocialWithExcludes(st *store.Store, year, month int, id string, target float64, excludes fieldExcludes) (bool, error) {
 	switch id {
-	case "totalSocial_cumulative_value":
+	case "社零总额_累计值":
 		return true, adjustTotalSocialCumulativeValueWithExcludes(st, year, month, target, excludes)
-	case "totalSocial_cumulative_rate":
+	case "社零总额增速_累计":
 		return true, adjustTotalSocialCumulativeRateWithExcludes(st, year, month, target, excludes)
 	default:
 		return false, nil

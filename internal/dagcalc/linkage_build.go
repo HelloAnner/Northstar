@@ -50,22 +50,22 @@ var uiColumnKeys = []string{
 }
 
 var indicatorIDs = []string{
-	"limitAbove_month_value",
-	"limitAbove_month_rate",
-	"limitAbove_cumulative_value",
-	"limitAbove_cumulative_rate",
-	"eatWearUse_month_rate",
-	"microSmall_month_rate",
-	"wholesale_month_rate",
-	"wholesale_cumulative_rate",
-	"retail_month_rate",
-	"retail_cumulative_rate",
-	"accommodation_month_rate",
-	"accommodation_cumulative_rate",
-	"catering_month_rate",
-	"catering_cumulative_rate",
-	"totalSocial_cumulative_value",
-	"totalSocial_cumulative_rate",
+	"限上社零额_当月值",
+	"限上社零额增速_当月",
+	"限上社零额_累计值",
+	"限上社零额增速_累计",
+	"吃穿用增速_当月",
+	"小微企业增速_当月",
+	"批发业销售额增速_当月",
+	"批发业销售额增速_累计",
+	"零售业销售额增速_当月",
+	"零售业销售额增速_累计",
+	"住宿业营业额增速_当月",
+	"住宿业营业额增速_累计",
+	"餐饮业营业额增速_当月",
+	"餐饮业营业额增速_累计",
+	"社零总额_累计值",
+	"社零总额增速_累计",
 }
 
 // BuildLinkageGraph 构建联动 DAG（统一入口）
@@ -105,9 +105,9 @@ func aggregateNode(field string) NodeID {
 }
 
 func attachSummaryEdges(g *Graph) {
-	g.AddEdge(summaryNode("micro_small", "rate"), indicatorNode("microSmall_month_rate"))
-	g.AddEdge(summaryNode("eat_wear_use", "rate"), indicatorNode("eatWearUse_month_rate"))
-	g.AddEdge(summaryNode("limit_above", "rate"), indicatorNode("limitAbove_month_rate"))
+	g.AddEdge(summaryNode("micro_small", "rate"), indicatorNode("小微企业增速_当月"))
+	g.AddEdge(summaryNode("eat_wear_use", "rate"), indicatorNode("吃穿用增速_当月"))
+	g.AddEdge(summaryNode("limit_above", "rate"), indicatorNode("限上社零额增速_当月"))
 }
 
 func addWRFieldEdges(g *Graph, r *model.WholesaleRetail) {
@@ -178,44 +178,44 @@ func addRetailEdges(g *Graph, n func(string) NodeID) {
 }
 
 func addIndicatorEdges(g *Graph) {
-	g.AddEdge(aggregateNode("limitAboveRetailCurSum"), indicatorNode("limitAbove_month_value"))
-	g.AddEdge(aggregateNode("limitAboveRetailCurSum"), indicatorNode("limitAbove_month_rate"))
-	g.AddEdge(aggregateNode("limitAboveRetailLastSum"), indicatorNode("limitAbove_month_rate"))
+	g.AddEdge(aggregateNode("limitAboveRetailCurSum"), indicatorNode("限上社零额_当月值"))
+	g.AddEdge(aggregateNode("limitAboveRetailCurSum"), indicatorNode("限上社零额增速_当月"))
+	g.AddEdge(aggregateNode("limitAboveRetailLastSum"), indicatorNode("限上社零额增速_当月"))
 
-	g.AddEdge(aggregateNode("limitAboveRetailCurCumSum"), indicatorNode("limitAbove_cumulative_value"))
-	g.AddEdge(aggregateNode("limitAboveRetailCurCumSum"), indicatorNode("limitAbove_cumulative_rate"))
-	g.AddEdge(aggregateNode("limitAboveRetailLastCumSum"), indicatorNode("limitAbove_cumulative_rate"))
+	g.AddEdge(aggregateNode("limitAboveRetailCurCumSum"), indicatorNode("限上社零额_累计值"))
+	g.AddEdge(aggregateNode("limitAboveRetailCurCumSum"), indicatorNode("限上社零额增速_累计"))
+	g.AddEdge(aggregateNode("limitAboveRetailLastCumSum"), indicatorNode("限上社零额增速_累计"))
 
-	g.AddEdge(aggregateNode("eatWearUseRetailCurSum"), indicatorNode("eatWearUse_month_rate"))
-	g.AddEdge(aggregateNode("eatWearUseRetailLastSum"), indicatorNode("eatWearUse_month_rate"))
+	g.AddEdge(aggregateNode("eatWearUseRetailCurSum"), indicatorNode("吃穿用增速_当月"))
+	g.AddEdge(aggregateNode("eatWearUseRetailLastSum"), indicatorNode("吃穿用增速_当月"))
 
-	g.AddEdge(aggregateNode("microSmallRetailCurSum"), indicatorNode("microSmall_month_rate"))
-	g.AddEdge(aggregateNode("microSmallRetailLastSum"), indicatorNode("microSmall_month_rate"))
+	g.AddEdge(aggregateNode("microSmallRetailCurSum"), indicatorNode("小微企业增速_当月"))
+	g.AddEdge(aggregateNode("microSmallRetailLastSum"), indicatorNode("小微企业增速_当月"))
 
-	g.AddEdge(industryNode("wholesale", "salesCurSum"), indicatorNode("wholesale_month_rate"))
-	g.AddEdge(industryNode("wholesale", "salesLastSum"), indicatorNode("wholesale_month_rate"))
-	g.AddEdge(industryNode("wholesale", "salesCurCumSum"), indicatorNode("wholesale_cumulative_rate"))
-	g.AddEdge(industryNode("wholesale", "salesLastCumSum"), indicatorNode("wholesale_cumulative_rate"))
+	g.AddEdge(industryNode("wholesale", "salesCurSum"), indicatorNode("批发业销售额增速_当月"))
+	g.AddEdge(industryNode("wholesale", "salesLastSum"), indicatorNode("批发业销售额增速_当月"))
+	g.AddEdge(industryNode("wholesale", "salesCurCumSum"), indicatorNode("批发业销售额增速_累计"))
+	g.AddEdge(industryNode("wholesale", "salesLastCumSum"), indicatorNode("批发业销售额增速_累计"))
 
-	g.AddEdge(industryNode("retail", "salesCurSum"), indicatorNode("retail_month_rate"))
-	g.AddEdge(industryNode("retail", "salesLastSum"), indicatorNode("retail_month_rate"))
-	g.AddEdge(industryNode("retail", "salesCurCumSum"), indicatorNode("retail_cumulative_rate"))
-	g.AddEdge(industryNode("retail", "salesLastCumSum"), indicatorNode("retail_cumulative_rate"))
+	g.AddEdge(industryNode("retail", "salesCurSum"), indicatorNode("零售业销售额增速_当月"))
+	g.AddEdge(industryNode("retail", "salesLastSum"), indicatorNode("零售业销售额增速_当月"))
+	g.AddEdge(industryNode("retail", "salesCurCumSum"), indicatorNode("零售业销售额增速_累计"))
+	g.AddEdge(industryNode("retail", "salesLastCumSum"), indicatorNode("零售业销售额增速_累计"))
 
-	g.AddEdge(industryNode("accommodation", "salesCurSum"), indicatorNode("accommodation_month_rate"))
-	g.AddEdge(industryNode("accommodation", "salesLastSum"), indicatorNode("accommodation_month_rate"))
-	g.AddEdge(industryNode("accommodation", "salesCurCumSum"), indicatorNode("accommodation_cumulative_rate"))
-	g.AddEdge(industryNode("accommodation", "salesLastCumSum"), indicatorNode("accommodation_cumulative_rate"))
+	g.AddEdge(industryNode("accommodation", "salesCurSum"), indicatorNode("住宿业营业额增速_当月"))
+	g.AddEdge(industryNode("accommodation", "salesLastSum"), indicatorNode("住宿业营业额增速_当月"))
+	g.AddEdge(industryNode("accommodation", "salesCurCumSum"), indicatorNode("住宿业营业额增速_累计"))
+	g.AddEdge(industryNode("accommodation", "salesLastCumSum"), indicatorNode("住宿业营业额增速_累计"))
 
-	g.AddEdge(industryNode("catering", "salesCurSum"), indicatorNode("catering_month_rate"))
-	g.AddEdge(industryNode("catering", "salesLastSum"), indicatorNode("catering_month_rate"))
-	g.AddEdge(industryNode("catering", "salesCurCumSum"), indicatorNode("catering_cumulative_rate"))
-	g.AddEdge(industryNode("catering", "salesLastCumSum"), indicatorNode("catering_cumulative_rate"))
+	g.AddEdge(industryNode("catering", "salesCurSum"), indicatorNode("餐饮业营业额增速_当月"))
+	g.AddEdge(industryNode("catering", "salesLastSum"), indicatorNode("餐饮业营业额增速_当月"))
+	g.AddEdge(industryNode("catering", "salesCurCumSum"), indicatorNode("餐饮业营业额增速_累计"))
+	g.AddEdge(industryNode("catering", "salesLastCumSum"), indicatorNode("餐饮业营业额增速_累计"))
 
-	g.AddEdge(indicatorNode("limitAbove_cumulative_value"), indicatorNode("totalSocial_cumulative_value"))
-	g.AddEdge(indicatorNode("microSmall_month_rate"), indicatorNode("totalSocial_cumulative_value"))
-	g.AddEdge(indicatorNode("totalSocial_cumulative_value"), indicatorNode("totalSocial_cumulative_rate"))
-	g.AddEdge(aggregateNode("limitAboveRetailLastCumSum"), indicatorNode("totalSocial_cumulative_rate"))
+	g.AddEdge(indicatorNode("限上社零额_累计值"), indicatorNode("社零总额_累计值"))
+	g.AddEdge(indicatorNode("小微企业增速_当月"), indicatorNode("社零总额_累计值"))
+	g.AddEdge(indicatorNode("社零总额_累计值"), indicatorNode("社零总额增速_累计"))
+	g.AddEdge(aggregateNode("limitAboveRetailLastCumSum"), indicatorNode("社零总额增速_累计"))
 }
 
 func attachIndicatorNodes(g *Graph) {
@@ -463,25 +463,25 @@ func attachIndicatorReverseEdges(g *Graph, wrRecords []*model.WholesaleRetail, a
 		n := func(field string) NodeID {
 			return BuildNodeID(nodeKindWR, r.ID, field)
 		}
-		g.AddReverseEdge(indicatorNode("limitAbove_month_value"), n("retailCurrentMonth"))
-		g.AddReverseEdge(indicatorNode("limitAbove_month_rate"), n("retailCurrentMonth"))
-		g.AddReverseEdge(indicatorNode("limitAbove_cumulative_value"), n("retailCurrentCumulative"))
-		g.AddReverseEdge(indicatorNode("limitAbove_cumulative_rate"), n("retailCurrentCumulative"))
+		g.AddReverseEdge(indicatorNode("限上社零额_当月值"), n("retailCurrentMonth"))
+		g.AddReverseEdge(indicatorNode("限上社零额增速_当月"), n("retailCurrentMonth"))
+		g.AddReverseEdge(indicatorNode("限上社零额_累计值"), n("retailCurrentCumulative"))
+		g.AddReverseEdge(indicatorNode("限上社零额增速_累计"), n("retailCurrentCumulative"))
 
 		if r.IsEatWearUse == 1 {
-			g.AddReverseEdge(indicatorNode("eatWearUse_month_rate"), n("retailCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("吃穿用增速_当月"), n("retailCurrentMonth"))
 		}
 		if r.IsSmallMicro == 1 {
-			g.AddReverseEdge(indicatorNode("microSmall_month_rate"), n("retailCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("小微企业增速_当月"), n("retailCurrentMonth"))
 		}
 
 		if r.IndustryType == "wholesale" {
-			g.AddReverseEdge(indicatorNode("wholesale_month_rate"), n("salesCurrentMonth"))
-			g.AddReverseEdge(indicatorNode("wholesale_cumulative_rate"), n("salesCurrentCumulative"))
+			g.AddReverseEdge(indicatorNode("批发业销售额增速_当月"), n("salesCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("批发业销售额增速_累计"), n("salesCurrentCumulative"))
 		}
 		if r.IndustryType == "retail" {
-			g.AddReverseEdge(indicatorNode("retail_month_rate"), n("salesCurrentMonth"))
-			g.AddReverseEdge(indicatorNode("retail_cumulative_rate"), n("salesCurrentCumulative"))
+			g.AddReverseEdge(indicatorNode("零售业销售额增速_当月"), n("salesCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("零售业销售额增速_累计"), n("salesCurrentCumulative"))
 		}
 	}
 
@@ -489,25 +489,25 @@ func attachIndicatorReverseEdges(g *Graph, wrRecords []*model.WholesaleRetail, a
 		n := func(field string) NodeID {
 			return BuildNodeID(nodeKindAC, r.ID, field)
 		}
-		g.AddReverseEdge(indicatorNode("limitAbove_month_value"), n("retailCurrentMonth"))
-		g.AddReverseEdge(indicatorNode("limitAbove_month_rate"), n("retailCurrentMonth"))
-		g.AddReverseEdge(indicatorNode("limitAbove_cumulative_value"), n("retailCurrentCumulative"))
-		g.AddReverseEdge(indicatorNode("limitAbove_cumulative_rate"), n("retailCurrentCumulative"))
+		g.AddReverseEdge(indicatorNode("限上社零额_当月值"), n("retailCurrentMonth"))
+		g.AddReverseEdge(indicatorNode("限上社零额增速_当月"), n("retailCurrentMonth"))
+		g.AddReverseEdge(indicatorNode("限上社零额_累计值"), n("retailCurrentCumulative"))
+		g.AddReverseEdge(indicatorNode("限上社零额增速_累计"), n("retailCurrentCumulative"))
 
 		if r.IndustryType == "accommodation" {
-			g.AddReverseEdge(indicatorNode("accommodation_month_rate"), n("salesCurrentMonth"))
-			g.AddReverseEdge(indicatorNode("accommodation_cumulative_rate"), n("salesCurrentCumulative"))
+			g.AddReverseEdge(indicatorNode("住宿业营业额增速_当月"), n("salesCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("住宿业营业额增速_累计"), n("salesCurrentCumulative"))
 		}
 		if r.IndustryType == "catering" {
-			g.AddReverseEdge(indicatorNode("catering_month_rate"), n("salesCurrentMonth"))
-			g.AddReverseEdge(indicatorNode("catering_cumulative_rate"), n("salesCurrentCumulative"))
+			g.AddReverseEdge(indicatorNode("餐饮业营业额增速_当月"), n("salesCurrentMonth"))
+			g.AddReverseEdge(indicatorNode("餐饮业营业额增速_累计"), n("salesCurrentCumulative"))
 		}
 	}
 
-	for _, id := range []string{"totalSocial_cumulative_value", "totalSocial_cumulative_rate"} {
+	for _, id := range []string{"社零总额_累计值", "社零总额增速_累计"} {
 		node := indicatorNode(id)
-		g.AddReverseEdge(node, indicatorNode("limitAbove_cumulative_value"))
-		g.AddReverseEdge(node, indicatorNode("limitAbove_cumulative_rate"))
+		g.AddReverseEdge(node, indicatorNode("限上社零额_累计值"))
+		g.AddReverseEdge(node, indicatorNode("限上社零额增速_累计"))
 	}
 }
 
@@ -517,78 +517,78 @@ func attachIndicatorCoords(g *Graph, index *TemplateIndex) {
 	totalRow := whGrowthRow + 3
 	totalGrowthRow := whGrowthRow + 4
 
-	addIndicatorExcel(g, "limitAbove_month_value", []ExcelCoord{
+	addIndicatorExcel(g, "限上社零额_当月值", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "G4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("J%d", totalRow)},
 	})
-	addIndicatorExcel(g, "limitAbove_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "限上社零额增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "S4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("K%d", totalGrowthRow)},
 	})
-	addIndicatorExcel(g, "limitAbove_cumulative_value", []ExcelCoord{
+	addIndicatorExcel(g, "限上社零额_累计值", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "I4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("M%d", totalRow)},
 	})
-	addIndicatorExcel(g, "limitAbove_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "限上社零额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "T4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("N%d", totalGrowthRow)},
 	})
 
-	addIndicatorExcel(g, "wholesale_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "批发业销售额增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "K4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("E%d", whGrowthRow)},
 	})
-	addIndicatorExcel(g, "wholesale_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "批发业销售额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "L4"},
 		{Sheet: "批发", Cell: fmt.Sprintf("H%d", whGrowthRow)},
 	})
 
 	retailRows := index.maxRows["零售"]
 	reGrowthRow := retailRows + 2
-	addIndicatorExcel(g, "retail_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "零售业销售额增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "M4"},
 		{Sheet: "零售", Cell: fmt.Sprintf("E%d", reGrowthRow)},
 	})
-	addIndicatorExcel(g, "retail_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "零售业销售额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "N4"},
 		{Sheet: "零售", Cell: fmt.Sprintf("H%d", reGrowthRow)},
 	})
 
 	accRows := index.maxRows["住宿"]
 	accGrowthRow := accRows + 2
-	addIndicatorExcel(g, "accommodation_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "住宿业营业额增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "O4"},
 		{Sheet: "住宿", Cell: fmt.Sprintf("E%d", accGrowthRow)},
 	})
-	addIndicatorExcel(g, "accommodation_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "住宿业营业额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "P4"},
 		{Sheet: "住宿", Cell: fmt.Sprintf("H%d", accGrowthRow)},
 	})
 
 	catRows := index.maxRows["餐饮"]
 	catGrowthRow := catRows + 2
-	addIndicatorExcel(g, "catering_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "餐饮业营业额增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "Q4"},
 		{Sheet: "餐饮", Cell: fmt.Sprintf("E%d", catGrowthRow)},
 	})
-	addIndicatorExcel(g, "catering_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "餐饮业营业额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "R4"},
 		{Sheet: "餐饮", Cell: fmt.Sprintf("H%d", catGrowthRow)},
 	})
 
-	addIndicatorExcel(g, "eatWearUse_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "吃穿用增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "U4"},
 		{Sheet: "社零额（定）", Cell: "C4"},
 	})
-	addIndicatorExcel(g, "microSmall_month_rate", []ExcelCoord{
+	addIndicatorExcel(g, "小微企业增速_当月", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "V4"},
 		{Sheet: "社零额（定）", Cell: "B4"},
 	})
 
-	addIndicatorExcel(g, "totalSocial_cumulative_value", []ExcelCoord{
+	addIndicatorExcel(g, "社零总额_累计值", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "N10"},
 	})
-	addIndicatorExcel(g, "totalSocial_cumulative_rate", []ExcelCoord{
+	addIndicatorExcel(g, "社零总额增速_累计", []ExcelCoord{
 		{Sheet: "汇总表（定）", Cell: "S10"},
 	})
 }

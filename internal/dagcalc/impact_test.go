@@ -41,12 +41,12 @@ func TestImpactRangeReturnsCoords(t *testing.T) {
 
 func TestImpactRangeReturnsIndicatorID(t *testing.T) {
 	g := NewGraph()
-	g.AddIndicatorID("k", "limitAbove_month_value")
+	g.AddIndicatorID("k", "限上社零额_当月值")
 	nodes := ImpactRange(g, "k")
 	if len(nodes) == 0 {
 		t.Fatalf("expected nodes")
 	}
-	if nodes[0].IndicatorID != "limitAbove_month_value" {
+	if nodes[0].IndicatorID != "限上社零额_当月值" {
 		t.Fatalf("expected indicator id")
 	}
 }

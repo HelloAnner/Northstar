@@ -89,8 +89,8 @@ func TestFillSocialRetailSheet_PlatformRetailInputs(t *testing.T) {
 	defer func() { _ = f.Close() }()
 
 	idx := indicatorIndex{
-		"microSmall_month_rate": {ID: "microSmall_month_rate", Value: 6},
-		"eatWearUse_month_rate": {ID: "eatWearUse_month_rate", Value: 8},
+		"小微企业增速_当月": {ID: "小微企业增速_当月", Value: 6},
+		"吃穿用增速_当月": {ID: "吃穿用增速_当月", Value: 8},
 	}
 
 	if err := fillSocialRetailSheetAndMaterialize(f, st, 2025, 12, idx); err != nil {
@@ -200,10 +200,10 @@ func TestRewriteFixedSummarySheet_UsesFormulaText(t *testing.T) {
 	acRecords := []*model.AccommodationCatering{{RevenueCurrentMonth: 55, RevenueLastYearMonth: 50}}
 
 	indicators := indicatorIndex{
-		"eatWearUse_month_rate":        {ID: "eatWearUse_month_rate", Value: 12},
-		"microSmall_month_rate":        {ID: "microSmall_month_rate", Value: 8},
-		"totalSocial_cumulative_value": {ID: "totalSocial_cumulative_value", Value: 1234567},
-		"totalSocial_cumulative_rate":  {ID: "totalSocial_cumulative_rate", Value: 6.5},
+		"吃穿用增速_当月":        {ID: "吃穿用增速_当月", Value: 12},
+		"小微企业增速_当月":        {ID: "小微企业增速_当月", Value: 8},
+		"社零总额_累计值": {ID: "社零总额_累计值", Value: 1234567},
+		"社零总额增速_累计":  {ID: "社零总额增速_累计", Value: 6.5},
 	}
 
 	if err := rewriteFixedSummarySheet(f, 2025, 12, wh, re, acc, cat, indicators, wrRecords, acRecords); err != nil {

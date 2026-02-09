@@ -185,7 +185,7 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 		}
 	case "retail_last_year_month":
 		record.RetailLastYearMonth = parseFloat(value)
-	case "retail_month_rate":
+	case "零售业销售额增速_当月":
 		record.RetailMonthRate = parseRatePercentPtr(value)
 	case "retail_prev_cumulative":
 		record.RetailPrevCumulative = parseFloat(value)
@@ -195,7 +195,7 @@ func (p *WRParser) setWRFieldValue(record *model.WholesaleRetail, field, value s
 		record.RetailCurrentCumulative = parseFloat(value)
 	case "retail_last_year_cumulative":
 		record.RetailLastYearCumulative = parseFloat(value)
-	case "retail_cumulative_rate":
+	case "零售业销售额增速_累计":
 		record.RetailCumulativeRate = parseRatePercentPtr(value)
 
 	// 商品分类

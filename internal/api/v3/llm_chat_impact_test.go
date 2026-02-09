@@ -71,8 +71,8 @@ func TestBuildLLMToolImpact_WRAnchor(t *testing.T) {
 	if !hasUICell(impact.ImpactCells, rowID, "salesCurrentMonth") {
 		t.Fatalf("missing ui cell highlight for salesCurrentMonth")
 	}
-	if !containsString(impact.ImpactIndicators, "wholesale_month_rate") {
-		t.Fatalf("missing indicator highlight for wholesale_month_rate")
+	if !containsString(impact.ImpactIndicators, "批发业销售额增速_当月") {
+		t.Fatalf("missing indicator highlight for 批发业销售额增速_当月")
 	}
 }
 
@@ -166,7 +166,7 @@ func TestBuildLLMToolImpact_IndicatorAnchor(t *testing.T) {
 	}
 
 	impact, err := buildLLMToolImpact(st, 2025, 12, nil, map[string]float64{
-		"limitAbove_month_value": 123.0,
+		"限上社零额_当月值": 123.0,
 	})
 	if err != nil {
 		t.Fatalf("build impact: %v", err)
@@ -174,8 +174,8 @@ func TestBuildLLMToolImpact_IndicatorAnchor(t *testing.T) {
 	if impact.ToolPositionCount != 1 {
 		t.Fatalf("tool position count mismatch: %d", impact.ToolPositionCount)
 	}
-	if !containsString(impact.ImpactIndicators, "limitAbove_month_value") {
-		t.Fatalf("missing indicator highlight for limitAbove_month_value")
+	if !containsString(impact.ImpactIndicators, "限上社零额_当月值") {
+		t.Fatalf("missing indicator highlight for 限上社零额_当月值")
 	}
 }
 

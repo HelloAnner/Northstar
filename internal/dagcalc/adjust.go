@@ -39,37 +39,37 @@ func ApplyIndicatorTarget(st *store.Store, year, month int, id string, target fl
 
 	var err error
 	switch id {
-	case "limitAbove_month_value":
+	case "限上社零额_当月值":
 		err = adjustLimitAboveMonthValue(st, year, month, target)
-	case "limitAbove_month_rate":
+	case "限上社零额增速_当月":
 		err = adjustLimitAboveMonthRate(st, year, month, target)
-	case "limitAbove_cumulative_value":
+	case "限上社零额_累计值":
 		err = adjustLimitAboveCumulativeValue(st, year, month, target)
-	case "limitAbove_cumulative_rate":
+	case "限上社零额增速_累计":
 		err = adjustLimitAboveCumulativeRate(st, year, month, target)
-	case "eatWearUse_month_rate":
+	case "吃穿用增速_当月":
 		err = adjustWRSpecialRate(st, year, month, "is_eat_wear_use", target)
-	case "microSmall_month_rate":
+	case "小微企业增速_当月":
 		err = adjustWRSpecialRate(st, year, month, "is_small_micro", target)
-	case "wholesale_month_rate":
+	case "批发业销售额增速_当月":
 		err = adjustWRIndustryRate(st, year, month, "wholesale", "sales_current_month", "sales_last_year_month", target)
-	case "wholesale_cumulative_rate":
+	case "批发业销售额增速_累计":
 		err = adjustWRCumulativeRate(st, year, month, "wholesale", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target)
-	case "retail_month_rate":
+	case "零售业销售额增速_当月":
 		err = adjustWRIndustryRate(st, year, month, "retail", "sales_current_month", "sales_last_year_month", target)
-	case "retail_cumulative_rate":
+	case "零售业销售额增速_累计":
 		err = adjustWRCumulativeRate(st, year, month, "retail", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target)
-	case "accommodation_month_rate":
+	case "住宿业营业额增速_当月":
 		err = adjustACIndustryRate(st, year, month, "accommodation", "revenue_current_month", "revenue_last_year_month", target)
-	case "accommodation_cumulative_rate":
+	case "住宿业营业额增速_累计":
 		err = adjustACCumulativeRate(st, year, month, "accommodation", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target)
-	case "catering_month_rate":
+	case "餐饮业营业额增速_当月":
 		err = adjustACIndustryRate(st, year, month, "catering", "revenue_current_month", "revenue_last_year_month", target)
-	case "catering_cumulative_rate":
+	case "餐饮业营业额增速_累计":
 		err = adjustACCumulativeRate(st, year, month, "catering", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target)
-	case "totalSocial_cumulative_value":
+	case "社零总额_累计值":
 		err = adjustTotalSocialCumulativeValue(st, year, month, target)
-	case "totalSocial_cumulative_rate":
+	case "社零总额增速_累计":
 		err = adjustTotalSocialCumulativeRate(st, year, month, target)
 	default:
 		return fmt.Errorf("不支持的指标: %s", id)

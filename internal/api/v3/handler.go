@@ -47,6 +47,11 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 
 	// 指标查询
 	router.GET("/indicators", h.GetIndicators)
+	router.GET("/indicator-definitions", h.ListIndicatorDefinitions)
+	router.PATCH("/indicator-definitions/:code", h.UpsertIndicatorDefinition)
+	router.GET("/rules", h.ListRules)
+	router.GET("/rules/evaluate", h.EvaluateRules)
+	router.PATCH("/rules/:code", h.UpsertRule)
 	// 联动预览
 	router.POST("/linkage/preview", h.PreviewLinkage)
 	// 智能调整

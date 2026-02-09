@@ -58,14 +58,14 @@ func TestTotalSocialRateIncludesACLastYearCumulative(t *testing.T) {
 	found := false
 	for _, g := range groups {
 		for _, it := range g.Indicators {
-			if it.ID == "totalSocial_cumulative_rate" {
+			if it.ID == "社零总额增速_累计" {
 				totalRate = it.Value
 				found = true
 			}
 		}
 	}
 	if !found {
-		t.Fatalf("missing totalSocial_cumulative_rate")
+		t.Fatalf("missing 社零总额增速_累计")
 	}
 	if totalRate != 0 {
 		t.Fatalf("unexpected total rate: %v", totalRate)

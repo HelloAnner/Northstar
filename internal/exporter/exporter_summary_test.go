@@ -41,10 +41,10 @@ func TestExport_UsesSummaryTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("calculateIndicatorIndex failed: %v", err)
 	}
-	if indicators["microSmall_month_rate"].Value != 12 {
-		t.Fatalf("microSmall rate mismatch: %v", indicators["microSmall_month_rate"].Value)
+	if indicators["小微企业增速_当月"].Value != 12 {
+		t.Fatalf("microSmall rate mismatch: %v", indicators["小微企业增速_当月"].Value)
 	}
-	if indicators["eatWearUse_month_rate"].Value != 34 {
-		t.Fatalf("eatWearUse rate mismatch: %v", indicators["eatWearUse_month_rate"].Value)
+	if indicators["吃穿用增速_当月"].Value != 34 {
+		t.Fatalf("eatWearUse rate mismatch: %v", indicators["吃穿用增速_当月"].Value)
 	}
 }

@@ -799,13 +799,13 @@ func (c *Coordinator) calculateDerivedFields(ctx *ImportContext) {
 				WHEN sales_last_year_cumulative = 0 THEN NULL
 				ELSE (sales_current_cumulative - sales_last_year_cumulative) / sales_last_year_cumulative * 100
 			END,
-			retail_month_rate = CASE
-				WHEN retail_month_rate IS NOT NULL THEN retail_month_rate
+			零售业销售额增速_当月 = CASE
+				WHEN 零售业销售额增速_当月 IS NOT NULL THEN 零售业销售额增速_当月
 				WHEN retail_last_year_month = 0 THEN NULL
 				ELSE (retail_current_month - retail_last_year_month) / retail_last_year_month * 100
 			END,
-			retail_cumulative_rate = CASE
-				WHEN retail_cumulative_rate IS NOT NULL THEN retail_cumulative_rate
+			零售业销售额增速_累计 = CASE
+				WHEN 零售业销售额增速_累计 IS NOT NULL THEN 零售业销售额增速_累计
 				WHEN retail_last_year_cumulative = 0 THEN NULL
 				ELSE (retail_current_cumulative - retail_last_year_cumulative) / retail_last_year_cumulative * 100
 			END,

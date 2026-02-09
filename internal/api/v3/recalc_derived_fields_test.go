@@ -54,7 +54,7 @@ func TestRecalcDerivedFields_LastYearZero_UseMinus100(t *testing.T) {
 	var retailRate float64
 	var retailCumRate float64
 	if err := st.QueryRow(`
-		SELECT sales_month_rate, sales_cumulative_rate, retail_month_rate, retail_cumulative_rate
+		SELECT sales_month_rate, sales_cumulative_rate, 零售业销售额增速_当月, 零售业销售额增速_累计
 		FROM wholesale_retail WHERE credit_code = ?
 	`, "ZZZ").Scan(&salesRate, &salesCumRate, &retailRate, &retailCumRate); err != nil {
 		t.Fatalf("query wr: %v", err)

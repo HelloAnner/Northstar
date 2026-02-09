@@ -313,9 +313,9 @@ func pickRateField(metric string, isCumulative bool) string {
 		return "sales_month_rate"
 	case "retail":
 		if isCumulative {
-			return "retail_cumulative_rate"
+			return "零售业销售额增速_累计"
 		}
-		return "retail_month_rate"
+		return "零售业销售额增速_当月"
 	case "revenue":
 		if isCumulative {
 			return "revenue_cumulative_rate"

@@ -26,26 +26,26 @@ const systemPromptTemplate = `你是 Northstar 经济数据分析助手。当前
 4) 保持多轮对话上下文一致。
 
 指标 ID 与含义（共 16 项）：
-- limitAbove_month_value：限上社零额（当月值，万元）= 批零企业 retail_current_month + 住餐企业 food_current_month + goods_current_month
-- limitAbove_month_rate：限上社零额增速（当月，%%）= (当月值-上年同期)/上年同期*100
-- limitAbove_cumulative_value：限上社零额（累计值，万元）= 批零 retail_current_cumulative + 住餐 food_current_cumulative + goods_current_cumulative
-- limitAbove_cumulative_rate：限上社零额增速（累计，%%）= (累计值-上年同期累计)/上年同期累计*100
+- 限上社零额_当月值：限上社零额（当月值，万元）= 批零企业 retail_current_month + 住餐企业 food_current_month + goods_current_month
+- 限上社零额增速_当月：限上社零额增速（当月，%%）= (当月值-上年同期)/上年同期*100
+- 限上社零额_累计值：限上社零额（累计值，万元）= 批零 retail_current_cumulative + 住餐 food_current_cumulative + goods_current_cumulative
+- 限上社零额增速_累计：限上社零额增速（累计，%%）= (累计值-上年同期累计)/上年同期累计*100
 
-- eatWearUse_month_rate：吃穿用增速（当月，%%）= 吃穿用企业 retail_current_month 与 retail_last_year_month 的同比增速
-- microSmall_month_rate：小微企业增速（当月，%%）= 小微企业 retail_current_month 与 retail_last_year_month 的同比增速
+- 吃穿用增速_当月：吃穿用增速（当月，%%）= 吃穿用企业 retail_current_month 与 retail_last_year_month 的同比增速
+- 小微企业增速_当月：小微企业增速（当月，%%）= 小微企业 retail_current_month 与 retail_last_year_month 的同比增速
 
-- wholesale_month_rate：批发业销售额增速（当月，%%）= 批发业 sales_current_month 与 sales_last_year_month 的同比增速
-- wholesale_cumulative_rate：批发业销售额增速（累计，%%）= 批发业 sales_current_cumulative 与 sales_last_year_cumulative 的同比增速
-- retail_month_rate：零售业销售额增速（当月，%%）= 零售业 sales_current_month 与 sales_last_year_month 的同比增速
-- retail_cumulative_rate：零售业销售额增速（累计，%%）= 零售业 sales_current_cumulative 与 sales_last_year_cumulative 的同比增速
-- accommodation_month_rate：住宿业营业额增速（当月，%%）= 住宿业 revenue_current_month 与 revenue_last_year_month 的同比增速
-- accommodation_cumulative_rate：住宿业营业额增速（累计，%%）= 住宿业 revenue_current_cumulative 与 revenue_last_year_cumulative 的同比增速
-- catering_month_rate：餐饮业营业额增速（当月，%%）= 餐饮业 revenue_current_month 与 revenue_last_year_month 的同比增速
-- catering_cumulative_rate：餐饮业营业额增速（累计，%%）= 餐饮业 revenue_current_cumulative 与 revenue_last_year_cumulative 的同比增速
+- 批发业销售额增速_当月：批发业销售额增速（当月，%%）= 批发业 sales_current_month 与 sales_last_year_month 的同比增速
+- 批发业销售额增速_累计：批发业销售额增速（累计，%%）= 批发业 sales_current_cumulative 与 sales_last_year_cumulative 的同比增速
+- 零售业销售额增速_当月：零售业销售额增速（当月，%%）= 零售业 sales_current_month 与 sales_last_year_month 的同比增速
+- 零售业销售额增速_累计：零售业销售额增速（累计，%%）= 零售业 sales_current_cumulative 与 sales_last_year_cumulative 的同比增速
+- 住宿业营业额增速_当月：住宿业营业额增速（当月，%%）= 住宿业 revenue_current_month 与 revenue_last_year_month 的同比增速
+- 住宿业营业额增速_累计：住宿业营业额增速（累计，%%）= 住宿业 revenue_current_cumulative 与 revenue_last_year_cumulative 的同比增速
+- 餐饮业营业额增速_当月：餐饮业营业额增速（当月，%%）= 餐饮业 revenue_current_month 与 revenue_last_year_month 的同比增速
+- 餐饮业营业额增速_累计：餐饮业营业额增速（累计，%%）= 餐饮业 revenue_current_cumulative 与 revenue_last_year_cumulative 的同比增速
 
-- totalSocial_cumulative_value：社零总额（累计值，万元）= limitAbove_cumulative_value + 估算限下社零额
-- totalSocial_cumulative_rate：社零总额增速（累计，%%）
-  其中估算限下社零额 = last_year_limit_below_cumulative * (1 + microSmall_month_rate/100)
+- 社零总额_累计值：社零总额（累计值，万元）= 限上社零额_累计值 + 估算限下社零额
+- 社零总额增速_累计：社零总额增速（累计，%%）
+  其中估算限下社零额 = last_year_limit_below_cumulative * (1 + 小微企业增速_当月/100)
 
 可修改的企业字段（patch，支持 camelCase 或 snake_case）：
 - 批零企业：salesCurrentMonth, salesLastYearMonth, salesCurrentCumulative, salesLastYearCumulative,

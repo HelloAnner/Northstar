@@ -376,21 +376,21 @@ func buildWRRateDrivenUpdates(existing model.WholesaleRetail, patch map[string]i
 			return nil, err
 		}
 	}
-	if rate, set, ok := parseOptionalFloatFromPatch(patch, "retailMonthRate", "retail_month_rate"); ok && set {
+	if rate, set, ok := parseOptionalFloatFromPatch(patch, "retailMonthRate", "零售业销售额增速_当月"); ok && set {
 		current := pickFloatOverride(existing.RetailCurrentMonth, patch, "retailCurrentMonth", "retail_current_month")
 		lastYear := pickFloatOverride(existing.RetailLastYearMonth, patch, "retailLastYearMonth", "retail_last_year_month")
 		currentLocked := patchHasKey(patch, "retailCurrentMonth", "retail_current_month")
 		lastYearLocked := patchHasKey(patch, "retailLastYearMonth", "retail_last_year_month")
-		if err := applyRateDrivenPair(out, rate, current, lastYear, "retail_current_month", "retail_last_year_month", "retail_month_rate", currentLocked, lastYearLocked); err != nil {
+		if err := applyRateDrivenPair(out, rate, current, lastYear, "retail_current_month", "retail_last_year_month", "零售业销售额增速_当月", currentLocked, lastYearLocked); err != nil {
 			return nil, err
 		}
 	}
-	if rate, set, ok := parseOptionalFloatFromPatch(patch, "retailCumulativeRate", "retail_cumulative_rate"); ok && set {
+	if rate, set, ok := parseOptionalFloatFromPatch(patch, "retailCumulativeRate", "零售业销售额增速_累计"); ok && set {
 		current := pickFloatOverride(existing.RetailCurrentCumulative, patch, "retailCurrentCumulative", "retail_current_cumulative")
 		lastYear := pickFloatOverride(existing.RetailLastYearCumulative, patch, "retailLastYearCumulative", "retail_last_year_cumulative")
 		currentLocked := patchHasKey(patch, "retailCurrentCumulative", "retail_current_cumulative")
 		lastYearLocked := patchHasKey(patch, "retailLastYearCumulative", "retail_last_year_cumulative")
-		if err := applyRateDrivenPair(out, rate, current, lastYear, "retail_current_cumulative", "retail_last_year_cumulative", "retail_cumulative_rate", currentLocked, lastYearLocked); err != nil {
+		if err := applyRateDrivenPair(out, rate, current, lastYear, "retail_current_cumulative", "retail_last_year_cumulative", "零售业销售额增速_累计", currentLocked, lastYearLocked); err != nil {
 			return nil, err
 		}
 	}

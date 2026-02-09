@@ -4,10 +4,13 @@ import "northstar/internal/store"
 
 // Indicator 指标定义
 type Indicator struct {
-	ID    string  `json:"id"`
-	Name  string  `json:"name"`
-	Value float64 `json:"value"`
-	Unit  string  `json:"unit"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Value    float64 `json:"value"`
+	Unit     string  `json:"unit"`
+	Formula  string  `json:"formula,omitempty"`
+	FloatMin float64 `json:"floatMin,omitempty"`
+	FloatMax float64 `json:"floatMax,omitempty"`
 }
 
 // IndicatorGroup 指标分组
@@ -33,6 +36,14 @@ func CalculateIndicators(store *store.Store, year, month int) ([]IndicatorGroup,
 
 // CalculateAll 计算所有16个指标
 func (c *IndicatorCalculator) CalculateAll(year, month int) ([]IndicatorGroup, error) {
+	defs, err := c.store.ListIndicatorDefinitions(true)
+	if err == nil && len(defs) > 0 {
+		groups, calcErr := calculateByDefinitions(c.store, year, month, defs)
+		if calcErr == nil {
+			return groups, nil
+		}
+	}
+
 	groups := []IndicatorGroup{
 		{
 			Name:       "限上社零额",
@@ -129,25 +140,25 @@ func (c *IndicatorCalculator) calculateLimitAbove(year, month int) ([]Indicator,
 
 	return []Indicator{
 		{
-			ID:    "limitAbove_month_value",
+			ID:    "限上社零额_当月值",
 			Name:  "限上社零额（当月值）",
 			Value: retailCurrentMonthSum,
 			Unit:  "万元",
 		},
 		{
-			ID:    "limitAbove_month_rate",
+			ID:    "限上社零额增速_当月",
 			Name:  "限上社零额增速（当月）",
 			Value: monthRate,
 			Unit:  "%",
 		},
 		{
-			ID:    "limitAbove_cumulative_value",
+			ID:    "限上社零额_累计值",
 			Name:  "限上社零额（累计值）",
 			Value: retailCurrentCumulativeSum,
 			Unit:  "万元",
 		},
 		{
-			ID:    "limitAbove_cumulative_rate",
+			ID:    "限上社零额增速_累计",
 			Name:  "限上社零额增速（累计）",
 			Value: cumulativeRate,
 			Unit:  "%",
@@ -202,13 +213,13 @@ func (c *IndicatorCalculator) calculateSpecialRates(year, month int) ([]Indicato
 
 	return []Indicator{
 		{
-			ID:    "eatWearUse_month_rate",
+			ID:    "吃穿用增速_当月",
 			Name:  "吃穿用增速（当月）",
 			Value: eatWearUseRate,
 			Unit:  "%",
 		},
 		{
-			ID:    "microSmall_month_rate",
+			ID:    "小微企业增速_当月",
 			Name:  "小微企业增速（当月）",
 			Value: smallMicroRate,
 			Unit:  "%",
@@ -396,13 +407,13 @@ func (c *IndicatorCalculator) calculateTotalSocial(year, month int, specialIndic
 
 	return []Indicator{
 		{
-			ID:    "totalSocial_cumulative_value",
+			ID:    "社零总额_累计值",
 			Name:  "社零总额（累计值）",
 			Value: totalSocialCumulative,
 			Unit:  "万元",
 		},
 		{
-			ID:    "totalSocial_cumulative_rate",
+			ID:    "社零总额增速_累计",
 			Name:  "社零总额增速（累计）",
 			Value: totalSocialRate,
 			Unit:  "%",

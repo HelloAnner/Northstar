@@ -47,6 +47,9 @@ func New(dbPath string) (*Store, error) {
 	if err := store.initSchema(); err != nil {
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
+	if err := store.normalizeIndicatorRuleIdentifiers(); err != nil {
+		return nil, fmt.Errorf("failed to normalize indicator and rule identifiers: %w", err)
+	}
 
 	return store, nil
 }

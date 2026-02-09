@@ -114,15 +114,15 @@ func loadIndicatorStats(st *store.Store, year, month int, id string) (indicatorS
 
 func loadLimitAboveStats(st *store.Store, year, month int, id string) (indicatorStats, bool, error) {
 	switch id {
-	case "limitAbove_month_value":
+	case "限上社零额_当月值":
 		count, err := limitAboveRowCount(st, year, month)
 		return indicatorStats{Eligible: count}, true, err
-	case "limitAbove_month_rate":
+	case "限上社零额增速_当月":
 		sum, count, err := sumLimitAboveLastYearMonth(st, year, month)
 		return indicatorStats{Eligible: count, LastYear: sum}, true, err
-	case "limitAbove_cumulative_value":
+	case "限上社零额_累计值":
 		return loadLimitAboveCumulativeValueStats(st, year, month)
-	case "limitAbove_cumulative_rate":
+	case "限上社零额增速_累计":
 		return loadLimitAboveCumulativeRateStats(st, year, month)
 	default:
 		return indicatorStats{}, false, nil
@@ -201,7 +201,7 @@ func loadACIndustryStats(st *store.Store, year, month int, id string) (indicator
 }
 
 func loadTotalSocialStats(st *store.Store, year, month int, id string) (indicatorStats, bool, error) {
-	if id != "totalSocial_cumulative_value" && id != "totalSocial_cumulative_rate" {
+	if id != "社零总额_累计值" && id != "社零总额增速_累计" {
 		return indicatorStats{}, false, nil
 	}
 	prev, err := sumLimitAbovePrevCumulative(st, year, month)
@@ -209,7 +209,7 @@ func loadTotalSocialStats(st *store.Store, year, month int, id string) (indicato
 		return indicatorStats{}, true, err
 	}
 	stats := indicatorStats{PrevSum: prev, HasPrevSum: true}
-	if id == "totalSocial_cumulative_rate" {
+	if id == "社零总额增速_累计" {
 		limitAboveLastYear, _, err := sumLimitAboveLastYearCumulative(st, year, month)
 		if err != nil {
 			return indicatorStats{}, true, err
@@ -226,9 +226,9 @@ func loadTotalSocialStats(st *store.Store, year, month int, id string) (indicato
 
 func minValueForIndicator(stats indicatorStats, id string) (float64, bool) {
 	switch id {
-	case "limitAbove_month_value":
+	case "限上社零额_当月值":
 		return 0, true
-	case "limitAbove_cumulative_value", "totalSocial_cumulative_value":
+	case "限上社零额_累计值", "社零总额_累计值":
 		if stats.PrevSum < 0 {
 			return 0, true
 		}
@@ -344,9 +344,9 @@ func sumACDerivedPrevCumulative(st *store.Store, year, month int) (float64, int,
 
 func specialFlagField(id string) (string, bool) {
 	switch id {
-	case "eatWearUse_month_rate":
+	case "吃穿用增速_当月":
 		return "is_eat_wear_use", true
-	case "microSmall_month_rate":
+	case "小微企业增速_当月":
 		return "is_small_micro", true
 	default:
 		return "", false
@@ -355,13 +355,13 @@ func specialFlagField(id string) (string, bool) {
 
 func wrRateSpec(id string) (string, string, bool) {
 	switch id {
-	case "wholesale_month_rate":
+	case "批发业销售额增速_当月":
 		return "wholesale", "sales_last_year_month", false
-	case "wholesale_cumulative_rate":
+	case "批发业销售额增速_累计":
 		return "wholesale", "sales_last_year_cumulative", true
-	case "retail_month_rate":
+	case "零售业销售额增速_当月":
 		return "retail", "sales_last_year_month", false
-	case "retail_cumulative_rate":
+	case "零售业销售额增速_累计":
 		return "retail", "sales_last_year_cumulative", true
 	default:
 		return "", "", false
@@ -370,13 +370,13 @@ func wrRateSpec(id string) (string, string, bool) {
 
 func acRateSpec(id string) (string, string, bool) {
 	switch id {
-	case "accommodation_month_rate":
+	case "住宿业营业额增速_当月":
 		return "accommodation", "revenue_last_year_month", false
-	case "accommodation_cumulative_rate":
+	case "住宿业营业额增速_累计":
 		return "accommodation", "revenue_last_year_cumulative", true
-	case "catering_month_rate":
+	case "餐饮业营业额增速_当月":
 		return "catering", "revenue_last_year_month", false
-	case "catering_cumulative_rate":
+	case "餐饮业营业额增速_累计":
 		return "catering", "revenue_last_year_cumulative", true
 	default:
 		return "", "", false
@@ -385,19 +385,19 @@ func acRateSpec(id string) (string, string, bool) {
 
 func isRateIndicator(id string) bool {
 	switch id {
-	case "limitAbove_month_rate",
-		"limitAbove_cumulative_rate",
-		"eatWearUse_month_rate",
-		"microSmall_month_rate",
-		"wholesale_month_rate",
-		"wholesale_cumulative_rate",
-		"retail_month_rate",
-		"retail_cumulative_rate",
-		"accommodation_month_rate",
-		"accommodation_cumulative_rate",
-		"catering_month_rate",
-		"catering_cumulative_rate",
-		"totalSocial_cumulative_rate":
+	case "限上社零额增速_当月",
+		"限上社零额增速_累计",
+		"吃穿用增速_当月",
+		"小微企业增速_当月",
+		"批发业销售额增速_当月",
+		"批发业销售额增速_累计",
+		"零售业销售额增速_当月",
+		"零售业销售额增速_累计",
+		"住宿业营业额增速_当月",
+		"住宿业营业额增速_累计",
+		"餐饮业营业额增速_当月",
+		"餐饮业营业额增速_累计",
+		"社零总额增速_累计":
 		return true
 	default:
 		return false
@@ -406,7 +406,7 @@ func isRateIndicator(id string) bool {
 
 func needsData(id string) bool {
 	switch id {
-	case "totalSocial_cumulative_value", "totalSocial_cumulative_rate":
+	case "社零总额_累计值", "社零总额增速_累计":
 		return false
 	default:
 		return true

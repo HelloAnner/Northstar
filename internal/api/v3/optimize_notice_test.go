@@ -54,7 +54,7 @@ func TestOptimize_Notices_LastYearZeroRate(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"targets": map[string]float64{
-			"limitAbove_month_rate": 10,
+			"限上社零额增速_当月": 10,
 		},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/optimize", bytes.NewReader(body))
@@ -77,7 +77,7 @@ func TestOptimize_Notices_LastYearZeroRate(t *testing.T) {
 	}
 	found := false
 	for _, notice := range resp.Notices {
-		if notice.IndicatorID == "limitAbove_month_rate" && notice.Code == "last_year_zero" {
+		if notice.IndicatorID == "限上社零额增速_当月" && notice.Code == "last_year_zero" {
 			if !strings.Contains(notice.Message, "根据") || !strings.Contains(notice.Message, "规则无法调整") || !strings.Contains(notice.Message, "建议") {
 				t.Fatalf("notice message format invalid: %s", notice.Message)
 			}
@@ -123,7 +123,7 @@ func TestOptimize_Notices_TargetSame_Format(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"targets": map[string]float64{
-			"limitAbove_month_value": 100,
+			"限上社零额_当月值": 100,
 		},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/optimize", bytes.NewReader(body))
@@ -146,7 +146,7 @@ func TestOptimize_Notices_TargetSame_Format(t *testing.T) {
 	}
 	found := false
 	for _, notice := range resp.Notices {
-		if notice.IndicatorID == "limitAbove_month_value" && notice.Code == "target_same" {
+		if notice.IndicatorID == "限上社零额_当月值" && notice.Code == "target_same" {
 			if !strings.Contains(notice.Message, "根据") || !strings.Contains(notice.Message, "规则无法调整") || !strings.Contains(notice.Message, "建议") {
 				t.Fatalf("notice message format invalid: %s", notice.Message)
 			}
@@ -192,7 +192,7 @@ func TestOptimize_Notices_BelowMinCumulative(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"targets": map[string]float64{
-			"limitAbove_cumulative_value": 100,
+			"限上社零额_累计值": 100,
 		},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/optimize", bytes.NewReader(body))
@@ -215,7 +215,7 @@ func TestOptimize_Notices_BelowMinCumulative(t *testing.T) {
 	}
 	found := false
 	for _, notice := range resp.Notices {
-		if notice.IndicatorID != "limitAbove_cumulative_value" {
+		if notice.IndicatorID != "限上社零额_累计值" {
 			continue
 		}
 		if notice.Code != "below_min" {

@@ -33,15 +33,15 @@ func calculateIndicatorIndex(st *store.Store, year, month int) (indicatorIndex, 
 
 	// 汇总表优先：若存在汇总增速，覆盖默认指标值
 	if rate, err := st.GetSummaryMicroSmallRate(year, month); err == nil && rate != nil {
-		if it, ok := m["microSmall_month_rate"]; ok {
+		if it, ok := m["小微企业增速_当月"]; ok {
 			it.Value = math.Round(*rate)
-			m["microSmall_month_rate"] = it
+			m["小微企业增速_当月"] = it
 		}
 	}
 	if rate, err := st.GetSummaryEatWearUseRate(year, month); err == nil && rate != nil {
-		if it, ok := m["eatWearUse_month_rate"]; ok {
+		if it, ok := m["吃穿用增速_当月"]; ok {
 			it.Value = math.Round(*rate)
-			m["eatWearUse_month_rate"] = it
+			m["吃穿用增速_当月"] = it
 		}
 	}
 	return m, nil

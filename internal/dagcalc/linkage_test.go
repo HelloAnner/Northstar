@@ -37,8 +37,8 @@ func TestBuildLinkageGraphImpact(t *testing.T) {
 	if !containsImpactNode(impact, string(BuildNodeID("wr", wr.ID, "retailMonthRate"))) {
 		t.Fatalf("impact missing retailMonthRate")
 	}
-	if !containsImpactNode(impact, "indicator:limitAbove_month_value") {
-		t.Fatalf("impact missing limitAbove_month_value")
+	if !containsImpactNode(impact, "indicator:限上社零额_当月值") {
+		t.Fatalf("impact missing 限上社零额_当月值")
 	}
 }
 

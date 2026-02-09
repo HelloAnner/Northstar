@@ -130,7 +130,7 @@ var wrRowLogics = []rowCellLogic[model.WholesaleRetail]{
 	{col: "K", key: "{{wr.retail_last_year_month}}", desc: "上年同期零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(math.Round(r.RetailLastYearMonth)), nil
 	}},
-	{col: "L", key: "{{wr.retail_month_rate}}", desc: "本月零售额增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
+	{col: "L", key: "{{wr.零售业销售额增速_当月}}", desc: "本月零售额增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(ratePercent(r.RetailCurrentMonth, r.RetailLastYearMonth)), nil
 	}},
 	{col: "M", key: "{{wr.retail_current_cumulative}}", desc: "本年累计零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
@@ -139,7 +139,7 @@ var wrRowLogics = []rowCellLogic[model.WholesaleRetail]{
 	{col: "N", key: "{{wr.retail_last_year_cumulative}}", desc: "上年同期累计零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(math.Round(r.RetailLastYearCumulative)), nil
 	}},
-	{col: "O", key: "{{wr.retail_cumulative_rate}}", desc: "累计零售额增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
+	{col: "O", key: "{{wr.零售业销售额增速_累计}}", desc: "累计零售额增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(ratePercent(r.RetailCurrentCumulative, r.RetailLastYearCumulative)), nil
 	}},
 	{col: "P", key: "{{wr.first_report_ip}}", desc: "首次上报IP", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
@@ -263,7 +263,7 @@ var eatWearUseRowLogics = []rowCellLogic[model.WholesaleRetail]{
 	{col: "L", key: "{{ewu.retail_last_year_month}}", desc: "上年同期零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(math.Round(r.RetailLastYearMonth)), nil
 	}},
-	{col: "M", key: "{{ewu.retail_month_rate}}", desc: "零售额当月增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
+	{col: "M", key: "{{ewu.零售业销售额增速_当月}}", desc: "零售额当月增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(ratePercent(r.RetailCurrentMonth, r.RetailLastYearMonth)), nil
 	}},
 	{col: "N", key: "{{ewu.retail_current_cumulative}}", desc: "本年累计零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
@@ -272,7 +272,7 @@ var eatWearUseRowLogics = []rowCellLogic[model.WholesaleRetail]{
 	{col: "O", key: "{{ewu.retail_last_year_cumulative}}", desc: "上年同期累计零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(math.Round(r.RetailLastYearCumulative)), nil
 	}},
-	{col: "P", key: "{{ewu.retail_cumulative_rate}}", desc: "零售额累计增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
+	{col: "P", key: "{{ewu.零售业销售额增速_累计}}", desc: "零售额累计增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(ratePercent(r.RetailCurrentCumulative, r.RetailLastYearCumulative)), nil
 	}},
 	{col: "Q", key: "{{ewu.eat_wear_use_current}}", desc: "吃穿用本月零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
@@ -348,7 +348,7 @@ var microSmallRowLogics = []rowCellLogic[model.WholesaleRetail]{
 	{col: "E", key: "{{micro.retail_last_year_month}}", desc: "上年同期零售额", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(math.Round(r.RetailLastYearMonth)), nil
 	}},
-	{col: "F", key: "{{micro.retail_month_rate}}", desc: "当月增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
+	{col: "F", key: "{{micro.零售业销售额增速_当月}}", desc: "当月增速", mode: writeAlways, value: func(r *model.WholesaleRetail) (cellValue, error) {
 		return valueOf(ratePercent(r.RetailCurrentMonth, r.RetailLastYearMonth)), nil
 	}},
 }
@@ -427,19 +427,19 @@ func socialSheetLogics() []cellLogic[socialContext] {
 			return valueOf(ctx.month), nil
 		}},
 		{sheet: "社零额（定）", cell: "B4", key: "{{social.micro_rate_month}}", desc: "小微增速（本月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
-			return valueOf(ctx.indicators["microSmall_month_rate"].Value), nil
+			return valueOf(ctx.indicators["小微企业增速_当月"].Value), nil
 		}},
 		{sheet: "社零额（定）", cell: "C4", key: "{{social.eat_wear_use_rate_month}}", desc: "吃穿用增速（本月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
-			return valueOf(ctx.indicators["eatWearUse_month_rate"].Value), nil
+			return valueOf(ctx.indicators["吃穿用增速_当月"].Value), nil
 		}},
 		{sheet: "社零额（定）", cell: "D4", key: "{{social.sample_rate_month}}", desc: "抽样增速（本月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
 			return valueOf(ctx.configFloat("sample_rate_month")), nil
 		}},
 		{sheet: "社零额（定）", cell: "B6", key: "{{social.micro_rate_prev}}", desc: "小微增速（上月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
-			return valueOf(ctx.prevIndicators["microSmall_month_rate"].Value), nil
+			return valueOf(ctx.prevIndicators["小微企业增速_当月"].Value), nil
 		}},
 		{sheet: "社零额（定）", cell: "C6", key: "{{social.eat_wear_use_rate_prev}}", desc: "吃穿用增速（上月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
-			return valueOf(ctx.prevIndicators["eatWearUse_month_rate"].Value), nil
+			return valueOf(ctx.prevIndicators["吃穿用增速_当月"].Value), nil
 		}},
 		{sheet: "社零额（定）", cell: "D6", key: "{{social.sample_rate_prev}}", desc: "抽样增速（上月）", mode: writeIfNoFormula, value: func(ctx *socialContext) (cellValue, error) {
 			return valueOf(ctx.configFloat("sample_rate_prev")), nil
@@ -586,8 +586,8 @@ func newSummaryContext(
 		formatTrimFloat(limitAboveCumWan/10000.0, 2),
 		formatTrimFloat(ratePercent(overallRetailCurCum, overallRetailLastCum), 1),
 		periodText,
-		formatTrimFloat(roundHalfUp(indicators["totalSocial_cumulative_value"].Value/10000.0, 2), 2),
-		formatTrimFloat(indicators["totalSocial_cumulative_rate"].Value, 1),
+		formatTrimFloat(roundHalfUp(indicators["社零总额_累计值"].Value/10000.0, 2), 2),
+		formatTrimFloat(indicators["社零总额增速_累计"].Value, 1),
 	)
 
 	return &summaryContext{
@@ -658,50 +658,50 @@ func summarySheetLogics() []cellLogic[summaryContext] {
 		{sheet: "汇总表（定）", cell: "J4", key: "{{summary.limit_above_last_cum_wan}}", desc: "限上零售额上年同期累计（万元）", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ctx.limitAboveLastCumWan), nil
 		}},
-		{sheet: "汇总表（定）", cell: "K4", key: "{{summary.wholesale_month_rate}}", desc: "批发当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
+		{sheet: "汇总表（定）", cell: "K4", key: "{{summary.批发业销售额增速_当月}}", desc: "批发当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.wh.salesCur, ctx.wh.salesLast)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "L4", key: "{{summary.wholesale_cum_rate}}", desc: "批发累计增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.wh.salesCurCum, ctx.wh.salesLastCum)), nil
 		}},
-		{sheet: "汇总表（定）", cell: "M4", key: "{{summary.retail_month_rate}}", desc: "零售当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
+		{sheet: "汇总表（定）", cell: "M4", key: "{{summary.零售业销售额增速_当月}}", desc: "零售当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.re.salesCur, ctx.re.salesLast)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "N4", key: "{{summary.retail_cum_rate}}", desc: "零售累计增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.re.salesCurCum, ctx.re.salesLastCum)), nil
 		}},
-		{sheet: "汇总表（定）", cell: "O4", key: "{{summary.accommodation_month_rate}}", desc: "住宿当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
+		{sheet: "汇总表（定）", cell: "O4", key: "{{summary.住宿业营业额增速_当月}}", desc: "住宿当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.acc.salesCur, ctx.acc.salesLast)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "P4", key: "{{summary.accommodation_cum_rate}}", desc: "住宿累计增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.acc.salesCurCum, ctx.acc.salesLastCum)), nil
 		}},
-		{sheet: "汇总表（定）", cell: "Q4", key: "{{summary.catering_month_rate}}", desc: "餐饮当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
+		{sheet: "汇总表（定）", cell: "Q4", key: "{{summary.餐饮业营业额增速_当月}}", desc: "餐饮当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.cat.salesCur, ctx.cat.salesLast)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "R4", key: "{{summary.catering_cum_rate}}", desc: "餐饮累计增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.cat.salesCurCum, ctx.cat.salesLastCum)), nil
 		}},
-		{sheet: "汇总表（定）", cell: "S4", key: "{{summary.overall_retail_month_rate}}", desc: "限上零售额当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
+		{sheet: "汇总表（定）", cell: "S4", key: "{{summary.overall_零售业销售额增速_当月}}", desc: "限上零售额当月增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.overallRetailCur, ctx.overallRetailLast)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "T4", key: "{{summary.overall_retail_cum_rate}}", desc: "限上零售额累计增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ratePercent(ctx.overallRetailCurCum, ctx.overallRetailLastCum)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "U4", key: "{{summary.eat_wear_use_rate}}", desc: "吃穿用增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
-			return valueOf(ctx.indicators["eatWearUse_month_rate"].Value), nil
+			return valueOf(ctx.indicators["吃穿用增速_当月"].Value), nil
 		}},
 		{sheet: "汇总表（定）", cell: "V4", key: "{{summary.micro_small_rate}}", desc: "小微增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
-			return valueOf(ctx.indicators["microSmall_month_rate"].Value), nil
+			return valueOf(ctx.indicators["小微企业增速_当月"].Value), nil
 		}},
 		{sheet: "汇总表（定）", cell: "W4", key: "{{summary.note_time}}", desc: "备注时间", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(fmt.Sprintf("%d-%02d", ctx.year, ctx.month)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "N10", key: "{{summary.total_social_yi}}", desc: "社零额预计（亿元）", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
-			return valueOf(roundHalfUp(ctx.indicators["totalSocial_cumulative_value"].Value/10000.0, 2)), nil
+			return valueOf(roundHalfUp(ctx.indicators["社零总额_累计值"].Value/10000.0, 2)), nil
 		}},
 		{sheet: "汇总表（定）", cell: "S10", key: "{{summary.total_social_rate}}", desc: "社零额增速", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
-			return valueOf(ctx.indicators["totalSocial_cumulative_rate"].Value), nil
+			return valueOf(ctx.indicators["社零总额增速_累计"].Value), nil
 		}},
 		{sheet: "汇总表（定）", cell: "X3", key: "{{summary.text}}", desc: "汇总文案", mode: writeIfNoFormula, value: func(ctx *summaryContext) (cellValue, error) {
 			return valueOf(ctx.summaryText), nil

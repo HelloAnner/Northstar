@@ -47,8 +47,8 @@ func TestImpactFromRetailCurrentMonth(t *testing.T) {
 	if !containsNode(impact, string(BuildNodeID("wr", wr.ID, "retailYoYDiff"))) {
 		t.Fatalf("impact missing retailYoYDiff: %v", impact)
 	}
-	if !containsNode(impact, "indicator:limitAbove_month_value") {
-		t.Fatalf("impact missing limitAbove_month_value: %v", impact)
+	if !containsNode(impact, "indicator:限上社零额_当月值") {
+		t.Fatalf("impact missing 限上社零额_当月值: %v", impact)
 	}
 }
 

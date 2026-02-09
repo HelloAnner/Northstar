@@ -286,20 +286,20 @@ func (c *Coordinator) backfillWRByRate(year, month int) error {
 			END,
 			retail_current_month = CASE
 				WHEN retail_current_month <> 0 THEN retail_current_month
-				WHEN retail_last_year_month = 0 OR retail_month_rate IS NULL THEN retail_current_month
-				ELSE retail_last_year_month * (1 + retail_month_rate / 100.0)
+				WHEN retail_last_year_month = 0 OR 零售业销售额增速_当月 IS NULL THEN retail_current_month
+				ELSE retail_last_year_month * (1 + 零售业销售额增速_当月 / 100.0)
 			END,
 			retail_current_cumulative = CASE
 				WHEN retail_current_cumulative <> 0 THEN retail_current_cumulative
-				WHEN retail_last_year_cumulative = 0 OR retail_cumulative_rate IS NULL THEN retail_current_cumulative
-				ELSE retail_last_year_cumulative * (1 + retail_cumulative_rate / 100.0)
+				WHEN retail_last_year_cumulative = 0 OR 零售业销售额增速_累计 IS NULL THEN retail_current_cumulative
+				ELSE retail_last_year_cumulative * (1 + 零售业销售额增速_累计 / 100.0)
 			END
 		WHERE data_year = ? AND data_month = ?
 			AND (
 				(sales_current_month = 0 AND sales_last_year_month <> 0 AND sales_month_rate IS NOT NULL) OR
 				(sales_current_cumulative = 0 AND sales_last_year_cumulative <> 0 AND sales_cumulative_rate IS NOT NULL) OR
-				(retail_current_month = 0 AND retail_last_year_month <> 0 AND retail_month_rate IS NOT NULL) OR
-				(retail_current_cumulative = 0 AND retail_last_year_cumulative <> 0 AND retail_cumulative_rate IS NOT NULL)
+				(retail_current_month = 0 AND retail_last_year_month <> 0 AND 零售业销售额增速_当月 IS NOT NULL) OR
+				(retail_current_cumulative = 0 AND retail_last_year_cumulative <> 0 AND 零售业销售额增速_累计 IS NOT NULL)
 			)
 	`, year, month)
 }
