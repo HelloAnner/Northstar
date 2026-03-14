@@ -25,6 +25,15 @@ type Client struct {
 
 // NewClient 创建客户端
 func NewClient(cfg Config, prompt string) (*Client, error) {
+	return newClient(cfg, prompt, Tools())
+}
+
+// NewTextClient 创建不带工具的纯文本客户端。
+func NewTextClient(cfg Config, prompt string) (*Client, error) {
+	return newClient(cfg, prompt, nil)
+}
+
+func newClient(cfg Config, prompt string, tools []llms.Tool) (*Client, error) {
 	llm, err := openai.New(
 		openai.WithToken(cfg.APIKey),
 		openai.WithModel(cfg.Model),
@@ -36,14 +45,17 @@ func NewClient(cfg Config, prompt string) (*Client, error) {
 	return &Client{
 		model:  llm,
 		prompt: prompt,
-		tools:  Tools(),
+		tools:  tools,
 	}, nil
 }
 
 // Chat 执行聊天并返回工具调用结果
 func (c *Client) Chat(ctx context.Context, req ChatRequest, stream func(string) error) (ChatResult, error) {
 	messages := buildMessages(c.prompt, req.Messages)
-	options := []llms.CallOption{llms.WithTools(c.tools)}
+	options := make([]llms.CallOption, 0, 2)
+	if len(c.tools) > 0 {
+		options = append(options, llms.WithTools(c.tools))
+	}
 	if stream != nil {
 		options = append(options, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
 			if shouldSkipStreamChunk(chunk) {

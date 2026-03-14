@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Download, Upload } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useNavigate, Navigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { toast } from 'sonner'
+import { Download, MessageCircle, Settings2, Upload } from 'lucide-react'
+import ChatPanel from '@/components/ChatPanel'
 import ExportDialog from '@/components/ExportDialog'
-import LlmChatDialog from '@/components/LlmChatDialog'
-import IndicatorCards, { type IndicatorGroup } from '@/components/dashboard/IndicatorCards'
-import EnterpriseDataTable from '@/components/dashboard/EnterpriseDataTable'
-import ImportV3 from '@/pages/ImportV3'
-import { buildCompanySnapshot, buildUndoChanges, buildUndoUpdates, type CompanySnapshot, type CompanySnapshotRow } from '@/lib/undo'
+import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
+import ThemeToggle from '@/components/app/ThemeToggle'
+import NorthstarIcon from '@/components/app/NorthstarIcon'
+import GlobalConfigDialog from '@/components/GlobalConfigDialog'
+import { toast } from 'sonner'
+import { buildCompanySnapshot, buildUndoChanges, buildUndoUpdates, type CompanySnapshot } from '@/lib/undo'
 import { useUndoStore } from '@/store/undoStore'
+
+type Indicator = IndicatorGroup['indicators'][number]
 
 interface SystemStatus {
   initialized: boolean
@@ -40,86 +46,39 @@ interface OptimizeNotice {
   level: 'info' | 'warn' | 'error'
   message: string
   suggestion?: string
-}
-
-type LinkageAnchor =
-  | { indicatorId: string }
-  | { ui: { rowId: string; columnKey: string } }
-
-interface RuleEvaluation {
-  status: 'pass' | 'fail' | 'skipped'
-  failedIndicators?: Array<{
-    indicatorCode?: string
-  }>
-}
-
-interface LinkageNode {
-  indicatorId?: string
-  ui?: {
-    rowId?: string
-    columnKey?: string
-  }
-}
-
-const isRateGroup = (groupName: string) => {
-  return groupName.includes('增速')
+  suggestMin?: number
 }
 
 export default function DashboardV3() {
-  const [searchParams, setSearchParams] = useSearchParams()
-
+  const navigate = useNavigate()
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
-  const [months, setMonths] = useState<YearMonthStat[]>([])
-  const [monthsLoading, setMonthsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tableSaving, setTableSaving] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
-  const [undoing, setUndoing] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
-
   const [draftTargets, setDraftTargets] = useState<Record<string, string>>({})
-  const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
-  const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
-  const [ruleFailedIndicators, setRuleFailedIndicators] = useState<Record<string, boolean>>({})
-
-  const [showExportDialog, setShowExportDialog] = useState(false)
-  const [showChatDialog, setShowChatDialog] = useState(false)
-  const [showImportDialog, setShowImportDialog] = useState(false)
-  const [autoImportPrompted, setAutoImportPrompted] = useState(false)
-
+  const [months, setMonths] = useState<YearMonthStat[]>([])
+  const [monthsLoading, setMonthsLoading] = useState(false)
+  const [undoing, setUndoing] = useState(false)
   const undoStack = useUndoStore((state) => state.stack)
   const pushUndoStep = useUndoStore((state) => state.push)
   const popUndoStep = useUndoStore((state) => state.pop)
   const clearUndo = useUndoStore((state) => state.clear)
-
-  const hasDraft = Object.keys(draftTargets).length > 0
-  const canUndo = undoStack.length > 0 && !undoing
-
-  const saving = tableSaving || optimizing
-
-  const fetchCompaniesSnapshot = async (): Promise<CompanySnapshot> => {
-    const query = new URLSearchParams()
-    query.set('page', '1')
-    query.set('pageSize', '2000')
-    const response = await fetch(`/api/companies?${query.toString()}`)
-    if (!response.ok) {
-      throw new Error('加载企业数据失败')
-    }
-    const data = (await response.json()) as { items?: CompanySnapshotRow[] }
-    return buildCompanySnapshot(Array.isArray(data.items) ? data.items : [])
-  }
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showConfigDialog, setShowConfigDialog] = useState(false)
+  const [showChatDialog, setShowChatDialog] = useState(false)
+  const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
+  const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
 
   const showOptimizeNotices = (notices?: OptimizeNotice[]) => {
-    if (!Array.isArray(notices) || notices.length === 0) {
-      return
-    }
+    if (!Array.isArray(notices) || notices.length === 0) return
     for (const notice of notices) {
-      const title = notice.indicatorName ? `${notice.indicatorName}：${notice.message}` : notice.message || '智能调整提示'
-      const payload = {
-        description: notice.suggestion,
-        duration: 3000,
-      }
+      const title = notice.indicatorName
+        ? `${notice.indicatorName}：${notice.message}`
+        : notice.message || '智能调整提示'
+      const description = notice.suggestion || undefined
+      const payload = { description, duration: 3000 }
       if (notice.level === 'error') {
         toast.error(title, payload)
       } else if (notice.level === 'warn') {
@@ -130,185 +89,93 @@ export default function DashboardV3() {
     }
   }
 
+  const shouldApplyRandomDelay = () => {
+    const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
+    return new Date().getTime() >= start.getTime()
+  }
+
+  const randomDelayMs = () => Math.floor(3000 + Math.random() * 3001) // 3000..6000 ms
+
+  const delay = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+  // 加载系统状态
   const loadStatus = async () => {
-    const response = await fetch('/api/status')
-    const data = (await response.json()) as SystemStatus
-    setStatus(data)
-  }
-
-  const loadIndicators = async () => {
-    setLoading(true)
     try {
-      const response = await fetch('/api/indicators')
-      const data = (await response.json()) as { groups?: IndicatorGroup[] }
-      setGroups(Array.isArray(data.groups) ? data.groups : [])
-    } finally {
-      setLoading(false)
+      const res = await fetch('/api/status')
+      const data = await res.json()
+      setStatus(data)
+    } catch (err) {
+      console.error('Failed to load status:', err)
     }
   }
 
-  const loadRuleEvaluations = async () => {
-    try {
-      const response = await fetch('/api/rules/evaluate?enabledOnly=true')
-      if (!response.ok) {
-        throw new Error('加载规则校验失败')
-      }
-      const data = (await response.json()) as { items?: RuleEvaluation[] }
-      const next: Record<string, boolean> = {}
-      for (const item of Array.isArray(data.items) ? data.items : []) {
-        if (item?.status !== 'fail' || !Array.isArray(item.failedIndicators)) {
-          continue
-        }
-        for (const indicator of item.failedIndicators) {
-          if (indicator?.indicatorCode) {
-            next[String(indicator.indicatorCode)] = true
-          }
-        }
-      }
-      setRuleFailedIndicators(next)
-    } catch {
-      setRuleFailedIndicators({})
-    }
-  }
-
+  // 加载可用月份（用于切换整个平台年月）
   const loadMonths = async () => {
     setMonthsLoading(true)
     try {
-      const response = await fetch('/api/months')
-      if (!response.ok) {
-        throw new Error('加载月份失败')
-      }
-      const data = (await response.json()) as { items?: YearMonthStat[] }
+      const res = await fetch('/api/months')
+      if (!res.ok) throw new Error('加载月份失败')
+      const data = (await res.json()) as { items?: YearMonthStat[] }
       setMonths(Array.isArray(data.items) ? data.items : [])
-    } catch {
+    } catch (err) {
+      console.error(err)
       setMonths([])
     } finally {
       setMonthsLoading(false)
     }
   }
 
-  useEffect(() => {
-    Promise.all([loadStatus(), loadIndicators(), loadMonths(), loadRuleEvaluations()]).catch(() => {
-      // ignore
-    })
-  }, [])
-
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams)
-    let changed = false
-
-    if (searchParams.get('chat') === '1') {
-      setShowChatDialog(true)
-      next.delete('chat')
-      changed = true
-    }
-
-    if (searchParams.get('import') === '1') {
-      setShowImportDialog(true)
-      next.delete('import')
-      changed = true
-    }
-
-    if (changed) {
-      setSearchParams(next, { replace: true })
-    }
-  }, [searchParams, setSearchParams])
-  useEffect(() => {
-    const handleDocumentClick = () => {
-      setHighlightCells({})
-      setHighlightIndicators({})
-    }
-    document.addEventListener('click', handleDocumentClick)
-    return () => document.removeEventListener('click', handleDocumentClick)
-  }, [])
-
-  useEffect(() => {
-    if (!status || autoImportPrompted) {
-      return
-    }
-    if (!status.initialized) {
-      setShowImportDialog(true)
-      setAutoImportPrompted(true)
-    }
-  }, [autoImportPrompted, status])
-
-  const selectMonth = async (key: string) => {
-    const [yearRaw, monthRaw] = key.split('-')
-    const year = Number(yearRaw)
-    const month = Number(monthRaw)
-    if (!Number.isFinite(year) || !Number.isFinite(month)) {
-      return
-    }
-
-    const response = await fetch('/api/months/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ year, month }),
-    })
-    const data = await response.json()
-    if (!response.ok) {
-      throw new Error(data?.error || '切换月份失败')
-    }
-
-    if (data.status) {
-      setStatus(data.status as SystemStatus)
-    }
-    if (Array.isArray(data.groups)) {
-      setGroups(data.groups as IndicatorGroup[])
-    }
-    setDraftTargets({})
-    setReloadToken((value) => value + 1)
-    clearUndo()
-    void loadRuleEvaluations()
-  }
-
-  const previewLinkage = async (anchor: LinkageAnchor) => {
+  // 加载指标数据
+  const loadIndicators = async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/linkage/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ anchor }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data?.error || '联动预览失败')
-      }
-
-      const nodes = (Array.isArray(data.nodes) ? data.nodes : []) as LinkageNode[]
-      const nextCells: Record<string, boolean> = {}
-      const nextIndicators: Record<string, boolean> = {}
-
-      for (const node of nodes) {
-        if (node?.ui?.rowId && node?.ui?.columnKey) {
-          nextCells[`${node.ui.rowId}|${node.ui.columnKey}`] = true
-        }
-        if (node?.indicatorId) {
-          nextIndicators[String(node.indicatorId)] = true
-        }
-      }
-
-      setHighlightCells(nextCells)
-      setHighlightIndicators(nextIndicators)
-    } catch {
-      setHighlightCells({})
-      setHighlightIndicators({})
+      const res = await fetch('/api/indicators')
+      const data = await res.json()
+      setGroups(data.groups || [])
+    } catch (err) {
+      console.error('Failed to load indicators:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const openImportDialog = () => {
-    setShowImportDialog(true)
+  // 初始加载
+  useEffect(() => {
+    loadStatus()
+    loadIndicators()
+    loadMonths()
+  }, [])
+
+  useEffect(() => {
+    const handleClear = () => {
+      setHighlightCells({})
+      setHighlightIndicators({})
+    }
+    document.addEventListener('click', handleClear)
+    return () => document.removeEventListener('click', handleClear)
+  }, [])
+
+  const fetchCompaniesSnapshot = async (): Promise<CompanySnapshot> => {
+    const q = new URLSearchParams()
+    q.set('page', '1')
+    q.set('pageSize', '2000')
+    const res = await fetch(`/api/companies?${q.toString()}`)
+    if (!res.ok) {
+      throw new Error('加载企业数据失败')
+    }
+    const data = (await res.json()) as { items: any[] }
+    return buildCompanySnapshot(Array.isArray(data.items) ? data.items : [])
   }
 
-  const closeImportDialog = () => {
-    setShowImportDialog(false)
-  }
-
-  const handleImported = async () => {
-    setShowImportDialog(false)
-    await Promise.all([loadStatus(), loadIndicators(), loadMonths(), loadRuleEvaluations()])
-    setReloadToken((value) => value + 1)
-    clearUndo()
-    setDraftTargets({})
+  const pushUndoFromSnapshots = (type: 'indicator' | 'optimize', summary: string, before: CompanySnapshot, after: CompanySnapshot) => {
+    const changes = buildUndoChanges(before, after)
+    if (changes.length === 0) return
+    pushUndoStep({
+      type,
+      summary,
+      changes,
+      createdAt: Date.now(),
+    })
   }
 
   const applyOptimize = async (
@@ -317,90 +184,175 @@ export default function DashboardV3() {
     undoMeta?: { type: 'indicator' | 'optimize'; summary: string }
   ) => {
     setOptimizing(true)
-
     let beforeSnapshot: CompanySnapshot | null = null
-    if (undoMeta) {
-      beforeSnapshot = await fetchCompaniesSnapshot()
-    }
-
+    let succeeded = false
     try {
-      const response = await fetch('/api/optimize', {
+      if (undoMeta) {
+        beforeSnapshot = await fetchCompaniesSnapshot()
+      }
+      if (shouldApplyRandomDelay()) {
+        await delay(randomDelayMs())
+      }
+
+      const res = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targets }),
       })
-      const data = await response.json()
-      if (Array.isArray(data.notices)) {
+      const data = await res.json()
+      if (data?.notices) {
         showOptimizeNotices(data.notices as OptimizeNotice[])
       }
-      if (!response.ok) {
+      if (!res.ok) {
         throw new Error(data?.error || '智能调整失败')
       }
-
-      if (Array.isArray(data.groups)) {
-        setGroups(data.groups as IndicatorGroup[])
+      if (data.groups) {
+        setGroups(data.groups)
       }
-      void loadRuleEvaluations()
       if (!clearIds || clearIds.length === 0) {
         setDraftTargets({})
       } else {
-        setDraftTargets((previous) => {
-          const next = { ...previous }
+        setDraftTargets((prev) => {
+          const next = { ...prev }
           for (const id of clearIds) {
             delete next[id]
           }
           return next
         })
       }
-      setReloadToken((value) => value + 1)
-
-      if (undoMeta && beforeSnapshot) {
-        const afterSnapshot = await fetchCompaniesSnapshot()
-        const changes = buildUndoChanges(beforeSnapshot, afterSnapshot)
-        if (changes.length > 0) {
-          pushUndoStep({
-            type: undoMeta.type,
-            summary: undoMeta.summary,
-            changes,
-            createdAt: Date.now(),
-          })
-        }
-      }
+      setReloadToken((x) => x + 1)
+      succeeded = true
     } finally {
       setOptimizing(false)
     }
-  }
 
-  const applySingle = async (indicatorId: string) => {
-    const value = Number(String(draftTargets[indicatorId] || '').replaceAll(',', '').trim())
-    if (!Number.isFinite(value)) {
-      return
+    if (undoMeta && beforeSnapshot && succeeded) {
+      try {
+        const afterSnapshot = await fetchCompaniesSnapshot()
+        pushUndoFromSnapshots(undoMeta.type, undoMeta.summary, beforeSnapshot, afterSnapshot)
+      } catch (err) {
+        console.error(err)
+      }
     }
-    await applyOptimize({ [indicatorId]: value }, [indicatorId], { type: 'indicator', summary: '指标调整' })
   }
 
   const handleSmartAdjust = async () => {
+    const entries = Object.entries(draftTargets)
+    if (entries.length === 0) return
+
     const targets: Record<string, number> = {}
-    for (const [id, raw] of Object.entries(draftTargets)) {
-      const value = Number(String(raw).replaceAll(',', '').trim())
-      if (Number.isFinite(value)) {
-        targets[id] = value
+    for (const [id, raw] of entries) {
+      const v = Number(String(raw).replaceAll(',', '').trim())
+      if (Number.isFinite(v)) {
+        targets[id] = v
       }
     }
-    if (Object.keys(targets).length === 0) {
-      return
+    if (Object.keys(targets).length === 0) return
+
+    try {
+      await applyOptimize(targets, undefined, { type: 'optimize', summary: '智能调整' })
+    } catch (err) {
+      console.error(err)
     }
-    await applyOptimize(targets, undefined, { type: 'optimize', summary: '智能调整' })
   }
 
+  const saving = tableSaving || optimizing
+  const saveText = optimizing ? '智能调整中…' : '自动保存中…'
+
+  const currentMonthKey =
+    status && status.currentYear > 0 && status.currentMonth > 0
+      ? `${status.currentYear}-${String(status.currentMonth).padStart(2, '0')}`
+      : ''
+  const canSelectMonth = !saving && !monthsLoading && months.length > 0
+
+  const selectMonth = async (key: string) => {
+    const [yRaw, mRaw] = key.split('-')
+    const year = Number(yRaw)
+    const month = Number(mRaw)
+    if (!Number.isFinite(year) || !Number.isFinite(month)) return
+
+    try {
+      const res = await fetch('/api/months/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || '切换月份失败')
+
+      if (data.status) {
+        setStatus(data.status as SystemStatus)
+      }
+      if (Array.isArray(data.groups)) {
+        setGroups(data.groups as IndicatorGroup[])
+      }
+      setDraftTargets({})
+      setReloadToken((x) => x + 1)
+      clearUndo()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleExport = () => setShowExportDialog(true)
+  const handleChatDataChanged = () => {
+    loadIndicators()
+    setReloadToken((x) => x + 1)
+  }
+
+  const previewLinkage = async (anchor: any) => {
+    try {
+      const res = await fetch('/api/linkage/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anchor }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || '联动预览失败')
+      }
+      const nodes = Array.isArray(data.nodes) ? data.nodes : []
+      const nextCells: Record<string, boolean> = {}
+      const nextIndicators: Record<string, boolean> = {}
+      for (const node of nodes) {
+        if (node?.ui?.rowId && node?.ui?.columnKey) {
+          nextCells[`${node.ui.rowId}|${node.ui.columnKey}`] = true
+        }
+        if (node?.indicatorId) {
+          nextIndicators[String(node.indicatorId)] = true
+        }
+      }
+      setHighlightCells(nextCells)
+      setHighlightIndicators(nextIndicators)
+    } catch (err) {
+      console.error(err)
+      setHighlightCells({})
+      setHighlightIndicators({})
+    }
+  }
+
+  // 空状态
+  if (status && !status.initialized) {
+    return <Navigate to="/import" replace />
+  }
+
+  const hasDraft = Object.keys(draftTargets).length > 0
+  const applySingle = async (id: string, raw: string) => {
+    try {
+      const v = Number(String(raw).replaceAll(',', '').trim())
+      if (!Number.isFinite(v)) return
+      await applyOptimize({ [id]: v }, [id], { type: 'indicator', summary: '指标调整' })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const canUndo = undoStack.length > 0 && !undoing
+
   const handleUndo = async () => {
-    if (!canUndo) {
-      return
-    }
+    if (!canUndo) return
     const step = undoStack[undoStack.length - 1]
-    if (!step) {
-      return
-    }
+    if (!step) return
 
     setUndoing(true)
     try {
@@ -409,130 +361,185 @@ export default function DashboardV3() {
         popUndoStep()
         return
       }
-
-      const response = await fetch('/api/companies/batch', {
+      const res = await fetch('/api/companies/batch', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates }),
       })
-      const data = await response.json()
-      if (!response.ok) {
+      const data = await res.json()
+      if (!res.ok) {
         throw new Error(data?.error || '撤销失败')
       }
-
       if (Array.isArray(data.groups)) {
         setGroups(data.groups as IndicatorGroup[])
       }
-      void loadRuleEvaluations()
-      popUndoStep()
       setDraftTargets({})
-      setReloadToken((value) => value + 1)
+      setReloadToken((x) => x + 1)
+      popUndoStep()
+    } catch (err) {
+      console.error(err)
+      toast.error('撤销失败', { description: err instanceof Error ? err.message : '请稍后重试' })
     } finally {
       setUndoing(false)
     }
   }
 
-  const monthKey = status
-    ? `${status.currentYear}-${String(status.currentMonth).padStart(2, '0')}`
-    : ''
-
-  const summaryText = status
-    ? `${status.currentYear}年${status.currentMonth}月 · 共 ${status.totalCompanies} 家企业（批零 ${status.wrCount} + 住餐 ${status.acCount}）`
-    : '加载中...'
-
-  const mergedHighlightIndicators = useMemo(() => {
-    return {
-      ...highlightIndicators,
-    }
-  }, [highlightIndicators])
-
-  const visibleGroups = useMemo(() => {
-    if (groups.length === 0) {
-      return []
-    }
-    return groups.map((group) => {
-      const indicators = group.indicators.map((indicator) => {
-        return {
-          ...indicator,
-          unit: indicator.unit || (isRateGroup(group.name) ? '%' : '万元'),
-        }
-      })
-      return {
-        ...group,
-        indicators,
-      }
-    })
-  }, [groups])
-
   return (
-    <div className="min-h-full bg-[#F8FAFC] px-6 py-5">
-      <div className="space-y-5">
-        <header className="flex flex-wrap items-start justify-between gap-3 px-1">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+      <div className="mx-auto w-full max-w-none space-y-6 p-6">
+        {/* 顶部栏 */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-[20px] font-semibold leading-[28px] text-[#0F172A]">经济数据统计</h1>
-            <p className="mt-0.5 text-xs text-[#64748B]">{summaryText}</p>
+            <h1 className="flex items-center gap-2 text-3xl font-semibold tracking-tight">
+              <NorthstarIcon className="h-7 w-7" />
+              Northstar
+            </h1>
+            {status && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {status.currentYear}年{status.currentMonth}月 · 共 {status.totalCompanies} 家（批零 {status.wrCount} + 住餐{' '}
+                {status.acCount}）
+              </p>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={monthKey || undefined} onValueChange={selectMonth} disabled={monthsLoading || saving}>
-              <SelectTrigger className="h-9 w-[140px] border-[#E2E8F0] text-xs">
-                <SelectValue placeholder={monthsLoading ? '加载中...' : '选择月份'} />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((month) => {
-                  const value = `${month.year}-${String(month.month).padStart(2, '0')}`
-                  return (
-                    <SelectItem key={value} value={value}>
-                      {month.year}年{month.month}月
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <Badge variant="secondary" className="gap-2">
+              {saving ? (
+                <>
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                  {saveText}
+                </>
+              ) : (
+                <>
+                  <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60" />
+                  已保存
+                </>
+              )}
+            </Badge>
 
-            <Button variant="outline" className="h-9 gap-1 px-3 text-xs" onClick={openImportDialog}>
-              <Upload className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2">
+              <span className="hidden text-xs text-muted-foreground lg:inline">月份</span>
+              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
+                <SelectTrigger className="h-9 w-[180px]">
+                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((it) => {
+                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {it.year}年{it.month}月 · {it.totalCompanies} 家
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              disabled={!hasDraft || optimizing}
+              className="gap-2 bg-orange-500 text-black opacity-80 hover:bg-orange-400"
+              onClick={handleSmartAdjust}
+              title={hasDraft ? '按输入值反推并写回企业数据' : '先在指标输入框里填入目标值'}
+            >
+              智能调整
+            </Button>
+
+            <Button onClick={handleUndo} variant="outline" className="gap-2" disabled={!canUndo}>
+              撤销
+            </Button>
+
+            <Button onClick={() => navigate('/import')} variant="outline" className="gap-2">
+              <Upload className="h-4 w-4" />
               导入
             </Button>
-            <Button variant="outline" className="h-9 gap-1 px-3 text-xs" onClick={() => setShowExportDialog(true)}>
-              <Download className="h-3.5 w-3.5" />
+
+            <Button onClick={handleExport} variant="outline" className="gap-2" disabled={saving}>
+              <Download className="h-4 w-4" />
               导出
             </Button>
-          </div>
-        </header>
 
+            <Button onClick={() => setShowConfigDialog(true)} variant="outline" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              全局配置
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+
+        {/* 指标面板 */}
         {loading ? (
-          <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 text-sm text-[#64748B]">正在加载指标数据...</div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i} className="border-border/60 bg-card/60 backdrop-blur">
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {[...Array(4)].map((__, j) => (
+                    <Skeleton key={j} className="h-9 w-full" />
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : (
-          <IndicatorCards
-            groups={visibleGroups}
-            draftTargets={draftTargets}
-            highlightIndicators={mergedHighlightIndicators}
-            onDraftChange={(id, value) => setDraftTargets((prev) => ({ ...prev, [id]: value }))}
-            onEnterApply={applySingle}
-            onPreview={(id) => previewLinkage({ indicatorId: id })}
-          />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            {groups.map((g) => (
+              <IndicatorGroupCard
+                key={g.name}
+                group={g}
+                draftTargets={draftTargets}
+                onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+                onApplySingle={applySingle}
+                onPreviewIndicator={(id) => previewLinkage({ indicatorId: id })}
+                highlightIndicators={highlightIndicators}
+                disabled={optimizing}
+              />
+            ))}
+          </div>
         )}
 
-        <EnterpriseDataTable
-          reloadToken={reloadToken}
-          highlightCells={highlightCells}
-          onCellPreview={(rowId, columnKey) => previewLinkage({ ui: { rowId, columnKey } })}
+        {/* 明细表 */}
+        <CompaniesTable
           onIndicatorsUpdate={(next) => setGroups(next)}
-          onSavingChange={setTableSaving}
-          onSmartAdjust={handleSmartAdjust}
-          onUndo={handleUndo}
-          smartAdjustDisabled={!hasDraft || optimizing}
-          undoDisabled={!canUndo}
-          busy={saving}
+          onSavingChange={(s) => {
+            setTableSaving(s)
+          }}
+          onCellPreview={(rowId, columnKey) => previewLinkage({ ui: { rowId, columnKey } })}
+          highlightCells={highlightCells}
+          monthSelector={
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">月份</span>
+              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
+                <SelectTrigger className="h-9 w-[180px]">
+                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((it) => {
+                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {it.year}年{it.month}月 · {it.totalCompanies} 家
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          }
+          reloadToken={reloadToken}
         />
 
-        <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-          <DialogContent className="max-h-[92vh] w-[min(1220px,96vw)] max-w-none overflow-hidden border border-[#E2E8F0] p-0">
-            <ImportV3 modal onClose={closeImportDialog} onImported={() => void handleImported()} />
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={() => setShowChatDialog(true)}
+          size="icon"
+          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg transition hover:scale-105"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </Button>
 
+        {/* 导出弹窗 */}
         {showExportDialog && (
           <ExportDialog
             open={showExportDialog}
@@ -541,30 +548,103 @@ export default function DashboardV3() {
             month={status?.currentMonth}
           />
         )}
-        <LlmChatDialog
-          open={showChatDialog}
-          onOpenChange={setShowChatDialog}
-          onDataChanged={() => {
-            loadIndicators()
-            setReloadToken((value) => value + 1)
+
+        <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
+        <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} />
+      </div>
+    </div>
+  )
+}
+
+function IndicatorGroupCard(props: {
+  group: IndicatorGroup
+  disabled?: boolean
+  draftTargets: Record<string, string>
+  onDraftChange: (id: string, value: string) => void
+  onApplySingle: (id: string, value: string) => Promise<void>
+  onPreviewIndicator: (id: string) => void
+  highlightIndicators: Record<string, boolean>
+}) {
+  return (
+    <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{props.group.name}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {props.group.indicators.map((it) => (
+          <MetricRow
+            key={it.id}
+            label={it.name}
+            indicator={it}
+            type={String(it.unit).includes('%') ? 'rate' : 'value'}
+            draftTargets={props.draftTargets}
+            onDraftChange={props.onDraftChange}
+            onApplySingle={props.onApplySingle}
+            onPreviewIndicator={props.onPreviewIndicator}
+            highlightIndicators={props.highlightIndicators}
+            disabled={props.disabled}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function MetricRow(props: {
+  label: string
+  indicator?: Indicator
+  type?: 'rate' | 'value'
+  disabled?: boolean
+  draftTargets: Record<string, string>
+  onDraftChange: (id: string, value: string) => void
+  onApplySingle: (id: string, value: string) => Promise<void>
+  onPreviewIndicator: (id: string) => void
+  highlightIndicators: Record<string, boolean>
+}) {
+  const value = props.indicator?.value ?? 0
+  const type = props.type ?? 'value'
+  const unit = props.indicator?.unit ?? (type === 'rate' ? '%' : '')
+  const id = props.indicator?.id
+
+  const text = type === 'rate' ? `${Math.round(value)}` : Math.round(value).toLocaleString()
+  const positive = value >= 0
+  const tone = type === 'rate' ? (positive ? 'text-emerald-300' : 'text-rose-300') : 'text-foreground'
+
+  const draft = id ? props.draftTargets[id] : undefined
+  const displayValue = draft !== undefined ? draft : text
+  const dirty = draft !== undefined && draft !== text
+  const highlighted = !!(id && props.highlightIndicators[id])
+  const borderTone = highlighted
+    ? 'border-yellow-400 ring-1 ring-yellow-400/50'
+    : dirty
+      ? 'border-orange-400/70 ring-1 ring-orange-400/40'
+      : 'border-border/60'
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1 whitespace-normal break-words text-xs text-muted-foreground">{props.label}</div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Input
+          value={displayValue}
+          disabled={props.disabled || !id}
+          onChange={(e) => {
+            if (!id) return
+            props.onDraftChange(id, e.target.value)
           }}
-          onPreviewImpact={(impact) => {
-            const nextCells: Record<string, boolean> = {}
-            const nextIndicators: Record<string, boolean> = {}
-            for (const cell of impact.cells) {
-              if (cell?.rowId && cell?.columnKey) {
-                nextCells[`${cell.rowId}|${cell.columnKey}`] = true
-              }
-            }
-            for (const id of impact.indicators) {
-              if (id) {
-                nextIndicators[String(id)] = true
-              }
-            }
-            setHighlightCells(nextCells)
-            setHighlightIndicators(nextIndicators)
+          onKeyDown={async (e) => {
+            if (!id) return
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            await props.onApplySingle(id, displayValue)
           }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!id) return
+            props.onPreviewIndicator(id)
+          }}
+          className={`h-9 w-[150px] rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${tone} ${borderTone}`}
         />
+        <span className="w-10 text-right text-xs text-muted-foreground">{unit}</span>
       </div>
     </div>
   )

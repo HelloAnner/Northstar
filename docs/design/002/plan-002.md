@@ -126,48 +126,48 @@
 
 **后端 internal/llm/system_prompt.go**
 
-- [ ] 定义 `SystemPromptContext`（Year、Month、RuleCount、IndicatorSummary）
-- [ ] 实现 `BuildChatSystemPrompt(ctx SystemPromptContext, userPrompt string) string`
-- [ ] 内置提示词模板（const，代码内维护）：含角色定义、系统职责、数据上下文占位符、行为约束
-- [ ] userPrompt 非空时以 `---` 分隔追加
+- [x] 定义 `SystemPromptContext`（Year、Month、RuleCount、IndicatorSummary）
+- [x] 实现 `BuildChatSystemPrompt(ctx SystemPromptContext, userPrompt string) string`
+- [x] 内置提示词模板（const，代码内维护）：含角色定义、系统职责、数据上下文占位符、行为约束
+- [x] userPrompt 非空时以 `---` 分隔追加
 
 **后端 internal/llm/intent.go**
 
-- [ ] 定义 `AdjustmentAction`（type/indicatorId/value）和 `AdjustmentPlan`（actions 数组）
-- [ ] 实现 `ParseIntent(client, userMsg, indicators) (*AdjustmentPlan, error)`
-- [ ] 意图解析 Prompt：注入当前 16 项指标值，要求输出纯 JSON；无调整意图时返回 `{"actions":[]}`
+- [x] 定义 `AdjustmentAction`（type/indicatorId/value）和 `AdjustmentPlan`（actions 数组）
+- [x] 实现 `ParseIntent(client, userMsg, indicators) (*AdjustmentPlan, error)`
+- [x] 意图解析 Prompt：注入当前 16 项指标值，要求输出纯 JSON；无调整意图时返回 `{"actions":[]}`
 
 **后端 api/v3/settings.go**
 
-- [ ] `GET /api/settings/user-prompt`：读 config 表 `llm_user_prompt`
-- [ ] `PUT /api/settings/user-prompt`：校验 `len(content) ≤ 500`，写 config 表
+- [x] `GET /api/settings/user-prompt`：读 config 表 `llm_user_prompt`
+- [x] `PUT /api/settings/user-prompt`：校验 `len(content) ≤ 500`，写 config 表
 
 **后端 api/v3/llm_chat.go**
 
-- [ ] `ChatRequest` 新增 `Mode string` 字段（`""` / `"chat"` / `"adjust"`）
-- [ ] `mode=chat` 分支：读用户偏好，拼接双层 Prompt，流式返回
-- [ ] `mode=adjust` 分支：
+- [x] `ChatRequest` 新增 `Mode string` 字段（`""` / `"chat"` / `"adjust"`）
+- [x] `mode=chat` 分支：读用户偏好，拼接双层 Prompt，流式返回
+- [x] `mode=adjust` 分支：
   1. `CalculateIndicators` 获取当前指标
   2. `ParseIntent` 解析意图 → `AdjustmentPlan`
   3. actions 为空时降级为 chat 模式
-  4. 逐 action 调用 `engine.Optimize()`，收集 `appliedRules`
+  4. 汇总 action 后调用 `engine.Optimize()`，收集 `appliedRules`
   5. 将执行结果注入 LLM 生成自然语言摘要
   6. 返回 `{reply, groups, appliedRules}`
 
 **前端 web/src/components/ChatPanel.tsx**
 
-- [ ] 右侧抽屉（400px），工具栏按钮展开/收起
-- [ ] 顶部模式切换：💬聊天 / 🔧调整
-- [ ] 对话历史区（滚动），含用户消息和 AI 回复
-- [ ] 调整模式 appliedRules 气泡展示：
+- [x] 右侧抽屉（400px），工具栏按钮展开/收起
+- [x] 顶部模式切换：💬聊天 / 🔧调整
+- [x] 对话历史区（滚动），含用户消息和 AI 回复
+- [x] 调整模式 appliedRules 气泡展示：
   - `clamp_target`：「目标值从 X 裁剪为 Y」
   - `filter_allocation`：「参与企业从 N 过滤为 M 家」
   - `compensate`：「联动补偿 {ensureIndicator} → {target}」
-- [ ] 调整成功后调用 `dataStore.loadGroups()` 刷新 Dashboard
+- [x] 调整成功后调用 `dataStore.loadGroups()` 刷新 Dashboard
 
 **前端 web/src/pages/Settings.tsx**（第二个 Tab）
 
-- [ ] 「AI 偏好」Tab：textarea 输入，字数统计（xx/500），保存按钮
+- [x] 「AI 偏好」Tab：textarea 输入，字数统计（xx/500），保存按钮
 
 ### 完成标准
 
@@ -199,4 +199,4 @@ Phase 3 (ai-chat)         — 依赖 Phase 1 的 engine.Optimize()
 |-------|------|------|
 | 1 | rule-engine | ✅ 已完成（2026-03-14） |
 | 2 | rule-management | ✅ 已完成（2026-03-14） |
-| 3 | ai-chat | ⬜ 未开始 |
+| 3 | ai-chat | ✅ 已完成（2026-03-14） |

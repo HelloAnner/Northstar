@@ -14,6 +14,7 @@ type Handler struct {
 	engine               *dagcalc.Engine
 	rulesRepo            *rulesFileRepo
 	ruleConverterFactory func() (RuleConverter, error)
+	llmClientFactory     func(prompt string) (LLMChatClient, error)
 }
 
 // NewHandler 创建 V3 API 处理器
@@ -45,6 +46,8 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	// 配置管理
 	router.GET("/config", h.GetConfig)
 	router.PATCH("/config", h.UpdateConfig)
+	router.GET("/settings/user-prompt", h.GetUserPrompt)
+	router.PUT("/settings/user-prompt", h.UpdateUserPrompt)
 	router.GET("/rules", h.GetRules)
 	router.POST("/rules", h.CreateRule)
 	router.PUT("/rules/:index", h.UpdateRule)
@@ -82,4 +85,9 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/export", h.Export)
 	router.POST("/export/stream", h.ExportStream)
 	router.GET("/export/download/:token", h.DownloadExport)
+}
+
+// SetLLMClientFactory 设置 AI 对话客户端工厂，主要用于测试。
+func (h *Handler) SetLLMClientFactory(factory func(prompt string) (LLMChatClient, error)) {
+	h.llmClientFactory = factory
 }

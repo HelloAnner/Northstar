@@ -164,6 +164,15 @@ func (e *Engine) getRules() *rules.RuleSet {
 	return e.rules
 }
 
+// RuleCount 返回当前已加载规则总数。
+func (e *Engine) RuleCount() int {
+	rs := e.getRules()
+	if rs == nil {
+		return 0
+	}
+	return len(rs.Clamps) + len(rs.Filters) + len(rs.Compensates)
+}
+
 func orderEngineTargets(targets map[string]float64) []orderedTarget {
 	knownOrder := []string{
 		"limitAbove_month_value",

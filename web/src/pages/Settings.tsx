@@ -5,8 +5,8 @@
  * Created on 2026/3/14
  */
 
+import AIPreferenceForm from '@/components/AIPreferenceForm'
 import RuleList from '@/components/RuleList'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Settings() {
@@ -24,21 +24,13 @@ export default function Settings() {
         <Tabs defaultValue="rules" className="space-y-4">
           <TabsList>
             <TabsTrigger value="rules">调整规则</TabsTrigger>
-            <TabsTrigger value="ai" disabled>
-              AI 偏好
-            </TabsTrigger>
+            <TabsTrigger value="ai">AI 偏好</TabsTrigger>
           </TabsList>
           <TabsContent value="rules">
             <RuleList />
           </TabsContent>
           <TabsContent value="ai">
-            <Card>
-              <CardHeader>
-                <CardTitle>AI 偏好</CardTitle>
-                <CardDescription>该能力属于后续 Phase 3，本阶段暂未开放。</CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">当前只提供规则管理能力。</CardContent>
-            </Card>
+            <AIPreferenceForm />
           </TabsContent>
         </Tabs>
       </div>
