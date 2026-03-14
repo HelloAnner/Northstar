@@ -67,46 +67,46 @@
 
 **后端 internal/rules/converter.go**
 
-- [ ] 定义 `Converter` 结构体（llm.Client + rolePath + mdPath + store + engine）
-- [ ] `ConvertAsync(mdContent string)`：启动 goroutine，立即返回；写入 `rules_convert_status=running`
-- [ ] `convert(mdContent string)`：同步执行，最多 3 轮重试，每轮将具体 `ValidationError` 列表反馈给 LLM
-- [ ] `extractJSON(content string)`：优先提取 \`\`\`json...\`\`\` 块，无则整体解析
-- [ ] `validateRoleJSON(jsonStr string) []ValidationError`：校验矩阵见 TECH-002 §2.1.4
-- [ ] `buildValidationErrorMessage(errs []ValidationError) string`：格式化错误为自然语言
-- [ ] 转换成功后：写 `rules_convert_status=ok`、`rules_convert_at`，调用 `engine.ReloadRules()`
-- [ ] 转换失败后：写 `rules_convert_status=error`、`rules_convert_error`
+- [x] 定义 `Converter` 结构体（llm.Client + rolePath + mdPath + store + engine）
+- [x] `ConvertAsync(mdContent string)`：启动 goroutine，立即返回；写入 `rules_convert_status=running`
+- [x] `convert(mdContent string)`：同步执行，最多 3 轮重试，每轮将具体 `ValidationError` 列表反馈给 LLM
+- [x] `extractJSON(content string)`：优先提取 \`\`\`json...\`\`\` 块，无则整体解析
+- [x] `validateRoleJSON(jsonStr string) []ValidationError`：校验矩阵见 TECH-002 §2.1.4
+- [x] `buildValidationErrorMessage(errs []ValidationError) string`：格式化错误为自然语言
+- [x] 转换成功后：写 `rules_convert_status=ok`、`rules_convert_at`，调用 `engine.ReloadRules()`
+- [x] 转换失败后：写 `rules_convert_status=error`、`rules_convert_error`
 
 **后端 api/v3/rules.go**
 
-- [ ] `rulesFileRepo`：`ReadRules()` 按行解析编号列表（正则 `^\d+\.\s+(.+)$`）；`WriteRules()` 重新生成整个文件
-- [ ] `GET /api/rules`：返回规则列表 JSON
-- [ ] `POST /api/rules`：追加规则，触发 `ConvertAsync`
-- [ ] `PUT /api/rules/:index`：替换指定项，触发 `ConvertAsync`
-- [ ] `DELETE /api/rules/:index`：删除并重新编号，触发 `ConvertAsync`
-- [ ] `POST /api/rules/convert`：读取当前 rules.md，手动触发 `ConvertAsync`，返回 `{"status":"running"}`
-- [ ] `GET /api/rules/status`：读 config 表三个键，返回状态 + 时间 + 错误详情
+- [x] `rulesFileRepo`：`ReadRules()` 按行解析编号列表（正则 `^\d+\.\s+(.+)$`）；`WriteRules()` 重新生成整个文件
+- [x] `GET /api/rules`：返回规则列表 JSON
+- [x] `POST /api/rules`：追加规则，触发 `ConvertAsync`
+- [x] `PUT /api/rules/:index`：替换指定项，触发 `ConvertAsync`
+- [x] `DELETE /api/rules/:index`：删除并重新编号，触发 `ConvertAsync`
+- [x] `POST /api/rules/convert`：读取当前 rules.md，手动触发 `ConvertAsync`，返回 `{"status":"running"}`
+- [x] `GET /api/rules/status`：读 config 表三个键，返回状态 + 时间 + 错误详情
 
 **后端 server/server.go**
 
-- [ ] 启动时检测 `config/rules.md` 是否存在，不存在则创建默认空文件
-- [ ] 启动时调用 `engine.ReloadRules()`（role.json 不存在时正常运行）
-- [ ] config 表新增四个键的默认值注入
+- [x] 启动时检测 `config/rules.md` 是否存在，不存在则创建默认空文件
+- [x] 启动时调用 `engine.ReloadRules()`（role.json 不存在时正常运行）
+- [x] config 表新增四个键的默认值注入
 
 **前端 web/src/store/rulesStore.ts**
 
-- [ ] 定义 `RuleItem`、`RulesStore` 接口
-- [ ] 实现 `loadRules`、`addRule`、`updateRule`、`deleteRule`、`loadStatus`
-- [ ] 实现 `startPolling`（2s 间隔）/ `stopPolling`：CRUD 后启动，状态变为 ok/error 后停止
+- [x] 定义 `RuleItem`、`RulesStore` 接口
+- [x] 实现 `loadRules`、`addRule`、`updateRule`、`deleteRule`、`loadStatus`
+- [x] 实现 `startPolling`（2s 间隔）/ `stopPolling`：CRUD 后启动，状态变为 ok/error 后停止
 
 **前端 web/src/components/RuleList.tsx**
 
-- [ ] 规则列表展示（编号 + 文本 + 编辑/删除按钮）
-- [ ] 状态徽标：idle/ok=绿色已生效，running=蓝色转换中（轮询），error=红色转换失败（点击展开详情）
-- [ ] 新增/编辑使用 Dialog + textarea
+- [x] 规则列表展示（编号 + 文本 + 编辑/删除按钮）
+- [x] 状态徽标：idle/ok=绿色已生效，running=蓝色转换中（轮询），error=红色转换失败（点击展开详情）
+- [x] 新增/编辑使用 Dialog + textarea
 
 **前端 web/src/pages/Settings.tsx**（第一个 Tab）
 
-- [ ] 路由 `/settings`，包含「调整规则」Tab（嵌入 RuleList）
+- [x] 路由 `/settings`，包含「调整规则」Tab（嵌入 RuleList）
 
 ### 完成标准
 
@@ -198,5 +198,5 @@ Phase 3 (ai-chat)         — 依赖 Phase 1 的 engine.Optimize()
 | Phase | 模块 | 状态 |
 |-------|------|------|
 | 1 | rule-engine | ✅ 已完成（2026-03-14） |
-| 2 | rule-management | ⬜ 未开始 |
+| 2 | rule-management | ✅ 已完成（2026-03-14） |
 | 3 | ai-chat | ⬜ 未开始 |

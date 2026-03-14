@@ -56,6 +56,19 @@ func (s *Store) SetConfigFloat(key string, value float64) error {
 	return s.SetConfig(key, strconv.FormatFloat(value, 'f', -1, 64))
 }
 
+// EnsureConfig 在配置不存在时写入默认值。
+func (s *Store) EnsureConfig(key string, value string) error {
+	var existing string
+	err := s.db.QueryRow("SELECT value FROM config WHERE key = ?", key).Scan(&existing)
+	if err == nil {
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+	return s.SetConfig(key, value)
+}
+
 // GetAllConfig 获取所有配置项
 func (s *Store) GetAllConfig() (map[string]string, error) {
 	rows, err := s.db.Query("SELECT key, value FROM config")

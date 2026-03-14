@@ -168,7 +168,10 @@ func EnsureDataDir(config *AppConfig) (string, error) {
 		exeDir = "."
 	}
 
-	dataDir := filepath.Join(exeDir, config.Data.DataDir)
+	dataDir := config.Data.DataDir
+	if !filepath.IsAbs(dataDir) {
+		dataDir = filepath.Join(exeDir, dataDir)
+	}
 
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return "", err
@@ -192,5 +195,9 @@ func GetDataPath(config *AppConfig, subdir, filename string) string {
 	if exeDir == "" {
 		exeDir = "."
 	}
-	return filepath.Join(exeDir, config.Data.DataDir, subdir, filename)
+	dataDir := config.Data.DataDir
+	if !filepath.IsAbs(dataDir) {
+		dataDir = filepath.Join(exeDir, dataDir)
+	}
+	return filepath.Join(dataDir, subdir, filename)
 }
