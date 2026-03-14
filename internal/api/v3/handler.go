@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/gin-gonic/gin"
+	"northstar/internal/dagcalc"
 	"northstar/internal/store"
 )
 
@@ -10,14 +11,24 @@ type Handler struct {
 	store        *store.Store
 	templatePath string
 	downloads    *exportDownloadStore
+	engine       *dagcalc.Engine
 }
 
 // NewHandler 创建 V3 API 处理器
 func NewHandler(store *store.Store, templatePath string) *Handler {
+	return NewHandlerWithEngine(store, templatePath, nil)
+}
+
+// NewHandlerWithEngine 创建带规则引擎的 V3 API 处理器。
+func NewHandlerWithEngine(store *store.Store, templatePath string, engine *dagcalc.Engine) *Handler {
+	if engine == nil {
+		engine = dagcalc.NewEngine(dagcalc.NewGraph(), store, 0, 0, "")
+	}
 	return &Handler{
 		store:        store,
 		templatePath: templatePath,
 		downloads:    newExportDownloadStore(),
+		engine:       engine,
 	}
 }
 

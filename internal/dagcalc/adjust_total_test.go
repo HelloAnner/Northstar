@@ -41,7 +41,7 @@ func TestApplyTotalSocialCumulativeValueAdjustsConfig(t *testing.T) {
 		t.Fatalf("insert wr: %v", err)
 	}
 
-	if err := ApplyIndicatorTarget(st, 2025, 12, "社零总额_累计值", 300); err != nil {
+	if _, err := ApplyIndicatorTarget(st, 2025, 12, "totalSocial_cumulative_value", 300, nil, 0); err != nil {
 		t.Fatalf("apply target: %v", err)
 	}
 

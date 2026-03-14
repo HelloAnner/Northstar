@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -83,7 +84,7 @@ func TestOptimize_RandomizeLimitAboveMonthValue(t *testing.T) {
 				retail_current_month, retail_last_year_month,
 				source_sheet, source_file
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "AAA", "企业A", "5101", "wholesale", 1, i+1, 2025, 12, 100, 100, "批发", "test.xlsx"); err != nil {
+		`, "AAA-"+dagcalc.BuildRowID("wr", int64(i+1)), "企业A", "5101", "wholesale", 1, i+1, 2025, 12, 100, 100, "批发", "test.xlsx"); err != nil {
 			t.Fatalf("insert wr: %v", err)
 		}
 	}
@@ -125,6 +126,58 @@ func TestOptimize_RandomizeLimitAboveMonthValue(t *testing.T) {
 	}
 	if values[0] == values[1] {
 		t.Fatalf("expected randomized values, got same: %v", values)
+	}
+}
+
+func TestRunOptimizeIncludesAppliedRules(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "northstar.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("init store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	if err := st.SetCurrentYearMonth(2025, 12); err != nil {
+		t.Fatalf("set ym: %v", err)
+	}
+	if err := st.Exec(`
+		INSERT INTO wholesale_retail (
+			credit_code, name, industry_code, industry_type, company_scale, row_no,
+			data_year, data_month,
+			sales_current_month, sales_last_year_month,
+			sales_current_cumulative, sales_last_year_cumulative,
+			retail_current_month, retail_last_year_month,
+			retail_current_cumulative, retail_last_year_cumulative,
+			source_sheet, source_file
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, "AAA", "企业A", "5101", "wholesale", 1, 1, 2025, 12, 100, 100, 100, 100, 100, 100, 100, 100, "批发", "test.xlsx"); err != nil {
+		t.Fatalf("insert wr: %v", err)
+	}
+
+	rolePath := filepath.Join(t.TempDir(), "role.json")
+	if err := os.WriteFile(rolePath, []byte(`{
+  "version": "1.0",
+  "rules": [
+    {"id":"c1","name":"限上","type":"clamp_target","indicator":"wholesale_month_rate","max":10}
+  ]
+}`), 0644); err != nil {
+		t.Fatalf("write role.json: %v", err)
+	}
+
+	eng := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, rolePath)
+	if err := eng.ReloadRules(); err != nil {
+		t.Fatalf("reload rules: %v", err)
+	}
+
+	resp, err := runOptimize(eng, st, 2025, 12, map[string]float64{"wholesale_month_rate": 50})
+	if err != nil {
+		t.Fatalf("run optimize: %v", err)
+	}
+	if len(resp.AppliedRules) != 1 {
+		t.Fatalf("unexpected applied rules: %+v", resp.AppliedRules)
+	}
+	if resp.AppliedRules[0].Type != "clamp_target" {
+		t.Fatalf("unexpected applied rule: %+v", resp.AppliedRules[0])
 	}
 }
 

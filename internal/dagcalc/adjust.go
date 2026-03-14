@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"northstar/internal/model"
+	"northstar/internal/rules"
 	"northstar/internal/store"
 )
 
@@ -31,65 +32,81 @@ func SetRandFloat64ForTest(fn func() float64) func() {
 	}
 }
 
-// ApplyIndicatorTarget 反向调整指标目标值
-func ApplyIndicatorTarget(st *store.Store, year, month int, id string, target float64) error {
+// ApplyIndicatorTarget 反向调整指标目标值。
+func ApplyIndicatorTarget(
+	st *store.Store,
+	year, month int,
+	id string,
+	target float64,
+	rs *rules.RuleSet,
+	depth int,
+) ([]AppliedRule, error) {
 	if math.IsNaN(target) || math.IsInf(target, 0) {
-		return fmt.Errorf("无效目标值: %s", id)
+		return nil, fmt.Errorf("无效目标值: %s", id)
 	}
+
+	scope := newAdjustRuleScope(id, rs)
+	target = scope.applyClamps(target)
 
 	var err error
 	switch id {
-	case "限上社零额_当月值":
-		err = adjustLimitAboveMonthValue(st, year, month, target)
-	case "限上社零额增速_当月":
-		err = adjustLimitAboveMonthRate(st, year, month, target)
-	case "限上社零额_累计值":
-		err = adjustLimitAboveCumulativeValue(st, year, month, target)
-	case "限上社零额增速_累计":
-		err = adjustLimitAboveCumulativeRate(st, year, month, target)
-	case "吃穿用增速_当月":
-		err = adjustWRSpecialRate(st, year, month, "is_eat_wear_use", target)
-	case "小微企业增速_当月":
-		err = adjustWRSpecialRate(st, year, month, "is_small_micro", target)
-	case "批发业销售额增速_当月":
-		err = adjustWRIndustryRate(st, year, month, "wholesale", "sales_current_month", "sales_last_year_month", target)
-	case "批发业销售额增速_累计":
-		err = adjustWRCumulativeRate(st, year, month, "wholesale", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target)
-	case "零售业销售额增速_当月":
-		err = adjustWRIndustryRate(st, year, month, "retail", "sales_current_month", "sales_last_year_month", target)
-	case "零售业销售额增速_累计":
-		err = adjustWRCumulativeRate(st, year, month, "retail", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target)
-	case "住宿业营业额增速_当月":
-		err = adjustACIndustryRate(st, year, month, "accommodation", "revenue_current_month", "revenue_last_year_month", target)
-	case "住宿业营业额增速_累计":
-		err = adjustACCumulativeRate(st, year, month, "accommodation", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target)
-	case "餐饮业营业额增速_当月":
-		err = adjustACIndustryRate(st, year, month, "catering", "revenue_current_month", "revenue_last_year_month", target)
-	case "餐饮业营业额增速_累计":
-		err = adjustACCumulativeRate(st, year, month, "catering", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target)
-	case "社零总额_累计值":
-		err = adjustTotalSocialCumulativeValue(st, year, month, target)
-	case "社零总额增速_累计":
-		err = adjustTotalSocialCumulativeRate(st, year, month, target)
+	case "limitAbove_month_value":
+		err = adjustLimitAboveMonthValue(st, year, month, target, scope)
+	case "limitAbove_month_rate":
+		err = adjustLimitAboveMonthRate(st, year, month, target, scope)
+	case "limitAbove_cumulative_value":
+		err = adjustLimitAboveCumulativeValue(st, year, month, target, scope)
+	case "limitAbove_cumulative_rate":
+		err = adjustLimitAboveCumulativeRate(st, year, month, target, scope)
+	case "eatWearUse_month_rate":
+		err = adjustWRSpecialRate(st, year, month, "is_eat_wear_use", target, scope)
+	case "microSmall_month_rate":
+		err = adjustWRSpecialRate(st, year, month, "is_small_micro", target, scope)
+	case "wholesale_month_rate":
+		err = adjustWRIndustryRate(st, year, month, "wholesale", "sales_current_month", "sales_last_year_month", target, scope)
+	case "wholesale_cumulative_rate":
+		err = adjustWRCumulativeRate(st, year, month, "wholesale", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target, scope)
+	case "retail_month_rate":
+		err = adjustWRIndustryRate(st, year, month, "retail", "sales_current_month", "sales_last_year_month", target, scope)
+	case "retail_cumulative_rate":
+		err = adjustWRCumulativeRate(st, year, month, "retail", "sales_current_month", "sales_prev_cumulative", "sales_last_year_cumulative", target, scope)
+	case "accommodation_month_rate":
+		err = adjustACIndustryRate(st, year, month, "accommodation", "revenue_current_month", "revenue_last_year_month", target, scope)
+	case "accommodation_cumulative_rate":
+		err = adjustACCumulativeRate(st, year, month, "accommodation", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target, scope)
+	case "catering_month_rate":
+		err = adjustACIndustryRate(st, year, month, "catering", "revenue_current_month", "revenue_last_year_month", target, scope)
+	case "catering_cumulative_rate":
+		err = adjustACCumulativeRate(st, year, month, "catering", "revenue_current_month", "revenue_prev_cumulative", "revenue_last_year_cumulative", target, scope)
+	case "totalSocial_cumulative_value":
+		err = adjustTotalSocialCumulativeValue(st, year, month, target, scope)
+	case "totalSocial_cumulative_rate":
+		err = adjustTotalSocialCumulativeRate(st, year, month, target, scope)
 	default:
-		return fmt.Errorf("不支持的指标: %s", id)
+		return nil, fmt.Errorf("不支持的指标: %s", id)
 	}
 
 	if err != nil && errors.Is(err, ErrNoAdjustData) {
-		return nil
+		return scope.AppliedRules(), nil
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	if err := scope.applyCompensates(st, year, month, depth); err != nil {
+		return nil, err
+	}
+	return scope.AppliedRules(), nil
 }
 
-func adjustLimitAboveMonthValue(st *store.Store, year, month int, target float64) error {
+func adjustLimitAboveMonthValue(st *store.Store, year, month int, target float64, scope *adjustRuleScope) error {
 	if target < 0 {
 		target = 0
 	}
 
-	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", target)
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", target, scope)
 }
 
-func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate float64) error {
+func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_month")
 	if err != nil {
 		return err
@@ -103,18 +120,18 @@ func adjustLimitAboveMonthRate(st *store.Store, year, month int, targetRate floa
 	if desired < 0 {
 		desired = 0
 	}
-	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", desired)
+	return scaleAcrossWRAndACDerivedRetail(st, year, month, "retail_current_month", "food_current_month", "goods_current_month", desired, scope)
 }
 
-func adjustLimitAboveCumulativeValue(st *store.Store, year, month int, target float64) error {
+func adjustLimitAboveCumulativeValue(st *store.Store, year, month int, target float64, scope *adjustRuleScope) error {
 	if target < 0 {
 		target = 0
 	}
 
-	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", target)
+	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", target, scope)
 }
 
-func adjustLimitAboveCumulativeRate(st *store.Store, year, month int, targetRate float64) error {
+func adjustLimitAboveCumulativeRate(st *store.Store, year, month int, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSumWR, _, err := sumAndCountWR(st, year, month, "", "", "retail_last_year_cumulative")
 	if err != nil {
 		return err
@@ -129,10 +146,10 @@ func adjustLimitAboveCumulativeRate(st *store.Store, year, month int, targetRate
 	if desired < 0 {
 		desired = 0
 	}
-	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", desired)
+	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", desired, scope)
 }
 
-func adjustWRSpecialRate(st *store.Store, year, month int, flagField string, targetRate float64) error {
+func adjustWRSpecialRate(st *store.Store, year, month int, flagField string, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSum, _, err := sumAndCountWR(st, year, month, "", flagField, "retail_last_year_month")
 	if err != nil {
 		return err
@@ -143,10 +160,10 @@ func adjustWRSpecialRate(st *store.Store, year, month int, flagField string, tar
 		desired = 0
 	}
 
-	return scaleWRField(st, year, month, "", flagField, "retail_current_month", desired)
+	return scaleWRField(st, year, month, "", flagField, "retail_current_month", desired, scope)
 }
 
-func adjustWRIndustryRate(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64) error {
+func adjustWRIndustryRate(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSum, _, err := sumAndCountWR(st, year, month, industryType, "", lastYearField)
 	if err != nil {
 		return err
@@ -157,10 +174,10 @@ func adjustWRIndustryRate(st *store.Store, year, month int, industryType, curren
 		desired = 0
 	}
 
-	return scaleWRField(st, year, month, industryType, "", currentField, desired)
+	return scaleWRField(st, year, month, industryType, "", currentField, desired, scope)
 }
 
-func adjustWRCumulativeRate(st *store.Store, year, month int, industryType, currentField, prevCumField, lastYearCumField string, targetRate float64) error {
+func adjustWRCumulativeRate(st *store.Store, year, month int, industryType, currentField, prevCumField, lastYearCumField string, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSum, _, err := sumAndCountWR(st, year, month, industryType, "", lastYearCumField)
 	if err != nil {
 		return err
@@ -171,10 +188,10 @@ func adjustWRCumulativeRate(st *store.Store, year, month int, industryType, curr
 		desiredCum = 0
 	}
 
-	return scaleWRFieldByCumulative(st, year, month, industryType, currentField, prevCumField, cumulativeFieldFor(currentField), desiredCum)
+	return scaleWRFieldByCumulative(st, year, month, industryType, currentField, prevCumField, cumulativeFieldFor(currentField), desiredCum, scope)
 }
 
-func adjustACIndustryRate(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64) error {
+func adjustACIndustryRate(st *store.Store, year, month int, industryType, currentField, lastYearField string, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSum, _, err := sumAndCountAC(st, year, month, industryType, lastYearField)
 	if err != nil {
 		return err
@@ -185,10 +202,10 @@ func adjustACIndustryRate(st *store.Store, year, month int, industryType, curren
 		desired = 0
 	}
 
-	return scaleACField(st, year, month, industryType, currentField, desired)
+	return scaleACField(st, year, month, industryType, currentField, desired, scope)
 }
 
-func adjustACCumulativeRate(st *store.Store, year, month int, industryType, currentField, prevCumField, lastYearCumField string, targetRate float64) error {
+func adjustACCumulativeRate(st *store.Store, year, month int, industryType, currentField, prevCumField, lastYearCumField string, targetRate float64, scope *adjustRuleScope) error {
 	lastYearSum, _, err := sumAndCountAC(st, year, month, industryType, lastYearCumField)
 	if err != nil {
 		return err
@@ -199,10 +216,10 @@ func adjustACCumulativeRate(st *store.Store, year, month int, industryType, curr
 		desiredCum = 0
 	}
 
-	return scaleACFieldByCumulative(st, year, month, industryType, currentField, prevCumField, cumulativeFieldFor(currentField), desiredCum)
+	return scaleACFieldByCumulative(st, year, month, industryType, currentField, prevCumField, cumulativeFieldFor(currentField), desiredCum, scope)
 }
 
-func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target float64) error {
+func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target float64, scope *adjustRuleScope) error {
 	if target < 0 {
 		target = 0
 	}
@@ -211,11 +228,18 @@ func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target f
 	if err != nil {
 		return err
 	}
-	limitBelowEstimate, err := estimateLimitBelowCumulative(st, year, month)
+
+	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
+	if err != nil {
+		limitBelowLastYear = 0
+	}
+
+	microRate, err := computeMicroSmallRate(st, year, month)
 	if err != nil {
 		return err
 	}
-	limitBelowEstimated := limitBelowEstimate.CurrentCumulative
+
+	limitBelowEstimated := limitBelowLastYear * (1 + microRate/100)
 	currentTotal := currentLimitAbove + limitBelowEstimated
 	delta := target - currentTotal
 
@@ -224,19 +248,25 @@ func adjustTotalSocialCumulativeValue(st *store.Store, year, month int, target f
 		limitBelowTarget = 0
 	}
 
-	if err := updateLimitBelowConfig(st, limitBelowEstimate.GrowthFactor, limitBelowTarget); err != nil {
+	if err := updateLimitBelowConfig(st, microRate, limitBelowTarget); err != nil {
 		return err
 	}
 
-	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", limitAboveTarget)
+	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", limitAboveTarget, scope)
 }
 
-func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRate float64) error {
+func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRate float64, scope *adjustRuleScope) error {
 	currentLimitAbove, err := sumLimitAboveCumulative(st, year, month)
 	if err != nil {
 		return err
 	}
-	limitBelowEstimate, err := estimateLimitBelowCumulative(st, year, month)
+
+	limitBelowLastYear, err := st.GetConfigFloat("last_year_limit_below_cumulative")
+	if err != nil {
+		limitBelowLastYear = 0
+	}
+
+	microRate, err := computeMicroSmallRate(st, year, month)
 	if err != nil {
 		return err
 	}
@@ -252,8 +282,8 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 	retailLastYearCumulativeSum := retailLastYearCumWR + retailLastYearCumAC
 
 	targetFraction := targetRate / 100
-	desiredTotal := (retailLastYearCumulativeSum + limitBelowEstimate.LastYearCumulative) * (1 + targetFraction)
-	limitBelowEstimated := limitBelowEstimate.CurrentCumulative
+	desiredTotal := (retailLastYearCumulativeSum + limitBelowLastYear) * (1 + targetFraction)
+	limitBelowEstimated := limitBelowLastYear * (1 + microRate/100)
 	currentTotal := currentLimitAbove + limitBelowEstimated
 	delta := desiredTotal - currentTotal
 
@@ -262,11 +292,11 @@ func adjustTotalSocialCumulativeRate(st *store.Store, year, month int, targetRat
 		limitBelowTarget = 0
 	}
 
-	if err := updateLimitBelowConfig(st, limitBelowEstimate.GrowthFactor, limitBelowTarget); err != nil {
+	if err := updateLimitBelowConfig(st, microRate, limitBelowTarget); err != nil {
 		return err
 	}
 
-	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", limitAboveTarget)
+	return scaleAcrossWRAndACDerivedRetailByCumulative(st, year, month, "retail_current_month", "retail_current_cumulative", "food_current_month", "food_current_cumulative", "goods_current_month", "goods_current_cumulative", limitAboveTarget, scope)
 }
 
 func computeMicroSmallRate(st *store.Store, year, month int) (float64, error) {
@@ -301,8 +331,8 @@ func splitDelta(delta, currentLimitAbove, currentLimitBelow float64) (float64, f
 	return clampTarget(currentLimitAbove + half), clampTarget(currentLimitBelow + half)
 }
 
-func updateLimitBelowConfig(st *store.Store, growthFactor float64, targetLimitBelow float64) error {
-	denom := growthFactor
+func updateLimitBelowConfig(st *store.Store, microRate float64, targetLimitBelow float64) error {
+	denom := 1 + microRate/100
 	if denom <= 0 {
 		return st.SetConfigFloat("last_year_limit_below_cumulative", 0)
 	}
@@ -408,7 +438,7 @@ func sumAndCountACDerivedRetailLastYearCumulative(st *store.Store, year, month i
 	return sum, len(rows), nil
 }
 
-func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField string, acFoodField string, acGoodsField string, target float64) error {
+func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField string, acFoodField string, acGoodsField string, target float64, scope *adjustRuleScope) error {
 	wrRows, err := loadWRRowsForAdjust(st, year, month, "", "")
 	if err != nil {
 		return err
@@ -417,6 +447,7 @@ func scaleAcrossWRAndACDerivedRetail(st *store.Store, year, month int, wrField s
 	if err != nil {
 		return err
 	}
+	wrRows, acRows = scope.filterMixedRows(wrRows, acRows)
 	if len(wrRows)+len(acRows) == 0 {
 		return ErrNoAdjustData
 	}
@@ -455,6 +486,7 @@ func scaleAcrossWRAndACDerivedRetailByCumulative(
 	acGoodsCurrent string,
 	acGoodsCum string,
 	targetCum float64,
+	scope *adjustRuleScope,
 ) error {
 	wrRows, err := loadWRRowsForAdjust(st, year, month, "", "")
 	if err != nil {
@@ -464,6 +496,7 @@ func scaleAcrossWRAndACDerivedRetailByCumulative(
 	if err != nil {
 		return err
 	}
+	wrRows, acRows = scope.filterMixedRows(wrRows, acRows)
 	if len(wrRows)+len(acRows) == 0 {
 		return ErrNoAdjustData
 	}
@@ -502,11 +535,12 @@ func scaleAcrossWRAndACDerivedRetailByCumulative(
 	return nil
 }
 
-func scaleWRField(st *store.Store, year, month int, industryType string, flagField string, field string, target float64) error {
+func scaleWRField(st *store.Store, year, month int, industryType string, flagField string, field string, target float64, scope *adjustRuleScope) error {
 	rows, err := loadWRRowsForAdjust(st, year, month, industryType, flagField)
 	if err != nil {
 		return err
 	}
+	rows = scope.filterWRRows(rows)
 	if len(rows) == 0 {
 		return ErrNoAdjustData
 	}
@@ -520,11 +554,12 @@ func scaleWRField(st *store.Store, year, month int, industryType string, flagFie
 	return updateWRFieldValues(st, field, rows, values)
 }
 
-func scaleWRFieldByCumulative(st *store.Store, year, month int, industryType string, currentField string, prevCumField string, cumField string, targetCum float64) error {
+func scaleWRFieldByCumulative(st *store.Store, year, month int, industryType string, currentField string, prevCumField string, cumField string, targetCum float64, scope *adjustRuleScope) error {
 	rows, err := loadWRRowsForAdjust(st, year, month, industryType, "")
 	if err != nil {
 		return err
 	}
+	rows = scope.filterWRRows(rows)
 	if len(rows) == 0 {
 		return ErrNoAdjustData
 	}
@@ -546,11 +581,12 @@ func scaleWRFieldByCumulative(st *store.Store, year, month int, industryType str
 	return updateWRFieldValuesWithCumulative(st, currentField, cumField, rows, values)
 }
 
-func scaleACField(st *store.Store, year, month int, industryType string, field string, target float64) error {
+func scaleACField(st *store.Store, year, month int, industryType string, field string, target float64, scope *adjustRuleScope) error {
 	rows, err := loadACRowsForAdjust(st, year, month, industryType)
 	if err != nil {
 		return err
 	}
+	rows = scope.filterACRows(rows)
 	if len(rows) == 0 {
 		return ErrNoAdjustData
 	}
@@ -564,11 +600,12 @@ func scaleACField(st *store.Store, year, month int, industryType string, field s
 	return updateACFieldValues(st, field, rows, values)
 }
 
-func scaleACFieldByCumulative(st *store.Store, year, month int, industryType string, currentField string, prevCumField string, cumField string, targetCum float64) error {
+func scaleACFieldByCumulative(st *store.Store, year, month int, industryType string, currentField string, prevCumField string, cumField string, targetCum float64, scope *adjustRuleScope) error {
 	rows, err := loadACRowsForAdjust(st, year, month, industryType)
 	if err != nil {
 		return err
 	}
+	rows = scope.filterACRows(rows)
 	if len(rows) == 0 {
 		return ErrNoAdjustData
 	}
