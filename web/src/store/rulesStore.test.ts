@@ -39,6 +39,26 @@ describe('rulesStore', () => {
     expect(store.getState().statusUpdatedAt).toBe('2026-03-14T10:30:00Z')
     expect(store.getState().pollingTimer).toBeNull()
   })
+
+  it('starts polling after manual convert', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ status: 'running' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'running', updatedAt: '', error: '' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'ok', updatedAt: '2026-03-14T11:00:00Z', error: '' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = createRulesStore()
+    await store.getState().convertRules()
+
+    expect(store.getState().status).toBe('running')
+    expect(store.getState().pollingTimer).not.toBeNull()
+
+    await vi.advanceTimersByTimeAsync(2000)
+
+    expect(store.getState().status).toBe('ok')
+    expect(store.getState().statusUpdatedAt).toBe('2026-03-14T11:00:00Z')
+    expect(store.getState().pollingTimer).toBeNull()
+  })
 })
 
 function jsonResponse(data: unknown) {

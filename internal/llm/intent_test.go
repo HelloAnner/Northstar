@@ -86,3 +86,24 @@ func TestParseIntentRejectsInvalidIndicator(t *testing.T) {
 		t.Fatalf("expected invalid indicator error, got %v", err)
 	}
 }
+
+func TestParseIntentAcceptsSetIndicatorAlias(t *testing.T) {
+	client := &fakeIntentClient{
+		result: ChatResult{
+			Content: `{"actions":[{"type":"set_indicator","indicatorId":"wholesale_month_rate","value":18}]}`,
+		},
+	}
+
+	plan, err := ParseIntent(client, "把批发当月增速调到 18%", map[string]float64{
+		"wholesale_month_rate": 12,
+	})
+	if err != nil {
+		t.Fatalf("parse intent: %v", err)
+	}
+	if len(plan.Actions) != 1 {
+		t.Fatalf("expected 1 action, got %+v", plan.Actions)
+	}
+	if plan.Actions[0].Type != "set_target" {
+		t.Fatalf("expected alias to normalize to set_target, got %+v", plan.Actions[0])
+	}
+}

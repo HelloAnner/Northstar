@@ -20,22 +20,25 @@ type RuleSet struct {
 }
 
 type rawRule struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Indicator string   `json:"indicator,omitempty"`
-	Min       *float64 `json:"min"`
-	Max       *float64 `json:"max"`
-	Filter    string   `json:"filter,omitempty"`
-	Trigger   string   `json:"trigger,omitempty"`
-	Ensure    string   `json:"ensure,omitempty"`
-	Relation  string   `json:"relation,omitempty"`
-	Tolerance float64  `json:"tolerance,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Type        string   `json:"type"`
+	Indicator   string   `json:"indicator,omitempty"`
+	Min         *float64 `json:"min"`
+	Max         *float64 `json:"max"`
+	Filter      string   `json:"filter,omitempty"`
+	Trigger     string   `json:"trigger,omitempty"`
+	Ensure      string   `json:"ensure,omitempty"`
+	Relation    string   `json:"relation,omitempty"`
+	Tolerance   float64  `json:"tolerance,omitempty"`
 }
 
 type rawRoleJSON struct {
-	Version string    `json:"version"`
-	Rules   []rawRule `json:"rules"`
+	Version    string    `json:"version"`
+	UpdatedAt  string    `json:"updatedAt,omitempty"`
+	SourceFile string    `json:"sourceFile,omitempty"`
+	Rules      []rawRule `json:"rules"`
 }
 
 // Load 读取 role.json 并构建 RuleSet。

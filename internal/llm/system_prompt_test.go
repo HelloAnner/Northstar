@@ -43,6 +43,22 @@ func TestBuildChatSystemPromptSkipsUserSectionWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestBuildChatSystemPromptIncludesBuiltInGuardrails(t *testing.T) {
+	prompt := BuildChatSystemPrompt(SystemPromptContext{
+		Year:             2026,
+		Month:            3,
+		RuleCount:        2,
+		IndicatorSummary: "- wholesale_month_rate 批发业销售额增速（当月）= 12.5%",
+	}, "")
+
+	assertPromptContains(t, prompt,
+		"Northstar 月度经济数据统计系统的 AI 助手",
+		"调整建议必须基于已加载的规则",
+		"不允许建议删除企业数据或重置导入数据",
+		"mode=adjust 时，输出结构化 AdjustmentPlan JSON",
+	)
+}
+
 func assertPromptContains(t *testing.T, prompt string, parts ...string) {
 	t.Helper()
 

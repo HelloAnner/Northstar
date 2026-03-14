@@ -173,7 +173,7 @@ func (c *Converter) convert(mdContent string) (string, error) {
 		}
 		errs := validateRoleJSON(jsonStr)
 		if len(errs) == 0 {
-			return jsonStr, nil
+			return normalizeRoleJSON(jsonStr, c.mdPath, time.Now().UTC())
 		}
 		messages = appendRetryMessages(messages, result.Content, buildValidationErrorMessage(errs))
 	}
@@ -296,10 +296,13 @@ func buildConvertSystemPrompt() string {
 2. 将自然语言规则转换为如下 JSON：
 {
   "version": "1.0",
+  "updatedAt": "2026-03-14T10:00:00Z",
+  "sourceFile": "config/rules.md",
   "rules": [
     {
       "id": "rule_1",
       "name": "规则摘要",
+      "description": "原始自然语言描述",
       "type": "clamp_target|filter_allocation|compensate"
     }
   ]
@@ -315,6 +318,54 @@ func buildConvertSystemPrompt() string {
 
 func buildConvertUserMessage(mdContent string) string {
 	return "请把以下 rules.md 转成 role.json：\n\n" + mdContent
+}
+
+func normalizeRoleJSON(jsonStr string, mdPath string, now time.Time) (string, error) {
+	var raw rawRoleJSON
+	if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(raw.Version) == "" {
+		raw.Version = "1.0"
+	}
+	raw.UpdatedAt = now.Format(time.RFC3339)
+	if strings.TrimSpace(raw.SourceFile) == "" {
+		raw.SourceFile = normalizeSourceFile(mdPath)
+	}
+	for idx := range raw.Rules {
+		if strings.TrimSpace(raw.Rules[idx].Description) == "" {
+			raw.Rules[idx].Description = fallbackRuleDescription(raw.Rules[idx])
+		}
+	}
+	data, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func normalizeSourceFile(mdPath string) string {
+	trimmed := strings.TrimSpace(filepath.ToSlash(mdPath))
+	if trimmed == "" {
+		return "config/rules.md"
+	}
+	if idx := strings.LastIndex(trimmed, "/config/"); idx >= 0 {
+		return trimmed[idx+1:]
+	}
+	if strings.HasSuffix(trimmed, "/rules.md") {
+		return "config/rules.md"
+	}
+	return trimmed
+}
+
+func fallbackRuleDescription(rule rawRule) string {
+	if strings.TrimSpace(rule.Name) != "" {
+		return strings.TrimSpace(rule.Name)
+	}
+	if strings.TrimSpace(rule.ID) != "" {
+		return strings.TrimSpace(rule.ID)
+	}
+	return "规则描述"
 }
 
 func (c *Converter) loadMarkdownContent() (string, error) {
