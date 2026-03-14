@@ -49,7 +49,14 @@ func NewServer(cfg *config.AppConfig) *Server {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		log.Fatalf("Failed to initialize config dir: %v", err)
 	}
+	rulesPath := filepath.Join(configDir, "rules.md")
 	rulePath := filepath.Join(configDir, "role.json")
+	if err := ensureRulesMarkdown(rulesPath); err != nil {
+		log.Fatalf("Failed to initialize rules.md: %v", err)
+	}
+	if err := ensureRuleManagementConfig(sqliteStore); err != nil {
+		log.Fatalf("Failed to initialize rule management config: %v", err)
+	}
 	engine := dagcalc.NewEngine(dagcalc.NewGraph(), sqliteStore, 0, 0, rulePath)
 	if err := engine.ReloadRules(); err != nil {
 		log.Printf("reload rules failed: %v", err)
@@ -57,6 +64,7 @@ func NewServer(cfg *config.AppConfig) *Server {
 
 	// 创建 V3 API 处理器
 	v3Handler := v3.NewHandlerWithEngine(sqliteStore, cfg.Excel.TemplatePath, engine)
+	v3Handler.ConfigureRuleManagement(rulesPath, rulePath)
 
 	s := &Server{
 		router: gin.Default(),
@@ -67,6 +75,30 @@ func NewServer(cfg *config.AppConfig) *Server {
 	s.setupRoutes(devMode)
 
 	return s
+}
+
+func ensureRulesMarkdown(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return os.WriteFile(path, []byte("# 调整规则\n\n"), 0644)
+}
+
+func ensureRuleManagementConfig(st *store.Store) error {
+	defaults := map[string]string{
+		"llm_user_prompt":      "",
+		"rules_convert_status": "idle",
+		"rules_convert_at":     "",
+		"rules_convert_error":  "",
+	}
+	for key, value := range defaults {
+		if err := st.EnsureConfig(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // setupRoutes 设置路由
@@ -144,4 +176,9 @@ func (s *Server) SaveNow() error {
 // GetStore 获取存储（用于测试）
 func (s *Server) GetStore() *store.Store {
 	return s.store
+}
+
+// RouterForTest 暴露路由，仅用于测试。
+func (s *Server) RouterForTest() http.Handler {
+	return s.router
 }

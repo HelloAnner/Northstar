@@ -15,6 +15,17 @@ import type {
 
 const BASE_URL = '/api/v1'
 
+export interface RuleItem {
+  index: number
+  text: string
+}
+
+export interface RuleStatus {
+  status: 'idle' | 'running' | 'ok' | 'error'
+  updatedAt: string
+  error: string
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${url}`, {
     headers: {
@@ -30,6 +41,22 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   return data.data
+}
+
+async function requestPlain<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${BASE_URL}${url}`, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...options,
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    throw new Error(payload?.error ?? '请求失败')
+  }
+
+  return response.json() as Promise<T>
 }
 
 // 导入相关
@@ -183,6 +210,34 @@ export const configApi = {
       method: 'PATCH',
       body: JSON.stringify(updates),
     }),
+}
+
+export const rulesApi = {
+  list: () => requestPlain<RuleItem[]>('/rules'),
+
+  create: (text: string) =>
+    requestPlain<RuleItem[]>('/rules', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  update: (index: number, text: string) =>
+    requestPlain<RuleItem[]>(`/rules/${index}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text }),
+    }),
+
+  remove: (index: number) =>
+    requestPlain<RuleItem[]>(`/rules/${index}`, {
+      method: 'DELETE',
+    }),
+
+  convert: () =>
+    requestPlain<{ status: string }>('/rules/convert', {
+      method: 'POST',
+    }),
+
+  status: () => requestPlain<RuleStatus>('/rules/status'),
 }
 
 // 导出

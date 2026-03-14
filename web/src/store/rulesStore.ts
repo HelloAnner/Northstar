@@ -1,0 +1,127 @@
+/**
+ * 规则管理状态
+ *
+ * @author Anner
+ * Created on 2026/3/14
+ */
+
+import { createStore } from 'zustand/vanilla'
+import { useStore } from 'zustand'
+import { rulesApi, type RuleItem, type RuleStatus } from '@/services/api'
+
+export type RulesConvertStatus = 'idle' | 'running' | 'ok' | 'error'
+
+export interface RulesStoreState {
+  rules: RuleItem[]
+  status: RulesConvertStatus
+  statusError: string
+  statusUpdatedAt: string
+  loading: boolean
+  submitting: boolean
+  pollingTimer: number | null
+  loadRules: () => Promise<void>
+  addRule: (text: string) => Promise<void>
+  updateRule: (index: number, text: string) => Promise<void>
+  deleteRule: (index: number) => Promise<void>
+  loadStatus: () => Promise<void>
+  startPolling: () => void
+  stopPolling: () => void
+}
+
+const pollingIntervalMs = 2000
+
+export function createRulesStore() {
+  return createStore<RulesStoreState>((set, get) => ({
+    rules: [],
+    status: 'idle',
+    statusError: '',
+    statusUpdatedAt: '',
+    loading: false,
+    submitting: false,
+    pollingTimer: null,
+
+    loadRules: async () => {
+      set({ loading: true })
+      try {
+        const rules = await rulesApi.list()
+        set({ rules })
+      } finally {
+        set({ loading: false })
+      }
+    },
+
+    addRule: async (text) => {
+      await mutateRules(set, get, () => rulesApi.create(text))
+    },
+
+    updateRule: async (index, text) => {
+      await mutateRules(set, get, () => rulesApi.update(index, text))
+    },
+
+    deleteRule: async (index) => {
+      await mutateRules(set, get, () => rulesApi.remove(index))
+    },
+
+    loadStatus: async () => {
+      const status = await rulesApi.status()
+      applyRuleStatus(set, get, status)
+    },
+
+    startPolling: () => {
+      if (get().pollingTimer != null) {
+        return
+      }
+      const timer = window.setInterval(async () => {
+        await get().loadStatus()
+      }, pollingIntervalMs)
+      set({ pollingTimer: timer })
+    },
+
+    stopPolling: () => {
+      const timer = get().pollingTimer
+      if (timer != null) {
+        window.clearInterval(timer)
+      }
+      set({ pollingTimer: null })
+    },
+  }))
+}
+
+async function mutateRules(
+  set: (partial: Partial<RulesStoreState>) => void,
+  get: () => RulesStoreState,
+  action: () => Promise<unknown>
+) {
+  set({ submitting: true })
+  try {
+    await action()
+    await get().loadRules()
+    set({ status: 'running', statusError: '' })
+    get().startPolling()
+  } finally {
+    set({ submitting: false })
+  }
+}
+
+function applyRuleStatus(
+  set: (partial: Partial<RulesStoreState>) => void,
+  get: () => RulesStoreState,
+  status: RuleStatus
+) {
+  set({
+    status: status.status,
+    statusError: status.error,
+    statusUpdatedAt: status.updatedAt,
+  })
+  if (status.status === 'running') {
+    get().startPolling()
+    return
+  }
+  get().stopPolling()
+}
+
+const rulesStore = createRulesStore()
+
+export function useRulesStore<T>(selector: (state: RulesStoreState) => T) {
+  return useStore(rulesStore, selector)
+}

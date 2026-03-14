@@ -8,10 +8,12 @@ import (
 
 // Handler V3 API 处理器
 type Handler struct {
-	store        *store.Store
-	templatePath string
-	downloads    *exportDownloadStore
-	engine       *dagcalc.Engine
+	store                *store.Store
+	templatePath         string
+	downloads            *exportDownloadStore
+	engine               *dagcalc.Engine
+	rulesRepo            *rulesFileRepo
+	ruleConverterFactory func() (RuleConverter, error)
 }
 
 // NewHandler 创建 V3 API 处理器
@@ -43,6 +45,12 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	// 配置管理
 	router.GET("/config", h.GetConfig)
 	router.PATCH("/config", h.UpdateConfig)
+	router.GET("/rules", h.GetRules)
+	router.POST("/rules", h.CreateRule)
+	router.PUT("/rules/:index", h.UpdateRule)
+	router.DELETE("/rules/:index", h.DeleteRule)
+	router.POST("/rules/convert", h.ConvertRules)
+	router.GET("/rules/status", h.GetRuleStatus)
 
 	// 数据导入
 	router.POST("/import", h.Import)
