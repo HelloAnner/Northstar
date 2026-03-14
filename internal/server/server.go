@@ -19,6 +19,9 @@ import (
 //go:embed all:dist
 var staticFiles embed.FS
 
+//go:embed defaults/rules.md defaults/role.json
+var defaultAssets embed.FS
+
 // Server HTTP服务器
 type Server struct {
 	router *gin.Engine
@@ -54,6 +57,9 @@ func NewServer(cfg *config.AppConfig) *Server {
 	if err := ensureRulesMarkdown(rulesPath); err != nil {
 		log.Fatalf("Failed to initialize rules.md: %v", err)
 	}
+	if err := ensureRoleJSON(rulePath); err != nil {
+		log.Fatalf("Failed to initialize role.json: %v", err)
+	}
 	if err := ensureRuleManagementConfig(sqliteStore); err != nil {
 		log.Fatalf("Failed to initialize rule management config: %v", err)
 	}
@@ -83,7 +89,24 @@ func ensureRulesMarkdown(path string) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	return os.WriteFile(path, []byte("# 调整规则\n\n"), 0644)
+	data, err := defaultAssets.ReadFile("defaults/rules.md")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+func ensureRoleJSON(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	data, err := defaultAssets.ReadFile("defaults/role.json")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
 func ensureRuleManagementConfig(st *store.Store) error {

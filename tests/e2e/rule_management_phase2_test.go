@@ -81,8 +81,17 @@ func TestRuleManagementPhase2E2E_ServerInit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rules.md: %v", err)
 	}
-	if string(raw) != "# 调整规则\n\n" {
-		t.Fatalf("unexpected rules.md content:\n%s", string(raw))
+	if len(raw) == 0 {
+		t.Fatal("rules.md should not be empty")
+	}
+
+	roleJSONPath := filepath.Join(dataDir, "config", "role.json")
+	roleRaw, err := os.ReadFile(roleJSONPath)
+	if err != nil {
+		t.Fatalf("read role.json: %v", err)
+	}
+	if len(roleRaw) == 0 {
+		t.Fatal("role.json should not be empty")
 	}
 
 	testServer := httptest.NewServer(s.RouterForTest())
@@ -97,6 +106,20 @@ func TestRuleManagementPhase2E2E_ServerInit(t *testing.T) {
 	status := decodeJSON[phase2RuleStatus](t, resp)
 	if status.Status != "idle" {
 		t.Fatalf("unexpected rules status: %+v", status)
+	}
+
+	rulesResp, err := http.Get(testServer.URL + "/api/v1/rules")
+	if err != nil {
+		t.Fatalf("get rules: %v", err)
+	}
+	defer rulesResp.Body.Close()
+	if rulesResp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected rules status code: %d", rulesResp.StatusCode)
+	}
+
+	items := decodeJSON[[]phase2RuleItem](t, rulesResp)
+	if len(items) != 17 {
+		t.Fatalf("expected 17 default rules, got %d", len(items))
 	}
 }
 

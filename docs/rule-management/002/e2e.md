@@ -28,15 +28,16 @@
 期望：
 
 - 自动创建 `config/rules.md`
-- 文件内容为固定头部 `# 调整规则`
-- `/api/rules` 返回空数组
+- 自动创建 `config/role.json`
+- `config/rules.md` 写入内置默认规则清单
+- `/api/rules` 返回内置默认规则列表（当前为 17 条）
 - `/api/rules/status` 返回 `idle`
 
 ### 场景 2：新增规则后自动触发转换
 
 前置条件：
 
-- `rules.md` 初始为空
+- `rules.md` 已包含默认规则，或由用户清空后再新增
 - LLM 返回合法 `role.json`
 
 步骤：
