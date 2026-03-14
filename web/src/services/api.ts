@@ -26,6 +26,10 @@ export interface RuleStatus {
   error: string
 }
 
+export interface UserPromptPayload {
+  content: string
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${url}`, {
     headers: {
@@ -238,6 +242,16 @@ export const rulesApi = {
     }),
 
   status: () => requestPlain<RuleStatus>('/rules/status'),
+}
+
+export const settingsApi = {
+  getUserPrompt: () => requestPlain<UserPromptPayload>('/settings/user-prompt'),
+
+  updateUserPrompt: (content: string) =>
+    requestPlain<UserPromptPayload>('/settings/user-prompt', {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    }),
 }
 
 // 导出

@@ -1,9 +1,8 @@
 /**
- * LLM 对话流式接口
+ * AI 对话流式接口
  *
  * @author Anner
- * @since 12.0
- * Created on 2026/2/1
+ * Created on 2026/3/14
  */
 package v3
 
@@ -13,11 +12,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"northstar/internal/linkage"
+
+	"northstar/internal/dagcalc"
 	"northstar/internal/llm"
 )
+
+// LLMChatClient 是 AI 对话依赖的最小模型接口。
+type LLMChatClient interface {
+	Chat(ctx context.Context, req llm.ChatRequest, stream func(string) error) (llm.ChatResult, error)
+}
 
 type llmChatMessage struct {
 	Role    string `json:"role"`
@@ -26,26 +33,22 @@ type llmChatMessage struct {
 
 type llmChatRequest struct {
 	SessionID string           `json:"sessionId"`
+	Mode      string           `json:"mode"`
 	Messages  []llmChatMessage `json:"messages"`
 }
 
-type llmToolSummary struct {
-	UpdatedCompanies     int               `json:"updatedCompanies"`
-	TargetIndicators     int               `json:"targetIndicators"`
-	Optimized            bool              `json:"optimized"`
-	ToolPositionCount    int               `json:"toolPositionCount,omitempty"`
-	ImpactCellCount      int               `json:"impactCellCount,omitempty"`
-	ImpactIndicatorCount int               `json:"impactIndicatorCount,omitempty"`
-	ImpactCells          []linkage.UICoord `json:"impactCells,omitempty"`
-	ImpactIndicators     []string          `json:"impactIndicators,omitempty"`
-	Warnings             []string          `json:"warnings,omitempty"`
+type llmResultPayload struct {
+	Mode         string                   `json:"mode"`
+	Reply        string                   `json:"reply"`
+	Groups       []dagcalc.IndicatorGroup `json:"groups,omitempty"`
+	AppliedRules []dagcalc.AppliedRule    `json:"appliedRules,omitempty"`
 }
 
 type llmStreamEvent struct {
-	Type    string          `json:"type"`
-	Content string          `json:"content,omitempty"`
-	Summary *llmToolSummary `json:"summary,omitempty"`
-	Error   string          `json:"error,omitempty"`
+	Type    string            `json:"type"`
+	Content string            `json:"content,omitempty"`
+	Result  *llmResultPayload `json:"result,omitempty"`
+	Error   string            `json:"error,omitempty"`
 }
 
 type llmStreamWriter struct {
@@ -54,14 +57,15 @@ type llmStreamWriter struct {
 }
 
 type llmChatContext struct {
-	ctx     context.Context
-	request llmChatRequest
-	year    int
-	month   int
-	client  *llm.Client
+	ctx        context.Context
+	request    llmChatRequest
+	year       int
+	month      int
+	userPrompt string
+	groups     []dagcalc.IndicatorGroup
 }
 
-// StreamLLMChat LLM 聊天接口（SSE）
+// StreamLLMChat AI 对话接口（SSE）
 // POST /api/llm/chat/stream
 func (h *Handler) StreamLLMChat(c *gin.Context) {
 	req, err := decodeLLMChatRequest(c)
@@ -69,18 +73,27 @@ func (h *Handler) StreamLLMChat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
 		return
 	}
-	log.Printf("llm chat start: session=%s messages=%d", req.SessionID, len(req.Messages))
+
+	log.Printf("llm chat start: session=%s mode=%s messages=%d", req.SessionID, req.Mode, len(req.Messages))
 	chatCtx, err := h.buildLLMChatContext(c.Request.Context(), req)
 	if err != nil {
 		log.Printf("llm chat context error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	stream := newLLMStreamWriter(c)
-	if err := h.runLLMChat(stream, chatCtx); err != nil {
+	result, err := h.runLLMChat(stream, chatCtx)
+	if err != nil {
 		log.Printf("llm chat run error: %v", err)
 		stream.SendError(err)
 		return
+	}
+	if result != nil {
+		if err := stream.Send(llmStreamEvent{Type: "result", Result: result}); err != nil {
+			log.Printf("llm chat result send error: %v", err)
+			return
+		}
 	}
 	_ = stream.Send(llmStreamEvent{Type: "final"})
 }
@@ -98,16 +111,19 @@ func (h *Handler) buildLLMChatContext(ctx context.Context, req llmChatRequest) (
 	if err != nil {
 		return llmChatContext{}, fmt.Errorf("系统未初始化")
 	}
-	cfg, err := llm.LoadConfig(h.store)
+	groups, err := dagcalc.CalculateIndicators(h.store, year, month)
 	if err != nil {
-		return llmChatContext{}, err
+		return llmChatContext{}, fmt.Errorf("计算指标失败")
 	}
-	prompt := llm.BuildSystemPrompt(llm.PromptContext{Year: year, Month: month})
-	client, err := llm.NewClient(cfg, prompt)
-	if err != nil {
-		return llmChatContext{}, fmt.Errorf("初始化模型失败: %v", err)
-	}
-	return llmChatContext{ctx: ctx, request: req, year: year, month: month, client: client}, nil
+	roundIndicatorGroupsInPlace(groups)
+	return llmChatContext{
+		ctx:        ctx,
+		request:    req,
+		year:       year,
+		month:      month,
+		userPrompt: h.getConfigValue("llm_user_prompt", ""),
+		groups:     groups,
+	}, nil
 }
 
 func toLLMChatRequest(req llmChatRequest, year, month int) llm.ChatRequest {
@@ -148,51 +164,274 @@ func (w *llmStreamWriter) SendError(err error) {
 	_ = w.Send(llmStreamEvent{Type: "error", Error: err.Error()})
 }
 
-func (h *Handler) runLLMChat(stream *llmStreamWriter, ctx llmChatContext) error {
-	result, err := ctx.client.Chat(
-		ctx.ctx,
-		toLLMChatRequest(ctx.request, ctx.year, ctx.month),
-		stream.SendDelta,
-	)
-	if err != nil {
-		return err
+func (h *Handler) runLLMChat(stream *llmStreamWriter, chatCtx llmChatContext) (*llmResultPayload, error) {
+	mode := normalizeChatMode(chatCtx.request.Mode)
+	if mode == "adjust" {
+		return h.runAdjustMode(stream, chatCtx)
 	}
-	parsed, err := llm.ParseToolCalls(result.ToolCalls)
-	if err != nil {
-		return err
-	}
-	summary, err := h.executeLLMTools(parsed, ctx.year, ctx.month)
-	if err != nil {
-		return err
-	}
-	return stream.Send(llmStreamEvent{Type: "tool_result", Summary: &summary})
+	return h.runChatMode(stream, chatCtx)
 }
 
-func (h *Handler) executeLLMTools(parsed llm.ParsedToolCalls, year, month int) (llmToolSummary, error) {
-	excludes, updated, applied, warnings, err := h.applyLLMCompanyUpdates(parsed.CompanyUpdates, year, month)
+func (h *Handler) runChatMode(stream *llmStreamWriter, chatCtx llmChatContext) (*llmResultPayload, error) {
+	client, err := h.newLLMClient(h.buildChatPrompt(chatCtx.year, chatCtx.month, chatCtx.groups, chatCtx.userPrompt))
 	if err != nil {
-		return llmToolSummary{}, err
+		return nil, err
 	}
-	optimized := false
-	if len(parsed.IndicatorTargets) > 0 {
-		if err := applyIndicatorTargetsWithExcludes(h.store, year, month, parsed.IndicatorTargets, excludes); err != nil {
-			return llmToolSummary{}, err
-		}
-		optimized = true
-	}
-	impact, err := buildLLMToolImpact(h.store, year, month, applied, parsed.IndicatorTargets)
+	reply, err := h.streamReply(stream, client, toLLMChatRequest(chatCtx.request, chatCtx.year, chatCtx.month), chatCtx.ctx)
 	if err != nil {
-		return llmToolSummary{}, err
+		return nil, err
 	}
-	return llmToolSummary{
-		UpdatedCompanies:     updated,
-		TargetIndicators:     len(parsed.IndicatorTargets),
-		Optimized:            optimized,
-		ToolPositionCount:    impact.ToolPositionCount,
-		ImpactCellCount:      impact.ImpactCellCount,
-		ImpactIndicatorCount: impact.ImpactIndicatorCount,
-		ImpactCells:          impact.ImpactCells,
-		ImpactIndicators:     impact.ImpactIndicators,
-		Warnings:             warnings,
+	return &llmResultPayload{
+		Mode:  "chat",
+		Reply: reply,
 	}, nil
+}
+
+func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext) (*llmResultPayload, error) {
+	userMsg, err := lastUserMessage(chatCtx.request.Messages)
+	if err != nil {
+		return nil, err
+	}
+
+	intentClient, err := h.newLLMClient(llm.BuildIntentSystemPrompt())
+	if err != nil {
+		return nil, err
+	}
+	plan, err := llm.ParseIntent(intentClient, userMsg, buildIndicatorValueMap(chatCtx.groups))
+	if err != nil {
+		return nil, err
+	}
+	if plan == nil || len(plan.Actions) == 0 {
+		return h.runChatMode(stream, chatCtx)
+	}
+
+	targets := make(map[string]float64, len(plan.Actions))
+	for _, action := range plan.Actions {
+		targets[action.IndicatorID] = action.Value
+	}
+
+	h.engine.SetPeriod(chatCtx.year, chatCtx.month)
+	resp, err := runOptimize(h.engine, h.store, chatCtx.year, chatCtx.month, targets)
+	if err != nil {
+		return nil, err
+	}
+
+	summaryClient, err := h.newLLMClient(h.buildChatPrompt(chatCtx.year, chatCtx.month, resp.Groups, chatCtx.userPrompt))
+	if err != nil {
+		return nil, err
+	}
+	reply, err := h.streamReply(stream, summaryClient, llm.ChatRequest{
+		Messages: []llm.ChatMessage{{
+			Role: "user",
+			Content: buildAdjustSummaryMessage(
+				userMsg,
+				plan.Actions,
+				resp.Groups,
+				resp.AppliedRules,
+			),
+		}},
+		Year:  chatCtx.year,
+		Month: chatCtx.month,
+	}, chatCtx.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &llmResultPayload{
+		Mode:         "adjust",
+		Reply:        reply,
+		Groups:       resp.Groups,
+		AppliedRules: resp.AppliedRules,
+	}, nil
+}
+
+func (h *Handler) newLLMClient(prompt string) (LLMChatClient, error) {
+	if h.llmClientFactory != nil {
+		client, err := h.llmClientFactory(prompt)
+		if err != nil {
+			return nil, err
+		}
+		if client == nil {
+			return nil, fmt.Errorf("初始化模型失败: empty client")
+		}
+		return client, nil
+	}
+
+	cfg, err := llm.LoadConfig(h.store)
+	if err != nil {
+		return nil, err
+	}
+	return llm.NewTextClient(cfg, prompt)
+}
+
+func (h *Handler) buildChatPrompt(year, month int, groups []dagcalc.IndicatorGroup, userPrompt string) string {
+	return llm.BuildChatSystemPrompt(llm.SystemPromptContext{
+		Year:             year,
+		Month:            month,
+		RuleCount:        h.engine.RuleCount(),
+		IndicatorSummary: buildIndicatorSummary(groups),
+	}, userPrompt)
+}
+
+func (h *Handler) streamReply(
+	stream *llmStreamWriter,
+	client LLMChatClient,
+	req llm.ChatRequest,
+	ctx context.Context,
+) (string, error) {
+	var builder strings.Builder
+	streamed := false
+	result, err := client.Chat(ctx, req, func(chunk string) error {
+		streamed = true
+		builder.WriteString(chunk)
+		return stream.SendDelta(chunk)
+	})
+	if err != nil {
+		return "", err
+	}
+
+	content := strings.TrimSpace(result.Content)
+	if !streamed && content != "" {
+		builder.WriteString(content)
+		if err := stream.SendDelta(content); err != nil {
+			return "", err
+		}
+	}
+	reply := strings.TrimSpace(builder.String())
+	if reply == "" {
+		reply = content
+	}
+	return reply, nil
+}
+
+func normalizeChatMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "chat":
+		return "chat"
+	case "adjust":
+		return "adjust"
+	default:
+		return "chat"
+	}
+}
+
+func lastUserMessage(messages []llmChatMessage) (string, error) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if strings.EqualFold(strings.TrimSpace(messages[i].Role), "user") {
+			content := strings.TrimSpace(messages[i].Content)
+			if content != "" {
+				return content, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("缺少用户消息")
+}
+
+func buildIndicatorSummary(groups []dagcalc.IndicatorGroup) string {
+	lines := make([]string, 0, 16)
+	for _, group := range groups {
+		for _, indicator := range group.Indicators {
+			lines = append(lines,
+				fmt.Sprintf("- %s %s = %.0f%s", indicator.ID, indicator.Name, indicator.Value, indicator.Unit),
+			)
+		}
+	}
+	if len(lines) == 0 {
+		return "- 暂无指标快照"
+	}
+	return strings.Join(lines, "\n")
+}
+
+func buildIndicatorValueMap(groups []dagcalc.IndicatorGroup) map[string]float64 {
+	values := make(map[string]float64, 16)
+	for _, group := range groups {
+		for _, indicator := range group.Indicators {
+			values[indicator.ID] = indicator.Value
+		}
+	}
+	return values
+}
+
+func buildAdjustSummaryMessage(
+	userMsg string,
+	actions []llm.AdjustmentAction,
+	groups []dagcalc.IndicatorGroup,
+	appliedRules []dagcalc.AppliedRule,
+) string {
+	lines := []string{
+		"请根据以下真实执行结果，生成一段给用户看的简洁中文总结。",
+		"",
+		"用户原始请求：",
+		userMsg,
+		"",
+		"已执行动作：",
+	}
+	for _, action := range actions {
+		lines = append(lines,
+			fmt.Sprintf("- %s -> %.0f", action.IndicatorID, action.Value),
+		)
+	}
+	lines = append(lines, "", "规则生效情况：")
+	ruleLines := formatAppliedRules(appliedRules)
+	lines = append(lines, ruleLines...)
+	lines = append(lines, "", "当前指标结果：")
+	lines = append(lines, strings.Split(buildIndicatorSummary(groups), "\n")...)
+	lines = append(lines,
+		"",
+		"要求：",
+		"1. 明确说明系统已经实际执行了哪些调整",
+		"2. 如有规则裁剪或过滤，要直接告诉用户",
+		"3. 不要编造未执行的企业修改",
+	)
+	return strings.Join(lines, "\n")
+}
+
+func formatAppliedRules(appliedRules []dagcalc.AppliedRule) []string {
+	if len(appliedRules) == 0 {
+		return []string{"- 本次没有规则额外干预"}
+	}
+
+	lines := make([]string, 0, len(appliedRules))
+	for _, rule := range appliedRules {
+		switch rule.Type {
+		case "clamp_target":
+			lines = append(lines,
+				fmt.Sprintf("- 规则 %s：%s 目标从 %.0f 裁剪到 %.0f",
+					rule.RuleID,
+					rule.IndicatorID,
+					rule.BeforeValue,
+					rule.AfterValue,
+				),
+			)
+		case "filter_allocation":
+			lines = append(lines,
+				fmt.Sprintf("- 规则 %s：%s 参与企业从 %d 家过滤到 %d 家",
+					rule.RuleID,
+					rule.IndicatorID,
+					rule.BeforeCount,
+					rule.AfterCount,
+				),
+			)
+		case "compensate":
+			lines = append(lines,
+				fmt.Sprintf("- 规则 %s：触发联动补偿 %s -> %.0f",
+					rule.RuleID,
+					rule.EnsureID,
+					rule.TargetValue,
+				),
+			)
+		default:
+			lines = append(lines, fmt.Sprintf("- 规则 %s：%s", rule.RuleID, rule.Type))
+		}
+	}
+	sort.Strings(lines)
+	return lines
+}
+
+func (h *Handler) getConfigValue(key string, fallback string) string {
+	value, err := h.store.GetConfig(key)
+	if err != nil {
+		return fallback
+	}
+	return value
 }

@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, MessageCircle, Settings2, Upload } from 'lucide-react'
+import ChatPanel from '@/components/ChatPanel'
 import ExportDialog from '@/components/ExportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 import ThemeToggle from '@/components/app/ThemeToggle'
 import NorthstarIcon from '@/components/app/NorthstarIcon'
 import GlobalConfigDialog from '@/components/GlobalConfigDialog'
-import LlmChatDialog from '@/components/LlmChatDialog'
 import { toast } from 'sonner'
 import { buildCompanySnapshot, buildUndoChanges, buildUndoUpdates, type CompanySnapshot } from '@/lib/undo'
 import { useUndoStore } from '@/store/undoStore'
@@ -300,23 +300,6 @@ export default function DashboardV3() {
     setReloadToken((x) => x + 1)
   }
 
-  const handleChatImpact = (impact: { cells: { rowId: string; columnKey: string }[]; indicators: string[] }) => {
-    const nextCells: Record<string, boolean> = {}
-    const nextIndicators: Record<string, boolean> = {}
-    for (const cell of impact.cells) {
-      if (cell?.rowId && cell?.columnKey) {
-        nextCells[`${cell.rowId}|${cell.columnKey}`] = true
-      }
-    }
-    for (const id of impact.indicators) {
-      if (id) {
-        nextIndicators[String(id)] = true
-      }
-    }
-    setHighlightCells(nextCells)
-    setHighlightIndicators(nextIndicators)
-  }
-
   const previewLinkage = async (anchor: any) => {
     try {
       const res = await fetch('/api/linkage/preview', {
@@ -567,12 +550,7 @@ export default function DashboardV3() {
         )}
 
         <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
-        <LlmChatDialog
-          open={showChatDialog}
-          onOpenChange={setShowChatDialog}
-          onDataChanged={handleChatDataChanged}
-          onPreviewImpact={handleChatImpact}
-        />
+        <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} />
       </div>
     </div>
   )
