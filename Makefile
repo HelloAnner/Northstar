@@ -280,6 +280,9 @@ test-e2e-only:
 	@echo "  运行 E2E 端到端测试 (agent-browser)"
 	@echo "=========================================="
 	@echo ""
+	@echo ">>> 执行 Rule Engine Phase 1 后端 E2E..."
+	go test -tags=e2e -v ./tests/e2e -run TestRuleEnginePhase1E2E
+	@echo ""
 	@echo ">>> 执行 agent-browser 自动化脚本..."
 	@BASE_URL="$${BASE_URL:-http://localhost:20260}" \
 		INPUT_XLSX="$${INPUT_XLSX:-$(CURDIR)/prd/12月月报（预估）_补全企业名称社会代码_20260129.xlsx}" \

@@ -34,7 +34,7 @@ func TestApplyIndicatorTargetRandomizesValues(t *testing.T) {
 				retail_current_month, retail_last_year_month,
 				source_sheet, source_file
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "AAA", "企业A", "5101", "wholesale", 1, i+1, 2025, 12, 100, 100, "批发", "test.xlsx"); err != nil {
+		`, "AAA-"+formatInt(int64(i+1)), "企业A", "5101", "wholesale", 1, i+1, 2025, 12, 100, 100, "批发", "test.xlsx"); err != nil {
 			t.Fatalf("insert wr: %v", err)
 		}
 	}
@@ -49,7 +49,7 @@ func TestApplyIndicatorTargetRandomizesValues(t *testing.T) {
 	}
 	defer func() { randFloat64 = originRand }()
 
-	if err := ApplyIndicatorTarget(st, 2025, 12, "limitAbove_month_value", 300); err != nil {
+	if _, err := ApplyIndicatorTarget(st, 2025, 12, "limitAbove_month_value", 300, nil, 0); err != nil {
 		t.Fatalf("apply target: %v", err)
 	}
 
@@ -103,7 +103,7 @@ func TestApplyIndicatorTarget_NoAdjustDataNoError(t *testing.T) {
 		t.Fatalf("insert wr: %v", err)
 	}
 
-	if err := ApplyIndicatorTarget(st, 2025, 12, "microSmall_month_rate", 5); err != nil {
+	if _, err := ApplyIndicatorTarget(st, 2025, 12, "microSmall_month_rate", 5, nil, 0); err != nil {
 		t.Fatalf("apply target should ignore empty dataset: %v", err)
 	}
 }

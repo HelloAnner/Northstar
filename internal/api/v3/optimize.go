@@ -26,7 +26,8 @@ func (h *Handler) Optimize(c *gin.Context) {
 	if !ok {
 		return
 	}
-	resp, err := runOptimize(h.store, year, month, req.Targets)
+	h.engine.SetPeriod(year, month)
+	resp, err := runOptimize(h.engine, h.store, year, month, req.Targets)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "智能调整失败"})
 		return
@@ -37,6 +38,11 @@ func (h *Handler) Optimize(c *gin.Context) {
 type orderedTarget struct {
 	ID    string
 	Value float64
+}
+
+func applyIndicatorTarget(st *store.Store, year, month int, id string, target float64) error {
+	_, err := dagcalc.ApplyIndicatorTarget(st, year, month, id, target, nil, 0)
+	return err
 }
 
 func orderTargets(targets map[string]float64) []orderedTarget {
@@ -80,15 +86,12 @@ func orderTargets(targets map[string]float64) []orderedTarget {
 	return out
 }
 
-func applyIndicatorTarget(st *store.Store, year, month int, id string, target float64) error {
-	return dagcalc.ApplyIndicatorTarget(st, year, month, id, target)
-}
-
 type optimizeResponse struct {
-	Year    int                      `json:"year"`
-	Month   int                      `json:"month"`
-	Groups  []dagcalc.IndicatorGroup `json:"groups"`
-	Notices []OptimizeNotice         `json:"notices,omitempty"`
+	Year         int                      `json:"year"`
+	Month        int                      `json:"month"`
+	Groups       []dagcalc.IndicatorGroup `json:"groups"`
+	Notices      []OptimizeNotice         `json:"notices,omitempty"`
+	AppliedRules []dagcalc.AppliedRule    `json:"appliedRules,omitempty"`
 }
 
 func bindOptimizeRequest(c *gin.Context) (OptimizeRequest, bool) {
@@ -116,7 +119,7 @@ func (h *Handler) loadCurrentYM(c *gin.Context) (int, int, bool) {
 	return year, month, true
 }
 
-func runOptimize(st *store.Store, year, month int, targets map[string]float64) (optimizeResponse, error) {
+func runOptimize(eng *dagcalc.Engine, st *store.Store, year, month int, targets map[string]float64) (optimizeResponse, error) {
 	beforeGroups, err := dagcalc.CalculateIndicators(st, year, month)
 	if err != nil {
 		return optimizeResponse{}, err
@@ -124,51 +127,80 @@ func runOptimize(st *store.Store, year, month int, targets map[string]float64) (
 	beforeSnap := buildIndicatorSnapshotMap(beforeGroups)
 	ordered := orderTargets(targets)
 	noticeMap := map[string]*OptimizeNotice{}
-	if err := applyTargetsWithNotices(st, year, month, ordered, beforeSnap, noticeMap); err != nil {
-		return optimizeResponse{}, err
-	}
-	groups, err := dagcalc.RecalcAll(st, year, month)
+	executableTargets, err := collectExecutableTargets(st, year, month, ordered, beforeSnap, noticeMap)
 	if err != nil {
 		return optimizeResponse{}, err
 	}
+
+	groups := beforeGroups
+	appliedRules := []dagcalc.AppliedRule{}
+	if len(executableTargets) > 0 {
+		result, err := eng.Optimize(executableTargets)
+		if err != nil {
+			return optimizeResponse{}, err
+		}
+		groups = result.Groups
+		appliedRules = result.AppliedRules
+	}
+
 	roundIndicatorGroupsInPlace(groups)
 	afterSnap := buildIndicatorSnapshotMap(groups)
-	notices, err := finalizeNotices(st, year, month, ordered, beforeSnap, afterSnap, noticeMap)
+	notices, err := finalizeNotices(st, year, month, ordered, beforeSnap, afterSnap, appliedRules, noticeMap)
 	if err != nil {
 		return optimizeResponse{}, err
 	}
-	return optimizeResponse{Year: year, Month: month, Groups: groups, Notices: notices}, nil
+	return optimizeResponse{
+		Year:         year,
+		Month:        month,
+		Groups:       groups,
+		Notices:      notices,
+		AppliedRules: appliedRules,
+	}, nil
 }
 
-func applyTargetsWithNotices(st *store.Store, year, month int, ordered []orderedTarget, before map[string]indicatorSnapshot, noticeMap map[string]*OptimizeNotice) error {
+func collectExecutableTargets(
+	st *store.Store,
+	year, month int,
+	ordered []orderedTarget,
+	before map[string]indicatorSnapshot,
+	noticeMap map[string]*OptimizeNotice,
+) (map[string]float64, error) {
+	targets := make(map[string]float64, len(ordered))
 	for _, item := range ordered {
 		meta := before[item.ID]
 		notice, err := precheckIndicatorTarget(st, year, month, item.ID, item.Value, meta)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if notice != nil {
 			noticeMap[item.ID] = notice
 			continue
 		}
-		if err := applyIndicatorTarget(st, year, month, item.ID, item.Value); err != nil {
-			return err
-		}
+		targets[item.ID] = item.Value
 	}
-	return nil
+	return targets, nil
 }
 
-func finalizeNotices(st *store.Store, year, month int, ordered []orderedTarget, before map[string]indicatorSnapshot, after map[string]indicatorSnapshot, noticeMap map[string]*OptimizeNotice) ([]OptimizeNotice, error) {
+func finalizeNotices(
+	st *store.Store,
+	year, month int,
+	ordered []orderedTarget,
+	before map[string]indicatorSnapshot,
+	after map[string]indicatorSnapshot,
+	appliedRules []dagcalc.AppliedRule,
+	noticeMap map[string]*OptimizeNotice,
+) ([]OptimizeNotice, error) {
 	for _, item := range ordered {
 		beforeSnap, afterSnap, ok := snapshotForID(before, after, item.ID)
 		if !ok {
 			continue
 		}
+		target := effectiveTargetForNotice(appliedRules, item.ID, item.Value)
 		if notice := noticeMap[item.ID]; notice != nil {
-			updateNoticeValues(notice, beforeSnap, afterSnap, item.Value)
+			updateNoticeValues(notice, beforeSnap, afterSnap, target)
 			continue
 		}
-		notice, err := buildPostApplyNotice(st, year, month, item.ID, item.Value, beforeSnap, afterSnap)
+		notice, err := buildPostApplyNotice(st, year, month, item.ID, target, beforeSnap, afterSnap)
 		if err != nil {
 			return nil, err
 		}
@@ -187,4 +219,18 @@ func orderedNotices(ordered []orderedTarget, noticeMap map[string]*OptimizeNotic
 		}
 	}
 	return out
+}
+
+func effectiveTargetForNotice(appliedRules []dagcalc.AppliedRule, indicatorID string, target float64) float64 {
+	next := target
+	for _, item := range appliedRules {
+		if item.Type != "clamp_target" {
+			continue
+		}
+		if item.IndicatorID != indicatorID {
+			continue
+		}
+		next = item.AfterValue
+	}
+	return next
 }

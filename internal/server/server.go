@@ -5,12 +5,14 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 
 	"northstar/internal/api/v3"
 	"northstar/internal/config"
+	"northstar/internal/dagcalc"
 	"northstar/internal/store"
 )
 
@@ -43,8 +45,18 @@ func NewServer(cfg *config.AppConfig) *Server {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	configDir := filepath.Join(dataDir, "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		log.Fatalf("Failed to initialize config dir: %v", err)
+	}
+	rulePath := filepath.Join(configDir, "role.json")
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), sqliteStore, 0, 0, rulePath)
+	if err := engine.ReloadRules(); err != nil {
+		log.Printf("reload rules failed: %v", err)
+	}
+
 	// 创建 V3 API 处理器
-	v3Handler := v3.NewHandler(sqliteStore, cfg.Excel.TemplatePath)
+	v3Handler := v3.NewHandlerWithEngine(sqliteStore, cfg.Excel.TemplatePath, engine)
 
 	s := &Server{
 		router: gin.Default(),

@@ -25,29 +25,29 @@
 
 **后端 internal/rules/**
 
-- [ ] `loader.go`：定义 `RuleSet`、`rawRule`、`rawRoleJSON` 结构体；实现 `Load(path string) (*RuleSet, error)`，role.json 不存在时返回空 RuleSet 不报错
-- [ ] `constraint.go`：实现三种 Constraint 类型及方法
+- [x] `loader.go`：定义 `RuleSet`、`rawRule`、`rawRoleJSON` 结构体；实现 `Load(path string) (*RuleSet, error)`，role.json 不存在时返回空 RuleSet 不报错
+- [x] `constraint.go`：实现三种 Constraint 类型及方法
   - `ClampTargetConstraint`：`Clamp(indicatorID, target)` → `(float64, bool)`
   - `FilterAllocationConstraint`：`Apply(indicatorID, companies)` → `([]CompanyRow, bool)`
   - `CompensateConstraint`：`Check(triggerID, indicators)` → `(bool, float64)`
-- [ ] `filter.go`：`filterByMode(companies, mode)` 支持 4 个枚举值，未知 mode 不过滤
+- [x] `filter.go`：`filterByMode(companies, mode)` 支持 4 个枚举值，未知 mode 不过滤
 
 **后端 dagcalc/**
 
-- [ ] `engine.go`：`Engine` 新增 `rules *rules.RuleSet` + `mu sync.RWMutex` + `rulePath string`；实现 `ReloadRules()`、`getRules()`、`Optimize()`
-- [ ] `adjust.go`：扩展 `ApplyIndicatorTarget` 函数签名（新增 `rs *rules.RuleSet`、`depth int` 参数）；实现三个干预点（ClampTarget → FilterAllocation → Compensate）；定义 `AppliedRule` 结构体
+- [x] `engine.go`：`Engine` 新增 `rules *rules.RuleSet` + `mu sync.RWMutex` + `rulePath string`；实现 `ReloadRules()`、`getRules()`、`Optimize()`
+- [x] `adjust.go`：扩展 `ApplyIndicatorTarget` 函数签名（新增 `rs *rules.RuleSet`、`depth int` 参数）；实现三个干预点（ClampTarget → FilterAllocation → Compensate）；定义 `AppliedRule` 结构体
 
 **后端 api/v3/optimize.go**
 
-- [ ] Handler 改调 `engine.Optimize()`（不直接调用 `ApplyIndicatorTarget`）
-- [ ] 响应新增 `appliedRules []AppliedRule`
+- [x] Handler 改调 `engine.Optimize()`（不直接调用 `ApplyIndicatorTarget`）
+- [x] 响应新增 `appliedRules []AppliedRule`
 
 ### 单元测试
 
-- [ ] `internal/rules/loader_test.go`：各 type 分发正确；不存在文件返回空 RuleSet
-- [ ] `internal/rules/constraint_test.go`：ClampTarget 边界值；Filter 各枚举；Compensate gte/lte 两向逻辑
-- [ ] `internal/rules/filter_test.go`：filterByMode 各模式；未知 mode 不过滤
-- [ ] `dagcalc/adjust_rules_test.go`：ClampTarget 生效；Filter 过滤减少企业数；Compensate 触发；depth=1 时跳过 Compensate
+- [x] `internal/rules/loader_test.go`：各 type 分发正确；不存在文件返回空 RuleSet
+- [x] `internal/rules/constraint_test.go`：ClampTarget 边界值；Filter 各枚举；Compensate gte/lte 两向逻辑
+- [x] `internal/rules/filter_test.go`：filterByMode 各模式；未知 mode 不过滤
+- [x] `dagcalc/adjust_rules_test.go`：ClampTarget 生效；Filter 过滤减少企业数；Compensate 触发；depth=1 时跳过 Compensate
 
 ### 完成标准
 
@@ -197,6 +197,6 @@ Phase 3 (ai-chat)         — 依赖 Phase 1 的 engine.Optimize()
 
 | Phase | 模块 | 状态 |
 |-------|------|------|
-| 1 | rule-engine | ⬜ 未开始 |
+| 1 | rule-engine | ✅ 已完成（2026-03-14） |
 | 2 | rule-management | ⬜ 未开始 |
 | 3 | ai-chat | ⬜ 未开始 |
