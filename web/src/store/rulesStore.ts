@@ -23,6 +23,7 @@ export interface RulesStoreState {
   addRule: (text: string) => Promise<void>
   updateRule: (index: number, text: string) => Promise<void>
   deleteRule: (index: number) => Promise<void>
+  convertRules: () => Promise<void>
   loadStatus: () => Promise<void>
   startPolling: () => void
   stopPolling: () => void
@@ -60,6 +61,17 @@ export function createRulesStore() {
 
     deleteRule: async (index) => {
       await mutateRules(set, get, () => rulesApi.remove(index))
+    },
+
+    convertRules: async () => {
+      set({ submitting: true })
+      try {
+        await rulesApi.convert()
+        set({ status: 'running', statusError: '' })
+        await get().loadStatus()
+      } finally {
+        set({ submitting: false })
+      }
     },
 
     loadStatus: async () => {

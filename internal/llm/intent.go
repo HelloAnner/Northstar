@@ -111,9 +111,11 @@ func ParseIntent(client IntentClient, userMsg string, indicators map[string]floa
 		plan.Actions = []AdjustmentAction{}
 	}
 	for idx, action := range plan.Actions {
-		if err := validateAdjustmentAction(idx, action); err != nil {
+		normalized, err := normalizeAdjustmentAction(idx, action)
+		if err != nil {
 			return nil, err
 		}
+		plan.Actions[idx] = normalized
 	}
 	return &plan, nil
 }
@@ -169,12 +171,15 @@ func extractIntentJSON(content string) (string, error) {
 	return "", fmt.Errorf("intent output is not valid JSON")
 }
 
-func validateAdjustmentAction(idx int, action AdjustmentAction) error {
+func normalizeAdjustmentAction(idx int, action AdjustmentAction) (AdjustmentAction, error) {
+	if action.Type == "set_indicator" {
+		action.Type = "set_target"
+	}
 	if action.Type != "set_target" {
-		return fmt.Errorf("action[%d] type must be set_target", idx)
+		return AdjustmentAction{}, fmt.Errorf("action[%d] type must be set_target", idx)
 	}
 	if _, ok := allowedAdjustmentIndicatorIDs[action.IndicatorID]; !ok {
-		return fmt.Errorf("action[%d] indicatorId %q is invalid", idx, action.IndicatorID)
+		return AdjustmentAction{}, fmt.Errorf("action[%d] indicatorId %q is invalid", idx, action.IndicatorID)
 	}
-	return nil
+	return action, nil
 }

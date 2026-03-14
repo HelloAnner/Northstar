@@ -35,6 +35,7 @@ interface RuleListViewProps {
   onEdit: (index: number, text: string) => Promise<void>
   onDelete: (index: number) => Promise<void>
   onRefresh: () => Promise<void>
+  onConvert: () => Promise<void>
 }
 
 export function RuleListView({
@@ -48,6 +49,7 @@ export function RuleListView({
   onEdit,
   onDelete,
   onRefresh,
+  onConvert,
 }: RuleListViewProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [draft, setDraft] = useState('')
@@ -87,6 +89,15 @@ export function RuleListView({
     }
   }
 
+  const handleConvert = async () => {
+    try {
+      await onConvert()
+      toast.success('已重新触发规则转换')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '触发规则转换失败')
+    }
+  }
+
   const openCreate = () => {
     setEditing(null)
     setDraft('')
@@ -116,6 +127,10 @@ export function RuleListView({
               <RefreshCw className="h-4 w-4" />
               刷新状态
             </Button>
+            <Button variant="outline" onClick={() => void handleConvert()} disabled={submitting}>
+              <RefreshCw className="h-4 w-4" />
+              重新转换
+            </Button>
             <Button onClick={openCreate} disabled={submitting}>
               <Plus className="h-4 w-4" />
               新增规则
@@ -124,13 +139,13 @@ export function RuleListView({
         </CardHeader>
         <CardContent className="space-y-4">
           {status === 'error' && statusError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              <div className="flex items-center gap-2 font-medium">
+            <details className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
                 <AlertCircle className="h-4 w-4" />
-                转换失败
-              </div>
+                转换失败，查看错误详情
+              </summary>
               <div className="mt-2 whitespace-pre-wrap break-words">{statusError}</div>
-            </div>
+            </details>
           )}
 
           <ScrollArea className="max-h-[480px]">
@@ -215,6 +230,7 @@ export default function RuleList() {
   const addRule = useRulesStore((state) => state.addRule)
   const updateRule = useRulesStore((state) => state.updateRule)
   const deleteRule = useRulesStore((state) => state.deleteRule)
+  const convertRules = useRulesStore((state) => state.convertRules)
   const stopPolling = useRulesStore((state) => state.stopPolling)
 
   useEffect(() => {
@@ -237,11 +253,15 @@ export default function RuleList() {
       onEdit={updateRule}
       onDelete={deleteRule}
       onRefresh={loadStatus}
+      onConvert={convertRules}
     />
   )
 }
 
 function buildStatusMeta(status: RuleListViewProps['status']) {
+  if (status === 'idle') {
+    return { label: '待转换', variant: 'outline' as const }
+  }
   if (status === 'running') {
     return { label: '转换中', variant: 'secondary' as const }
   }

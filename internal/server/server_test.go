@@ -47,6 +47,16 @@ func TestNewServerInitializesRuleManagement(t *testing.T) {
 	if len(roleRaw) == 0 {
 		t.Fatal("role.json should not be empty")
 	}
+	var rolePayload map[string]any
+	if err := json.Unmarshal(roleRaw, &rolePayload); err != nil {
+		t.Fatalf("decode role.json: %v", err)
+	}
+	if rolePayload["updatedAt"] == "" {
+		t.Fatalf("expected role.json updatedAt, got %s", string(roleRaw))
+	}
+	if rolePayload["sourceFile"] != "config/rules.md" {
+		t.Fatalf("unexpected role.json sourceFile: %v", rolePayload["sourceFile"])
+	}
 	loadedRules, err := rules.Load(roleJSONPath)
 	if err != nil {
 		t.Fatalf("load role.json: %v", err)

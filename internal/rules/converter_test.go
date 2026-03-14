@@ -9,6 +9,7 @@ package rules
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,6 +152,59 @@ func TestConvertAsyncWritesRoleFileAndStatus(t *testing.T) {
 	}
 	if reloader.reloadCount != 1 {
 		t.Fatalf("expected reload rules once, got %d", reloader.reloadCount)
+	}
+}
+
+func TestConvertAsyncNormalizesRoleJSONMetadata(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "northstar.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("init store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	tmpDir := t.TempDir()
+	rolePath := filepath.Join(tmpDir, "config", "role.json")
+	mdPath := filepath.Join(tmpDir, "config", "rules.md")
+	converter := &Converter{
+		llm: &fakeRuleChatClient{
+			responses: []llm.ChatResult{
+				{Content: "{\"version\":\"1.0\",\"rules\":[{\"id\":\"c1\",\"name\":\"批发上限\",\"type\":\"clamp_target\",\"indicator\":\"wholesale_month_rate\",\"max\":15}]}"},
+			},
+		},
+		rolePath: rolePath,
+		mdPath:   mdPath,
+		store:    st,
+	}
+
+	converter.ConvertAsync("# 调整规则\n\n1. 批发当月增速不超过 15%")
+
+	waitForRuleStatus(t, st, "ok")
+	data, err := os.ReadFile(rolePath)
+	if err != nil {
+		t.Fatalf("read role.json: %v", err)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("unmarshal role.json: %v", err)
+	}
+	if strings.TrimSpace(raw["updatedAt"].(string)) == "" {
+		t.Fatalf("expected updatedAt, got %s", string(data))
+	}
+	if raw["sourceFile"] != "config/rules.md" {
+		t.Fatalf("expected normalized sourceFile, got %v", raw["sourceFile"])
+	}
+	rules, ok := raw["rules"].([]any)
+	if !ok || len(rules) != 1 {
+		t.Fatalf("expected rules array, got %v", raw["rules"])
+	}
+	rule, ok := rules[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first rule object, got %T", rules[0])
+	}
+	if rule["description"] != "批发上限" {
+		t.Fatalf("expected synthesized description, got %v", rule["description"])
 	}
 }
 
