@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"northstar/internal/config"
+	"northstar/internal/rules"
 )
 
 func TestNewServerInitializesRuleManagement(t *testing.T) {
@@ -34,8 +35,27 @@ func TestNewServerInitializesRuleManagement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rules.md: %v", err)
 	}
-	if string(raw) != "# 调整规则\n\n" {
-		t.Fatalf("unexpected rules.md content:\n%s", string(raw))
+	if len(raw) == 0 {
+		t.Fatal("rules.md should not be empty")
+	}
+
+	roleJSONPath := filepath.Join(dataDir, "config", "role.json")
+	roleRaw, err := os.ReadFile(roleJSONPath)
+	if err != nil {
+		t.Fatalf("read role.json: %v", err)
+	}
+	if len(roleRaw) == 0 {
+		t.Fatal("role.json should not be empty")
+	}
+	loadedRules, err := rules.Load(roleJSONPath)
+	if err != nil {
+		t.Fatalf("load role.json: %v", err)
+	}
+	if loadedRules == nil {
+		t.Fatal("loaded rules should not be nil")
+	}
+	if total := len(loadedRules.Clamps) + len(loadedRules.Filters) + len(loadedRules.Compensates); total != 17 {
+		t.Fatalf("expected 17 default role.json rules, got %d", total)
 	}
 
 	assertConfigValue(t, s, "rules_convert_status", "idle")
@@ -59,8 +79,9 @@ func TestNewServerInitializesRuleManagement(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
 		t.Fatalf("decode rules: %v", err)
 	}
-	if len(items) != 0 {
-		t.Fatalf("expected empty rules list, got %+v", items)
+	// 默认内置 3 条值类非负约束 + 13 条增速范围约束 + 1 条联动约束
+	if len(items) != 17 {
+		t.Fatalf("expected 17 default rules, got %d", len(items))
 	}
 }
 

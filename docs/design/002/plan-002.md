@@ -88,7 +88,7 @@
 
 **后端 server/server.go**
 
-- [x] 启动时检测 `config/rules.md` 是否存在，不存在则创建默认空文件
+- [x] 启动时检测 `config/rules.md` / `config/role.json` 是否存在，不存在则从内置 defaults 拷贝默认规则文件
 - [x] 启动时调用 `engine.ReloadRules()`（role.json 不存在时正常运行）
 - [x] config 表新增四个键的默认值注入
 

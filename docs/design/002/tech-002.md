@@ -597,11 +597,10 @@ config/                  ← 新建目录，与 store.db 同级
 
 ```go
 // server/server.go 启动时
-if _, err := os.Stat("config/rules.md"); os.IsNotExist(err) {
-    os.MkdirAll("config", 0755)
-    os.WriteFile("config/rules.md", []byte("# 调整规则\n\n"), 0644)
-}
-engine.ReloadRules()  // role.json 不存在时返回空 RuleSet，正常运行
+os.MkdirAll("config", 0755)
+ensureRulesMarkdown("config/rules.md") // 从 internal/server/defaults/rules.md 拷贝
+ensureRoleJSON("config/role.json")     // 从 internal/server/defaults/role.json 拷贝
+engine.ReloadRules()                   // 加载默认或现有 role.json
 ```
 
 ---
