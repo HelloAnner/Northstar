@@ -1,0 +1,1766 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "text",
+      "id": "dashboard_dark_label",
+      "name": "Dashboard Dark Label",
+      "x": 0,
+      "y": 0,
+      "content": "仪表盘页面 · Dark",
+      "fontFamily": "Inter",
+      "fontSize": 28,
+      "fontWeight": "bold",
+      "fill": "#111827"
+    },
+    {
+      "type": "frame",
+      "id": "dashboard_dark_screen",
+      "name": "Dashboard Dark",
+      "x": 0,
+      "y": 56,
+      "width": 1440,
+      "height": 1120,
+      "layout": "none",
+      "fill": "#070e1b",
+      "children": [
+        {
+          "type": "text",
+          "id": "dashboard_dark_title",
+          "x": 24,
+          "y": 18,
+          "content": "Northstar",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#f8fbff"
+        },
+        {
+          "type": "text",
+          "id": "dashboard_dark_subtitle",
+          "x": 24,
+          "y": 50,
+          "content": "2025年12月 · 共 225 家（批零 178 + 住餐 47）",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#8fa0b8"
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_saved",
+          "x": 812,
+          "y": 18,
+          "width": 78,
+          "height": 28,
+          "layout": "none",
+          "fill": "#111a2b",
+          "cornerRadius": 999,
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_saved_text",
+              "x": 16,
+              "y": 8,
+              "content": "已保存",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_month",
+          "x": 900,
+          "y": 16,
+          "width": 156,
+          "height": 32,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_month_text",
+              "x": 16,
+              "y": 10,
+              "content": "2025年12月 · 225 家",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_adjust",
+          "x": 1068,
+          "y": 16,
+          "width": 88,
+          "height": 32,
+          "layout": "none",
+          "fill": "#d97706",
+          "cornerRadius": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_adjust_text",
+              "x": 16,
+              "y": 10,
+              "content": "智能调整",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#ffffff"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_undo",
+          "x": 1164,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_undo_text",
+              "x": 18,
+              "y": 10,
+              "content": "撤销",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_import_btn",
+          "x": 1228,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_import_btn_text",
+              "x": 18,
+              "y": 10,
+              "content": "导入",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_export_btn",
+          "x": 1292,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_export_btn_text",
+              "x": 18,
+              "y": 10,
+              "content": "导出",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_config_btn",
+          "x": 1356,
+          "y": 16,
+          "width": 60,
+          "height": 32,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_config_btn_text",
+              "x": 8,
+              "y": 10,
+              "content": "配置",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_card1",
+          "x": 24,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_card1_title",
+              "x": 18,
+              "y": 18,
+              "content": "限上社零额",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_card1_lines",
+              "x": 18,
+              "y": 50,
+              "content": "限上社零额\n月值（当月）\n\n限上社零额\n增速（当月）\n\n限上社零额\n月值（累计）\n\n限上社零额\n增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card1_p1",
+              "x": 172,
+              "y": 48,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card1_p1_t",
+                  "x": 68,
+                  "y": 9,
+                  "content": "0",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#e5edf8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card1_p2",
+              "x": 172,
+              "y": 96,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card1_p2_t",
+                  "x": 54,
+                  "y": 9,
+                  "content": "-100",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#ff8f8f"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card1_p3",
+              "x": 172,
+              "y": 144,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card1_p3_t",
+                  "x": 22,
+                  "y": 9,
+                  "content": "4,668,009",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#e5edf8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card1_p4",
+              "x": 172,
+              "y": 192,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card1_p4_t",
+                  "x": 68,
+                  "y": 9,
+                  "content": "0",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#76d6c0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_card2",
+          "x": 372,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_card2_title",
+              "x": 18,
+              "y": 18,
+              "content": "专项增速",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_card2_lines",
+              "x": 18,
+              "y": 56,
+              "content": "吃穿用增速\n（当月）\n\n小微企业增速\n（当月）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card2_p1",
+              "x": 172,
+              "y": 56,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card2_p1_t",
+                  "x": 68,
+                  "y": 9,
+                  "content": "0",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#76d6c0"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card2_p2",
+              "x": 172,
+              "y": 112,
+              "width": 116,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card2_p2_t",
+                  "x": 54,
+                  "y": 9,
+                  "content": "-100",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#ff8f8f"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_card3",
+          "x": 720,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_card3_title",
+              "x": 18,
+              "y": 18,
+              "content": "四大行业增速",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_card3_lines",
+              "x": 18,
+              "y": 46,
+              "content": "批发业销售额增速（当月）\n批发业销售额增速（累计）\n零售业销售额增速（当月）\n零售业销售额增速（累计）\n住宿业营业额增速（当月）\n住宿业营业额增速（累计）\n餐饮业营业额增速（当月）\n餐饮业营业额增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_card3_values",
+              "x": 244,
+              "y": 46,
+              "content": "-100\n22\n-100\n-1\n-100\n17\n-100\n4",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "bold",
+              "fill": "#ff8f8f"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_card4",
+          "x": 1068,
+          "y": 96,
+          "width": 348,
+          "height": 228,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_card4_title",
+              "x": 18,
+              "y": 18,
+              "content": "社零总额",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_card4_lines",
+              "x": 18,
+              "y": 56,
+              "content": "社零总额（累计值）\n\n社零总额增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card4_p1",
+              "x": 190,
+              "y": 56,
+              "width": 126,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card4_p1_t",
+                  "x": 24,
+                  "y": 9,
+                  "content": "4,668,009",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#e5edf8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_card4_p2",
+              "x": 190,
+              "y": 112,
+              "width": 126,
+              "height": 28,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_card4_p2_t",
+                  "x": 58,
+                  "y": 9,
+                  "content": "0",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#76d6c0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_dark_table",
+          "x": 24,
+          "y": 348,
+          "width": 1392,
+          "height": 732,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_dark_table_title",
+              "x": 18,
+              "y": 18,
+              "content": "企业数据微调",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "bold",
+              "fill": "#f8fbff"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_table_subtitle",
+              "x": 18,
+              "y": 42,
+              "content": "支持搜索 / 筛选 / 排序；修改后自动保存并联动更新 16 项指标",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_autosave",
+              "x": 1278,
+              "y": 18,
+              "width": 78,
+              "height": 24,
+              "layout": "none",
+              "fill": "#111a2b",
+              "cornerRadius": 999,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_autosave_t",
+                  "x": 12,
+                  "y": 7,
+                  "content": "自动保存",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#dce4f0"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_tabs",
+              "x": 18,
+              "y": 74,
+              "width": 188,
+              "height": 30,
+              "layout": "none",
+              "fill": "#0b1424",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dashboard_dark_tab_all",
+                  "x": 4,
+                  "y": 4,
+                  "width": 34,
+                  "height": 22,
+                  "layout": "none",
+                  "fill": "#e5edf8",
+                  "cornerRadius": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dashboard_dark_tab_all_t",
+                      "x": 10,
+                      "y": 6,
+                      "content": "全部",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "bold",
+                      "fill": "#111827"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_tabs_other",
+                  "x": 50,
+                  "y": 9,
+                  "content": "批发    零售    住宿    餐饮",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#8fa0b8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_table_month",
+              "x": 872,
+              "y": 72,
+              "width": 160,
+              "height": 32,
+              "layout": "none",
+              "fill": "#091221",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_table_month_t",
+                  "x": 16,
+                  "y": 10,
+                  "content": "2025年12月 · 225 家",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#e5edf8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_search",
+              "x": 1044,
+              "y": 72,
+              "width": 312,
+              "height": 32,
+              "layout": "none",
+              "fill": "#091221",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#223046"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_search_t",
+                  "x": 16,
+                  "y": 10,
+                  "content": "按企业名称/信用代码搜索…",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal",
+                  "fill": "#7d8ca2"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_header_row",
+              "x": 18,
+              "y": 122,
+              "width": 1356,
+              "height": 40,
+              "layout": "none",
+              "fill": "#101a2b",
+              "cornerRadius": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_header_t",
+                  "x": 22,
+                  "y": 14,
+                  "content": "企业名称        规模   标记   本年-上月   本年-本月   上年-本月   同比增量(当月)   同比增速(当月)   本年-1—本月",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#8fa0b8"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row1_name",
+              "x": 28,
+              "y": 186,
+              "content": "东北酒店测试企业0641有限公司\n91320500TCE5UYN5HX",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row1_values",
+              "x": 388,
+              "y": 196,
+              "content": "0      小微      408      0      327      -327      -100      4164",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_dark_row1_line",
+              "x": 18,
+              "y": 232,
+              "width": 1356,
+              "height": 1,
+              "fill": "#162334"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row2_name",
+              "x": 28,
+              "y": 252,
+              "content": "华东电器测试企业0646股份有限公司\n91320500YYNR3L6DH1",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row2_values",
+              "x": 388,
+              "y": 262,
+              "content": "0      -         253      0      201      -201      -100      3080",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_dark_row2_line",
+              "x": 18,
+              "y": 298,
+              "width": 1356,
+              "height": 1,
+              "fill": "#162334"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row3_name",
+              "x": 28,
+              "y": 318,
+              "content": "华南批发测试企业0644有限责任公司\n91510100YFBMD93HMM",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row3_values",
+              "x": 388,
+              "y": 328,
+              "content": "0      小微      881      0      791      -791      -100      13164",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_dark_row3_line",
+              "x": 18,
+              "y": 364,
+              "width": 1356,
+              "height": 1,
+              "fill": "#162334"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row4_name",
+              "x": 28,
+              "y": 384,
+              "content": "安城食品测试企业0640有限责任公司\n91350200T2GNMPQXBY",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#e5edf8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_row4_values",
+              "x": 388,
+              "y": 394,
+              "content": "0      小微      382      0      311      -311      -100      3971",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_dark_row4_line",
+              "x": 18,
+              "y": 430,
+              "width": 1356,
+              "height": 1,
+              "fill": "#162334"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_dark_footer",
+              "x": 18,
+              "y": 694,
+              "content": "共 225 家企业",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_dark_fab",
+              "x": 1336,
+              "y": 450,
+              "width": 44,
+              "height": 44,
+              "layout": "none",
+              "fill": "#3b82f6",
+              "cornerRadius": 999,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_dark_fab_t",
+                  "x": 18,
+                  "y": 14,
+                  "content": "D",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "dashboard_light_label",
+      "name": "Dashboard Light Label",
+      "x": 1560,
+      "y": 0,
+      "content": "仪表盘页面 · Light",
+      "fontFamily": "Inter",
+      "fontSize": 28,
+      "fontWeight": "bold",
+      "fill": "#111827"
+    },
+    {
+      "type": "frame",
+      "id": "dashboard_light_screen",
+      "name": "Dashboard Light",
+      "x": 1560,
+      "y": 56,
+      "width": 1440,
+      "height": 1120,
+      "layout": "none",
+      "fill": "#f8fafc",
+      "children": [
+        {
+          "type": "text",
+          "id": "dashboard_light_title",
+          "x": 24,
+          "y": 18,
+          "content": "Northstar",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#111827"
+        },
+        {
+          "type": "text",
+          "id": "dashboard_light_subtitle",
+          "x": 24,
+          "y": 50,
+          "content": "2025年12月 · 共 225 家（批零 178 + 住餐 47）",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#94a3b8"
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_saved",
+          "x": 812,
+          "y": 18,
+          "width": 78,
+          "height": 28,
+          "layout": "none",
+          "fill": "#eef2f7",
+          "cornerRadius": 999,
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_saved_text",
+              "x": 16,
+              "y": 8,
+              "content": "已保存",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_month",
+          "x": 900,
+          "y": 16,
+          "width": 156,
+          "height": 32,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_month_text",
+              "x": 16,
+              "y": 10,
+              "content": "2025年12月 · 225 家",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_adjust",
+          "x": 1068,
+          "y": 16,
+          "width": 88,
+          "height": 32,
+          "layout": "none",
+          "fill": "#fdba74",
+          "cornerRadius": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_adjust_text",
+              "x": 16,
+              "y": 10,
+              "content": "智能调整",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#ffffff"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_undo",
+          "x": 1164,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_undo_text",
+              "x": 18,
+              "y": 10,
+              "content": "撤销",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_import_btn",
+          "x": 1228,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_import_btn_text",
+              "x": 18,
+              "y": 10,
+              "content": "导入",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_export_btn",
+          "x": 1292,
+          "y": 16,
+          "width": 56,
+          "height": 32,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_export_btn_text",
+              "x": 18,
+              "y": 10,
+              "content": "导出",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_config_btn",
+          "x": 1356,
+          "y": 16,
+          "width": 60,
+          "height": 32,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 12,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_config_btn_text",
+              "x": 8,
+              "y": 10,
+              "content": "配置",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_card1",
+          "x": 24,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_card1_title",
+              "x": 18,
+              "y": 18,
+              "content": "限上社零额",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card1_lines",
+              "x": 18,
+              "y": 50,
+              "content": "限上社零额\n月值（当月）\n\n限上社零额\n增速（当月）\n\n限上社零额\n月值（累计）\n\n限上社零额\n增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card1_vals",
+              "x": 220,
+              "y": 58,
+              "content": "0\n\n-100\n\n4,668,009\n\n0",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#fb7185"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_card2",
+          "x": 372,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_card2_title",
+              "x": 18,
+              "y": 18,
+              "content": "专项增速",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card2_lines",
+              "x": 18,
+              "y": 56,
+              "content": "吃穿用增速\n（当月）\n\n小微企业增速\n（当月）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card2_vals",
+              "x": 238,
+              "y": 62,
+              "content": "0\n\n-100",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#34d399"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_card3",
+          "x": 720,
+          "y": 96,
+          "width": 324,
+          "height": 228,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_card3_title",
+              "x": 18,
+              "y": 18,
+              "content": "四大行业增速",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card3_lines",
+              "x": 18,
+              "y": 46,
+              "content": "批发业销售额增速（当月）\n批发业销售额增速（累计）\n零售业销售额增速（当月）\n零售业销售额增速（累计）\n住宿业营业额增速（当月）\n住宿业营业额增速（累计）\n餐饮业营业额增速（当月）\n餐饮业营业额增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card3_values",
+              "x": 244,
+              "y": 46,
+              "content": "-100\n22\n-100\n-1\n-100\n17\n-100\n4",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "bold",
+              "fill": "#fb7185"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_card4",
+          "x": 1068,
+          "y": 96,
+          "width": 348,
+          "height": 228,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_card4_title",
+              "x": 18,
+              "y": 18,
+              "content": "社零总额",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#475569"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card4_lines",
+              "x": 18,
+              "y": 56,
+              "content": "社零总额（累计值）\n\n社零总额增速（累计）",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_card4_vals",
+              "x": 224,
+              "y": 62,
+              "content": "4,668,009\n\n0",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#34d399"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dashboard_light_table",
+          "x": 24,
+          "y": 348,
+          "width": 1392,
+          "height": 732,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "dashboard_light_table_title",
+              "x": 18,
+              "y": 18,
+              "content": "企业数据微调",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "bold",
+              "fill": "#111827"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_table_subtitle",
+              "x": 18,
+              "y": 42,
+              "content": "支持搜索 / 筛选 / 排序；修改后自动保存并联动更新 16 项指标",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_autosave",
+              "x": 1278,
+              "y": 18,
+              "width": 78,
+              "height": 24,
+              "layout": "none",
+              "fill": "#eef2f7",
+              "cornerRadius": 999,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_light_autosave_t",
+                  "x": 12,
+                  "y": 7,
+                  "content": "自动保存",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#475569"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_tabs",
+              "x": 18,
+              "y": 74,
+              "width": 188,
+              "height": 30,
+              "layout": "none",
+              "fill": "#eef2f7",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dashboard_light_tab_all",
+                  "x": 4,
+                  "y": 4,
+                  "width": 34,
+                  "height": 22,
+                  "layout": "none",
+                  "fill": "#ffffff",
+                  "cornerRadius": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dashboard_light_tab_all_t",
+                      "x": 10,
+                      "y": 6,
+                      "content": "全部",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "bold",
+                      "fill": "#111827"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "dashboard_light_tabs_other",
+                  "x": 50,
+                  "y": 9,
+                  "content": "批发    零售    住宿    餐饮",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#94a3b8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_table_month",
+              "x": 872,
+              "y": 72,
+              "width": 160,
+              "height": 32,
+              "layout": "none",
+              "fill": "#ffffff",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#e2e8f0"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_light_table_month_t",
+                  "x": 16,
+                  "y": 10,
+                  "content": "2025年12月 · 225 家",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "bold",
+                  "fill": "#475569"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_search",
+              "x": 1044,
+              "y": 72,
+              "width": 312,
+              "height": 32,
+              "layout": "none",
+              "fill": "#ffffff",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#e2e8f0"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_light_search_t",
+                  "x": 16,
+                  "y": 10,
+                  "content": "按企业名称/信用代码搜索…",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal",
+                  "fill": "#94a3b8"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_header_row",
+              "x": 18,
+              "y": 122,
+              "width": 1356,
+              "height": 40,
+              "layout": "none",
+              "fill": "#f8fafc",
+              "cornerRadius": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_light_header_t",
+                  "x": 22,
+                  "y": 14,
+                  "content": "企业名称        规模   标记   本年-上月   本年-本月   上年-本月   同比增量(当月)   同比增速(当月)   本年-1—本月",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "bold",
+                  "fill": "#94a3b8"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row1_name",
+              "x": 28,
+              "y": 186,
+              "content": "东北酒店测试企业0641有限公司\n91320500TCE5UYN5HX",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#334155"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row1_values",
+              "x": 388,
+              "y": 196,
+              "content": "0      小微      408      0      327      -327      -100      4164",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#475569"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_light_row1_line",
+              "x": 18,
+              "y": 232,
+              "width": 1356,
+              "height": 1,
+              "fill": "#e5ebf4"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row2_name",
+              "x": 28,
+              "y": 252,
+              "content": "华东电器测试企业0646股份有限公司\n91320500YYNR3L6DH1",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#334155"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row2_values",
+              "x": 388,
+              "y": 262,
+              "content": "0      -         253      0      201      -201      -100      3080",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#475569"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_light_row2_line",
+              "x": 18,
+              "y": 298,
+              "width": 1356,
+              "height": 1,
+              "fill": "#e5ebf4"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row3_name",
+              "x": 28,
+              "y": 318,
+              "content": "华南批发测试企业0644有限责任公司\n91510100YFBMD93HMM",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#334155"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row3_values",
+              "x": 388,
+              "y": 328,
+              "content": "0      小微      881      0      791      -791      -100      13164",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#475569"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_light_row3_line",
+              "x": 18,
+              "y": 364,
+              "width": 1356,
+              "height": 1,
+              "fill": "#e5ebf4"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row4_name",
+              "x": 28,
+              "y": 384,
+              "content": "安城食品测试企业0640有限责任公司\n91350200T2GNMPQXBY",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#334155"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_row4_values",
+              "x": 388,
+              "y": 394,
+              "content": "0      小微      382      0      311      -311      -100      3971",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal",
+              "fill": "#475569"
+            },
+            {
+              "type": "rectangle",
+              "id": "dashboard_light_row4_line",
+              "x": 18,
+              "y": 430,
+              "width": 1356,
+              "height": 1,
+              "fill": "#e5ebf4"
+            },
+            {
+              "type": "text",
+              "id": "dashboard_light_footer",
+              "x": 18,
+              "y": 694,
+              "content": "共 225 家企业",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "frame",
+              "id": "dashboard_light_fab",
+              "x": 1336,
+              "y": 450,
+              "width": 44,
+              "height": 44,
+              "layout": "none",
+              "fill": "#3b82f6",
+              "cornerRadius": 999,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dashboard_light_fab_t",
+                  "x": 18,
+                  "y": 14,
+                  "content": "D",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

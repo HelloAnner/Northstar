@@ -89,15 +89,6 @@ export default function DashboardV3() {
     }
   }
 
-  const shouldApplyRandomDelay = () => {
-    const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
-    return new Date().getTime() >= start.getTime()
-  }
-
-  const randomDelayMs = () => Math.floor(3000 + Math.random() * 3001) // 3000..6000 ms
-
-  const delay = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-
   // 加载系统状态
   const loadStatus = async () => {
     try {
@@ -190,10 +181,6 @@ export default function DashboardV3() {
       if (undoMeta) {
         beforeSnapshot = await fetchCompaniesSnapshot()
       }
-      if (shouldApplyRandomDelay()) {
-        await delay(randomDelayMs())
-      }
-
       const res = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -438,7 +425,7 @@ export default function DashboardV3() {
 
             <Button
               disabled={!hasDraft || optimizing}
-              className="gap-2 bg-orange-500 text-black opacity-80 hover:bg-orange-400"
+              className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
               onClick={handleSmartAdjust}
               title={hasDraft ? '按输入值反推并写回企业数据' : '先在指标输入框里填入目标值'}
             >

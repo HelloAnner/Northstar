@@ -39,6 +39,9 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     return `${year} 年 ${String(month).padStart(2, '0')} 月`
   }, [year, month])
 
+  // 让进度条“慢一点”：每增加 1% 需要 10ms，总计额外 ~1s（0% -> 100%）
+  const perPercentMs = 10
+
   const resetState = () => {
     setExporting(false)
     setCompleted(false)
@@ -87,7 +90,12 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
 
   const ensureAnimating = () => {
     if (rafRef.current !== null) return
-    const step = () => {
+
+    let last = performance.now()
+    const step = (now: number) => {
+      const deltaMs = now - last
+      last = now
+
       const display = displayPercentRef.current
       const target = targetPercentRef.current
       if (display >= target) {
@@ -96,7 +104,8 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
         return
       }
 
-      const next = target
+      const inc = deltaMs / perPercentMs
+      const next = Math.min(target, display + inc)
       displayPercentRef.current = next
       setPercent(next)
 
@@ -241,14 +250,14 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-red-200">
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
               <XCircle className="h-4 w-4" />
               <span className="text-sm">{error}</span>
             </div>
           )}
 
           {completed && !error && (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-200">
+            <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-600 dark:text-emerald-400">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm">导出完成，点击按钮下载</span>
             </div>

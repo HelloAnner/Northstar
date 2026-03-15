@@ -1,0 +1,763 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "text",
+      "id": "help_dark_label",
+      "name": "Help Dark Label",
+      "x": 0,
+      "y": 0,
+      "content": "帮助文档页面 · Dark",
+      "fontFamily": "Inter",
+      "fontSize": 28,
+      "fontWeight": "bold",
+      "fill": "#111827"
+    },
+    {
+      "type": "frame",
+      "id": "help_dark_screen",
+      "name": "Help Dark",
+      "x": 0,
+      "y": 56,
+      "width": 1440,
+      "height": 900,
+      "layout": "none",
+      "fill": "#070e1b",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "help_dark_topline",
+          "x": 0,
+          "y": 47,
+          "width": 1440,
+          "height": 1,
+          "fill": "#162131"
+        },
+        {
+          "type": "text",
+          "id": "help_dark_navtitle",
+          "x": 16,
+          "y": 14,
+          "content": "帮助文档",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#8fa0b8"
+        },
+        {
+          "type": "frame",
+          "id": "help_dark_backbtn",
+          "x": 1294,
+          "y": 10,
+          "width": 122,
+          "height": 28,
+          "layout": "none",
+          "fill": "#070e1b",
+          "cornerRadius": 10,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#223046"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_dark_backtxt",
+              "x": 16,
+              "y": 7,
+              "content": "< 返回首页",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "bold",
+              "fill": "#e8eef8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "help_dark_sidebar",
+          "x": 122,
+          "y": 70,
+          "width": 220,
+          "height": 188,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_dark_sideheading",
+              "x": 20,
+              "y": 18,
+              "content": "章节导航",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "bold",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "help_dark_sideactive",
+              "x": 12,
+              "y": 31,
+              "width": 196,
+              "height": 44,
+              "layout": "none",
+              "fill": "#273246",
+              "cornerRadius": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_dark_sideactive_title",
+                  "x": 16,
+                  "y": 10,
+                  "content": "推荐流程",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#f8fbff"
+                },
+                {
+                  "type": "text",
+                  "id": "help_dark_sideactive_desc",
+                  "x": 16,
+                  "y": 26,
+                  "content": "导入与使用的最佳路径",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal",
+                  "fill": "#9cacbf"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_dark_side2",
+              "x": 20,
+              "y": 104,
+              "content": "指标含义",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_side2_desc",
+              "x": 20,
+              "y": 121,
+              "content": "企业字段与指标口径",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#7d8ca2"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_side3",
+              "x": 20,
+              "y": 157,
+              "content": "联动逻辑",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "bold",
+              "fill": "#dce4f0"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_side3_desc",
+              "x": 20,
+              "y": 174,
+              "content": "指标计算与保存机制",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#7d8ca2"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "help_dark_title",
+          "x": 360,
+          "y": 68,
+          "content": "帮助文档",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#f8fbff"
+        },
+        {
+          "type": "text",
+          "id": "help_dark_subtitle",
+          "x": 360,
+          "y": 107,
+          "content": "系统使用指南与指标计算规则",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#8fa0b8"
+        },
+        {
+          "type": "frame",
+          "id": "help_dark_card",
+          "x": 360,
+          "y": 142,
+          "width": 746,
+          "height": 245,
+          "layout": "none",
+          "fill": "#091221",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#172334"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_dark_cardtitle",
+              "x": 24,
+              "y": 19,
+              "content": "推荐流程",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "bold",
+              "fill": "#f8fbff"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_cardsubtitle",
+              "x": 24,
+              "y": 48,
+              "content": "导入 -> Northstar 调整 -> 导出",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#8fa0b8"
+            },
+            {
+              "type": "frame",
+              "id": "help_dark_step1_badge",
+              "x": 24,
+              "y": 83,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_dark_step1_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "1",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step1_title",
+              "x": 60,
+              "y": 80,
+              "content": "导入 Excel 数据",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#f8fbff"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step1_desc",
+              "x": 60,
+              "y": 104,
+              "content": "上传企业数据 Excel，系统会自动识别表格结构并导入数据。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#9cacbf"
+            },
+            {
+              "type": "frame",
+              "id": "help_dark_step2_badge",
+              "x": 24,
+              "y": 134,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_dark_step2_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "2",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step2_title",
+              "x": 60,
+              "y": 131,
+              "content": "在 Northstar 查看与调整",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#f8fbff"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step2_desc",
+              "x": 60,
+              "y": 155,
+              "content": "查看 16 项指标和企业数据；所有数据均可编辑，任意字段变更后会自动重新计算全部指标并保存。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#9cacbf"
+            },
+            {
+              "type": "frame",
+              "id": "help_dark_step3_badge",
+              "x": 24,
+              "y": 186,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_dark_step3_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "3",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step3_title",
+              "x": 60,
+              "y": 183,
+              "content": "导出数据",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#f8fbff"
+            },
+            {
+              "type": "text",
+              "id": "help_dark_step3_desc",
+              "x": 60,
+              "y": 207,
+              "content": "导出包含企业数据与指标汇总的 Excel 文件。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#9cacbf"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "help_light_label",
+      "name": "Help Light Label",
+      "x": 1560,
+      "y": 0,
+      "content": "帮助文档页面 · Light",
+      "fontFamily": "Inter",
+      "fontSize": 28,
+      "fontWeight": "bold",
+      "fill": "#111827"
+    },
+    {
+      "type": "frame",
+      "id": "help_light_screen",
+      "name": "Help Light",
+      "x": 1560,
+      "y": 56,
+      "width": 1440,
+      "height": 900,
+      "layout": "none",
+      "fill": "#f8fafc",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "help_light_topline",
+          "x": 0,
+          "y": 47,
+          "width": 1440,
+          "height": 1,
+          "fill": "#e7edf5"
+        },
+        {
+          "type": "text",
+          "id": "help_light_navtitle",
+          "x": 16,
+          "y": 14,
+          "content": "帮助文档",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#6b7280"
+        },
+        {
+          "type": "frame",
+          "id": "help_light_backbtn",
+          "x": 1294,
+          "y": 10,
+          "width": 122,
+          "height": 28,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 10,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#d9e2ec"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_light_backtxt",
+              "x": 16,
+              "y": 7,
+              "content": "< 返回首页",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "bold",
+              "fill": "#374151"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "help_light_sidebar",
+          "x": 122,
+          "y": 70,
+          "width": 220,
+          "height": 188,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_light_sideheading",
+              "x": 20,
+              "y": 18,
+              "content": "章节导航",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "bold",
+              "fill": "#6b7280"
+            },
+            {
+              "type": "frame",
+              "id": "help_light_sideactive",
+              "x": 12,
+              "y": 31,
+              "width": 196,
+              "height": 44,
+              "layout": "none",
+              "fill": "#eef4fb",
+              "cornerRadius": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_light_sideactive_title",
+                  "x": 16,
+                  "y": 10,
+                  "content": "推荐流程",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#1f2937"
+                },
+                {
+                  "type": "text",
+                  "id": "help_light_sideactive_desc",
+                  "x": 16,
+                  "y": 26,
+                  "content": "导入与使用的最佳路径",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "normal",
+                  "fill": "#6b7280"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_light_side2",
+              "x": 20,
+              "y": 104,
+              "content": "指标含义",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "bold",
+              "fill": "#374151"
+            },
+            {
+              "type": "text",
+              "id": "help_light_side2_desc",
+              "x": 20,
+              "y": 121,
+              "content": "企业字段与指标口径",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "text",
+              "id": "help_light_side3",
+              "x": 20,
+              "y": 157,
+              "content": "联动逻辑",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "bold",
+              "fill": "#374151"
+            },
+            {
+              "type": "text",
+              "id": "help_light_side3_desc",
+              "x": 20,
+              "y": 174,
+              "content": "指标计算与保存机制",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "help_light_title",
+          "x": 360,
+          "y": 68,
+          "content": "帮助文档",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#111827"
+        },
+        {
+          "type": "text",
+          "id": "help_light_subtitle",
+          "x": 360,
+          "y": 107,
+          "content": "系统使用指南与指标计算规则",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#94a3b8"
+        },
+        {
+          "type": "frame",
+          "id": "help_light_card",
+          "x": 360,
+          "y": 142,
+          "width": 746,
+          "height": 245,
+          "layout": "none",
+          "fill": "#ffffff",
+          "cornerRadius": 16,
+          "stroke": {
+            "thickness": 1,
+            "fill": "#e2e8f0"
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "help_light_cardtitle",
+              "x": 24,
+              "y": 19,
+              "content": "推荐流程",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "bold",
+              "fill": "#111827"
+            },
+            {
+              "type": "text",
+              "id": "help_light_cardsubtitle",
+              "x": 24,
+              "y": 48,
+              "content": "导入 -> Northstar 调整 -> 导出",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#94a3b8"
+            },
+            {
+              "type": "frame",
+              "id": "help_light_step1_badge",
+              "x": 24,
+              "y": 83,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_light_step1_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "1",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_light_step1_title",
+              "x": 60,
+              "y": 80,
+              "content": "导入 Excel 数据",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#111827"
+            },
+            {
+              "type": "text",
+              "id": "help_light_step1_desc",
+              "x": 60,
+              "y": 104,
+              "content": "上传企业数据 Excel，系统会自动识别表格结构并导入数据。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#64748b"
+            },
+            {
+              "type": "frame",
+              "id": "help_light_step2_badge",
+              "x": 24,
+              "y": 134,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_light_step2_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "2",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_light_step2_title",
+              "x": 60,
+              "y": 131,
+              "content": "在 Northstar 查看与调整",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#111827"
+            },
+            {
+              "type": "text",
+              "id": "help_light_step2_desc",
+              "x": 60,
+              "y": 155,
+              "content": "查看 16 项指标和企业数据；所有数据均可编辑，任意字段变更后会自动重新计算全部指标并保存。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#64748b"
+            },
+            {
+              "type": "frame",
+              "id": "help_light_step3_badge",
+              "x": 24,
+              "y": 186,
+              "width": 24,
+              "height": 24,
+              "layout": "none",
+              "fill": "#f97316",
+              "cornerRadius": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "help_light_step3_badge_text",
+                  "x": 8,
+                  "y": 4,
+                  "content": "3",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#ffffff"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "help_light_step3_title",
+              "x": 60,
+              "y": 183,
+              "content": "导出数据",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#111827"
+            },
+            {
+              "type": "text",
+              "id": "help_light_step3_desc",
+              "x": 60,
+              "y": 207,
+              "content": "导出包含企业数据与指标汇总的 Excel 文件。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal",
+              "fill": "#64748b"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
