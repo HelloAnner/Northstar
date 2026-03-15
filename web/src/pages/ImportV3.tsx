@@ -448,7 +448,7 @@ export default function ImportV3() {
             )}
           </div>
           <div className="mt-4 grid grid-cols-4 gap-3">
-            <Card className="p-3">
+            <Card className="border-border/60 bg-card/60 p-3">
               <div className="text-xs text-muted-foreground">识别结果</div>
               <div className="mt-1 flex items-center gap-2 text-sm">
                 <Badge variant="secondary">{liveSummary.total} 个 Sheet</Badge>
@@ -456,13 +456,13 @@ export default function ImportV3() {
                 <Badge variant="secondary">{liveSummary.warn} 警告</Badge>
               </div>
             </Card>
-            <Card className="p-3">
+            <Card className="border-border/60 bg-card/60 p-3">
               <div className="text-xs text-muted-foreground">进度</div>
               <div className="mt-2">
                 <Progress value={displayProgress} className="h-2" />
               </div>
             </Card>
-            <Card className="p-3">
+            <Card className="border-border/60 bg-card/60 p-3">
               <div className="text-xs text-muted-foreground">异常</div>
               <div className="mt-1 flex items-center gap-2 text-sm">
                 <AlertTriangle className="h-4 w-4 text-amber-400" />
@@ -489,7 +489,7 @@ export default function ImportV3() {
 
             <ScrollArea className="h-full">
               <div className="p-6 space-y-4">
-                <Card className="p-4">
+                <Card className="border-border/60 bg-card/60 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-muted-foreground">当前阶段</div>
                     <Badge variant={importStatusVariant}>{importStatusText}</Badge>
@@ -506,7 +506,7 @@ export default function ImportV3() {
                   </div>
                 </Card>
 
-                <Card className="p-4">
+                <Card className="border-border/60 bg-card/60 p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-muted-foreground">Sheet 任务</div>
                     <Badge variant="secondary">{progressItems.length} 项</Badge>
@@ -571,7 +571,7 @@ export default function ImportV3() {
 
             <ScrollArea className="h-full">
               <div className="p-6">
-                <Card className="p-4">
+                <Card className="border-border/60 bg-card/60 p-4">
                   <div className="text-xs font-medium text-muted-foreground">详细日志</div>
                   <Separator className="my-3" />
                   {importLogs.length === 0 ? (

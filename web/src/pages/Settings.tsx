@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Settings() {
   return (
-    <div className="min-h-screen bg-background px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 px-6 py-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Settings</div>

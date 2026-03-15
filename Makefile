@@ -45,6 +45,7 @@ help:
 	@echo "  make test-e2e       - 仅运行E2E测试"
 	@echo "  make start          - 完整构建并启动（含前端编译）"
 	@echo "  make start-quick    - 快速启动（跳过前端编译）"
+	@echo "  make stop           - 停止正在运行的 Northstar 进程"
 	@echo "  make run            - 直接运行（不重新编译）"
 	@echo "  make dev            - 开发模式启动（热更新）"
 	@echo "  make clean          - 清理构建产物"
@@ -183,6 +184,12 @@ start-quick: ensure-static
 	@cp config.toml.example $(HOST_INSTALL_DIR)/config.toml
 	@cp packaging/readme.txt $(HOST_INSTALL_DIR)/readme.txt
 	$(HOST_BIN)
+
+# 停止正在运行的 Northstar 进程
+.PHONY: stop
+stop:
+	@echo ">>> 停止 Northstar..."
+	@pkill -f "northstar" 2>/dev/null && echo ">>> 已停止" || echo ">>> 没有找到运行中的 Northstar 进程"
 
 # 仅运行（不重新编译，使用已有的可执行文件）
 .PHONY: run

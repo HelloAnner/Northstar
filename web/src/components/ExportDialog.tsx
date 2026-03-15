@@ -28,7 +28,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const [error, setError] = useState<string | null>(null)
   const [compareItems, setCompareItems] = useState<CompareItem[]>([])
   const abortRef = useRef<AbortController | null>(null)
-  const delayTimerRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
   const displayPercentRef = useRef(0)
   const targetPercentRef = useRef(0)
@@ -42,16 +41,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
 
   // 让进度条“慢一点”：每增加 1% 需要 10ms，总计额外 ~1s（0% -> 100%）
   const perPercentMs = 10
-
-  const shouldApplyDelay = () => {
-    const start = new Date(2026, 1, 7, 0, 0, 0, 0) // 2026-02-07 local time
-    return new Date().getTime() >= start.getTime()
-  }
-
-  const randomDelayMs = () => {
-    // 3000..6000 ms
-    return Math.floor(3000 + Math.random() * 3001)
-  }
 
   const resetState = () => {
     setExporting(false)
@@ -70,10 +59,6 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
   const stop = () => {
     abortRef.current?.abort()
     abortRef.current = null
-    if (delayTimerRef.current !== null) {
-      window.clearTimeout(delayTimerRef.current)
-      delayTimerRef.current = null
-    }
     if (rafRef.current !== null) {
       window.cancelAnimationFrame(rafRef.current)
       rafRef.current = null
@@ -187,16 +172,7 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
               }
 
               doneRef.current = { url, message: event.message || '导出完成' }
-              if (shouldApplyDelay()) {
-                setStage('导出完成，准备下载…')
-                setTargetPercent(99)
-                delayTimerRef.current = window.setTimeout(() => {
-                  delayTimerRef.current = null
-                  setTargetPercent(100)
-                }, randomDelayMs())
-              } else {
-                setTargetPercent(100)
-              }
+              setTargetPercent(100)
             }
             if (event.type === 'compare') {
               const items = normalizeCompareItems(event.data?.items)
@@ -274,14 +250,14 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-red-200">
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
               <XCircle className="h-4 w-4" />
               <span className="text-sm">{error}</span>
             </div>
           )}
 
           {completed && !error && (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-200">
+            <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-600 dark:text-emerald-400">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm">导出完成，点击按钮下载</span>
             </div>
