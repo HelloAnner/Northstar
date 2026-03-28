@@ -655,26 +655,26 @@ func (c *Coordinator) processWRSnapshot(ctx *ImportContext, sheetName string, op
 		return
 	}
 
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入批零快照", map[string]interface{}{
+		"rows": len(records),
+	})
+
+	// 使用原子化替换（delete+insert 在同一事务中）避免数据丢失
+	var insertErr error
 	if opts.ClearExisting && len(records) > 0 {
 		year := records[0].SnapshotYear
 		month := records[0].SnapshotMonth
 		key := fmt.Sprintf("%d-%02d", year, month)
 		if !ctx.clearedWRSYM[key] {
 			ctx.clearedWRSYM[key] = true
-			if err := c.store.DeleteWRSnapshotByYearMonth(year, month); err != nil {
-				c.sendProgress(ctx.ProgressChan, ProgressEvent{
-					Type:      "warning",
-					Message:   fmt.Sprintf("清空批零快照旧数据失败: %v", err),
-					Timestamp: time.Now(),
-				})
-			}
+			insertErr = c.store.ReplaceWRSnapshotByYearMonth(year, month, records)
+		} else {
+			insertErr = c.store.BatchInsertWRSnapshot(records)
 		}
+	} else {
+		insertErr = c.store.BatchInsertWRSnapshot(records)
 	}
-
-	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入批零快照", map[string]interface{}{
-		"rows": len(records),
-	})
-	if err := c.store.BatchInsertWRSnapshot(records); err != nil {
+	if err := insertErr; err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
 			SheetType:    parser.SheetTypeWRSnapshot,
@@ -718,26 +718,25 @@ func (c *Coordinator) processACSnapshot(ctx *ImportContext, sheetName string, op
 		return
 	}
 
+	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入住餐快照", map[string]interface{}{
+		"rows": len(records),
+	})
+
+	var acInsertErr error
 	if opts.ClearExisting && len(records) > 0 {
 		year := records[0].SnapshotYear
 		month := records[0].SnapshotMonth
 		key := fmt.Sprintf("%d-%02d", year, month)
 		if !ctx.clearedACSYM[key] {
 			ctx.clearedACSYM[key] = true
-			if err := c.store.DeleteACSnapshotByYearMonth(year, month); err != nil {
-				c.sendProgress(ctx.ProgressChan, ProgressEvent{
-					Type:      "warning",
-					Message:   fmt.Sprintf("清空住餐快照旧数据失败: %v", err),
-					Timestamp: time.Now(),
-				})
-			}
+			acInsertErr = c.store.ReplaceACSnapshotByYearMonth(year, month, records)
+		} else {
+			acInsertErr = c.store.BatchInsertACSnapshot(records)
 		}
+	} else {
+		acInsertErr = c.store.BatchInsertACSnapshot(records)
 	}
-
-	insertStart := c.logStageStart(ctx.ProgressChan, sheetName, "写入住餐快照", map[string]interface{}{
-		"rows": len(records),
-	})
-	if err := c.store.BatchInsertACSnapshot(records); err != nil {
+	if err := acInsertErr; err != nil {
 		c.recordSheetResult(ctx, parser.ParseResult{
 			SheetName:    sheetName,
 			SheetType:    parser.SheetTypeACSnapshot,

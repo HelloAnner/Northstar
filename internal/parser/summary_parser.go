@@ -153,24 +153,51 @@ func ParseSummarySheet(file *excelize.File, sheetName string, year, month int) (
 	return limitAbove, micro, eatWearUse, nil
 }
 
+// detectSummaryColumns 检测汇总表的"当期"、"去年同期"和"增速"列
+// 支持 Excel 日期序列号和文本两种格式，不再硬编码特定日期值
 func detectSummaryColumns(file *excelize.File, sheetName string, maxCol int) (current, last, rate int) {
+	type dateCol struct {
+		col    int
+		serial float64
+	}
+	var dateCols []dateCol
+
 	for col := 1; col <= maxCol; col++ {
 		val := readCellRaw(file, sheetName, col, 1)
 		val = strings.TrimSpace(val)
-		switch val {
-		case "45839":
-			current = col
-		case "45474":
-			last = col
-		case "45809":
-			current = col
-		case "45444":
-			last = col
-		case "增速":
+
+		// 匹配"增速"文本
+		if strings.Contains(val, "增速") {
 			rate = col
+			continue
+		}
+
+		// 尝试解析为 Excel 日期序列号（通常 40000~60000 范围）
+		if serial, err := strconv.ParseFloat(val, 64); err == nil && serial > 40000 && serial < 60000 {
+			dateCols = append(dateCols, dateCol{col: col, serial: serial})
+			continue
+		}
+
+		// 尝试匹配中文年月文本（如 "2025年12月"）
+		if _, _, found := ExtractYearMonth(val); found {
+			// 把年月文本当作日期列候选
+			dateCols = append(dateCols, dateCol{col: col, serial: 0})
 		}
 	}
-	if rate == 0 {
+
+	// 根据日期序列号大小判断：较大的为当期，较小的为去年同期
+	if len(dateCols) >= 2 {
+		a, b := dateCols[0], dateCols[1]
+		if a.serial > b.serial {
+			current, last = a.col, b.col
+		} else {
+			current, last = b.col, a.col
+		}
+	} else if len(dateCols) == 1 {
+		current = dateCols[0].col
+	}
+
+	if rate == 0 && last > 0 {
 		rate = last + 1
 	}
 	return current, last, rate

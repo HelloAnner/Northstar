@@ -72,3 +72,51 @@ func (s *Store) DeleteACSnapshotByYearMonth(year, month int) error {
 	return nil
 }
 
+// ReplaceACSnapshotByYearMonth 原子化替换：先删除后插入，在同一事务中
+func (s *Store) ReplaceACSnapshotByYearMonth(year, month int, records []*model.ACSnapshot) error {
+	if len(records) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM ac_snapshot WHERE snapshot_year = ? AND snapshot_month = ?", year, month); err != nil {
+		return fmt.Errorf("delete old data: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO ac_snapshot (
+			snapshot_year, snapshot_month, snapshot_name,
+			credit_code, name, industry_code, company_scale,
+			revenue_current_month, revenue_current_cumulative,
+			room_current_month, room_current_cumulative,
+			food_current_month, food_current_cumulative,
+			goods_current_month, goods_current_cumulative,
+			source_sheet
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range records {
+		if _, err := stmt.Exec(
+			r.SnapshotYear, r.SnapshotMonth, r.SnapshotName,
+			r.CreditCode, r.Name, r.IndustryCode, r.CompanyScale,
+			r.RevenueCurrentMonth, r.RevenueCurrentCumulative,
+			r.RoomCurrentMonth, r.RoomCurrentCumulative,
+			r.FoodCurrentMonth, r.FoodCurrentCumulative,
+			r.GoodsCurrentMonth, r.GoodsCurrentCumulative,
+			r.SourceSheet,
+		); err != nil {
+			return fmt.Errorf("insert: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+

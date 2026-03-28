@@ -69,3 +69,49 @@ func (s *Store) DeleteWRSnapshotByYearMonth(year, month int) error {
 	return nil
 }
 
+// ReplaceWRSnapshotByYearMonth 原子化替换：先删除后插入，在同一事务中
+func (s *Store) ReplaceWRSnapshotByYearMonth(year, month int, records []*model.WRSnapshot) error {
+	if len(records) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM wr_snapshot WHERE snapshot_year = ? AND snapshot_month = ?", year, month); err != nil {
+		return fmt.Errorf("delete old data: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO wr_snapshot (
+			snapshot_year, snapshot_month, snapshot_name,
+			credit_code, name, industry_code, company_scale,
+			sales_current_month, sales_current_cumulative, sales_last_year_month, sales_last_year_cumulative,
+			retail_current_month, retail_current_cumulative, retail_last_year_month, retail_last_year_cumulative,
+			cat_grain_oil_food, cat_beverage, cat_tobacco_liquor, cat_clothing, cat_daily_use, cat_automobile,
+			source_sheet
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range records {
+		if _, err := stmt.Exec(
+			r.SnapshotYear, r.SnapshotMonth, r.SnapshotName,
+			r.CreditCode, r.Name, r.IndustryCode, r.CompanyScale,
+			r.SalesCurrentMonth, r.SalesCurrentCumulative, r.SalesLastYearMonth, r.SalesLastYearCumulative,
+			r.RetailCurrentMonth, r.RetailCurrentCumulative, r.RetailLastYearMonth, r.RetailLastYearCumulative,
+			r.CatGrainOilFood, r.CatBeverage, r.CatTobaccoLiquor, r.CatClothing, r.CatDailyUse, r.CatAutomobile,
+			r.SourceSheet,
+		); err != nil {
+			return fmt.Errorf("insert: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
