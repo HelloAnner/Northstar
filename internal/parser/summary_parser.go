@@ -75,12 +75,12 @@ func ParseSummarySheet(file *excelize.File, sheetName string, year, month int) (
 			}
 		}
 		if actualRow > 0 {
-			if maxRow == 0 || actualRow < maxRow {
+			if maxRow == 0 || actualRow > maxRow {
 				maxRow = actualRow
 			}
 		}
 		if actualCol > 0 {
-			if maxCol == 0 || actualCol < maxCol {
+			if maxCol == 0 || actualCol > maxCol {
 				maxCol = actualCol
 			}
 		}

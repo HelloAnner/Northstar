@@ -298,6 +298,45 @@ test-e2e-only:
 	@echo ""
 	@echo ">>> E2E 测试完成: $(REPORTS_DIR)/report.html"
 
+# ==================== Playwright E2E 测试 ====================
+
+PW_E2E_DIR := tests/e2e_playwright
+
+# 安装 Playwright E2E 依赖
+.PHONY: e2e-deps
+e2e-deps:
+	@echo ">>> 安装 Playwright E2E 依赖..."
+	python3 -m pip install -r $(PW_E2E_DIR)/requirements.txt
+	python3 -m playwright install chromium
+	@echo ">>> 依赖安装完成"
+
+# 运行全部 Playwright E2E 测试
+.PHONY: test-e2e-pw
+test-e2e-pw: build-web ensure-static
+	@echo ""
+	@echo "=========================================="
+	@echo "  运行 Playwright E2E 测试"
+	@echo "=========================================="
+	@echo ""
+	cd $(PW_E2E_DIR) && python3 -m pytest -v --tb=short --html-report=$(CURDIR)/$(REPORTS_DIR)/report.html
+	@echo ""
+	@echo ">>> 报告: $(REPORTS_DIR)/report.html"
+
+# 仅运行确定性测试（排除 LLM）
+.PHONY: test-e2e-deterministic
+test-e2e-deterministic: build-web ensure-static
+	cd $(PW_E2E_DIR) && python3 -m pytest -v --tb=short -m "not llm"
+
+# 仅运行导入导出测试
+.PHONY: test-e2e-import
+test-e2e-import: build-web ensure-static
+	cd $(PW_E2E_DIR) && python3 -m pytest -v --tb=short test_01_import_export.py test_06_excel_edge_cases.py
+
+# 仅运行 AI 对话测试
+.PHONY: test-e2e-ai
+test-e2e-ai: build-web ensure-static
+	cd $(PW_E2E_DIR) && python3 -m pytest -v --tb=short test_04_ai_chat.py
+
 # 快速测试（仅单元测试，不启动服务器）
 .PHONY: test-quick
 test-quick:
