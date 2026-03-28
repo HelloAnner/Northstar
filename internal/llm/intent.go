@@ -40,8 +40,10 @@ var allowedAdjustmentIndicatorIDs = map[string]struct{}{
 // AdjustmentAction 表示一条结构化调整动作。
 type AdjustmentAction struct {
 	Type        string  `json:"type"`
-	IndicatorID string  `json:"indicatorId"`
-	Value       float64 `json:"value"`
+	IndicatorID string  `json:"indicatorId,omitempty"`
+	Value       float64 `json:"value,omitempty"`
+	Percent     float64 `json:"percent,omitempty"`
+	RuleText    string  `json:"ruleText,omitempty"`
 }
 
 // AdjustmentPlan 表示意图解析后的调整计划。
@@ -60,25 +62,31 @@ func BuildIntentSystemPrompt() string {
 你是 Northstar 的调整意图解析器。
 
 任务：
-1. 从用户输入中识别“要把哪个指标调整到多少”
+1. 从用户输入中识别调整意图，分为三类：设定绝对目标值、按百分比调整、添加持久规则
 2. 只输出纯 JSON，不要输出解释、Markdown 或额外文本
-3. 若用户只是咨询，不要求系统执行调整，则返回 {"actions":[]}
+3. 若用户只是咨询，不要求系统执行调整，则返回 {“actions”:[]}
+
+判断规则：
+- 如果用户说”调到 X”、”设为 X”，这是 set_target（设定绝对目标值）
+- 如果用户说”调整 X%”、”增加/减少 X%”、”随机调整 X%”，这是 adjust_percent（相对百分比调整）
+- 如果用户说”不能超过”、”不能低于”、”限制”、”只允许”、”帮我加一条规则”，或描述一种持久约束，这是 add_rule（添加持久规则）
+- 如果用户的意图是永久生效的约束而非一次性调整，应识别为 add_rule
 
 输出格式：
 {
-  "actions": [
-    {
-      "type": "set_target",
-      "indicatorId": "wholesale_month_rate",
-      "value": 15
-    }
+  “actions”: [
+    {“type”: “set_target”, “indicatorId”: “wholesale_month_rate”, “value”: 15},
+    {“type”: “adjust_percent”, “indicatorId”: “retail_month_rate”, “percent”: 5},
+    {“type”: “add_rule”, “ruleText”: “限制批发当月增速不超过15%”}
   ]
 }
 
 约束：
-- type 只能是 set_target
-- indicatorId 只能使用系统提供的合法指标 ID
-- value 必须是数字
+- type 只能是 set_target、adjust_percent、add_rule 三者之一
+- set_target 和 adjust_percent 的 indicatorId 只能使用系统提供的合法指标 ID
+- set_target 的 value 必须是数字
+- adjust_percent 的 percent 必须是数字（正数表示增加，负数表示减少）
+- add_rule 的 ruleText 必须是清晰的中文自然语言规则描述
 `)
 }
 
@@ -175,11 +183,21 @@ func normalizeAdjustmentAction(idx int, action AdjustmentAction) (AdjustmentActi
 	if action.Type == "set_indicator" {
 		action.Type = "set_target"
 	}
-	if action.Type != "set_target" {
-		return AdjustmentAction{}, fmt.Errorf("action[%d] type must be set_target", idx)
-	}
-	if _, ok := allowedAdjustmentIndicatorIDs[action.IndicatorID]; !ok {
-		return AdjustmentAction{}, fmt.Errorf("action[%d] indicatorId %q is invalid", idx, action.IndicatorID)
+	switch action.Type {
+	case "set_target":
+		if _, ok := allowedAdjustmentIndicatorIDs[action.IndicatorID]; !ok {
+			return AdjustmentAction{}, fmt.Errorf("action[%d] indicatorId %q is invalid", idx, action.IndicatorID)
+		}
+	case "adjust_percent":
+		if _, ok := allowedAdjustmentIndicatorIDs[action.IndicatorID]; !ok {
+			return AdjustmentAction{}, fmt.Errorf("action[%d] indicatorId %q is invalid", idx, action.IndicatorID)
+		}
+	case "add_rule":
+		if strings.TrimSpace(action.RuleText) == "" {
+			return AdjustmentAction{}, fmt.Errorf("action[%d] add_rule requires ruleText", idx)
+		}
+	default:
+		return AdjustmentAction{}, fmt.Errorf("action[%d] type %q is not supported", idx, action.Type)
 	}
 	return action, nil
 }

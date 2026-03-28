@@ -7,6 +7,7 @@
 
 import { createStore } from 'zustand/vanilla'
 import { useStore } from 'zustand'
+import { toast } from 'sonner'
 import { rulesApi, type RuleItem, type RuleStatus } from '@/services/api'
 
 export type RulesConvertStatus = 'idle' | 'running' | 'ok' | 'error'
@@ -109,6 +110,7 @@ async function mutateRules(
     await action()
     await get().loadRules()
     set({ status: 'running', statusError: '' })
+    toast.info('正在转换规则为 JSON…')
     get().startPolling()
   } finally {
     set({ submitting: false })
@@ -120,11 +122,20 @@ function applyRuleStatus(
   get: () => RulesStoreState,
   status: RuleStatus
 ) {
+  const prevStatus = get().status
   set({
     status: status.status,
     statusError: status.error,
     statusUpdatedAt: status.updatedAt,
   })
+
+  // 状态变化时发送 Toast 通知
+  if (prevStatus === 'running' && status.status === 'ok') {
+    toast.success('JSON 规则转换成功，规则已生效')
+  } else if (prevStatus === 'running' && status.status === 'error') {
+    toast.error('规则转换失败：' + (status.error || '未知错误'))
+  }
+
   if (status.status === 'running') {
     get().startPolling()
     return

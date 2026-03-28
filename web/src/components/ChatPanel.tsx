@@ -8,7 +8,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { MessageCircle, Sparkles, Target, TrendingUp, Wand2, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { BookPlus, MessageCircle, Sparkles, Target, TrendingUp, Wand2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -34,12 +35,19 @@ export interface ChatPanelMessage {
   content: string
   streaming?: boolean
   appliedRules?: AppliedRule[]
+  ruleAdded?: RuleAddedPayload
+}
+
+interface RuleAddedPayload {
+  text: string
+  status: string
 }
 
 interface StreamResultPayload {
   mode: ChatMode
   reply: string
   appliedRules?: AppliedRule[]
+  ruleAdded?: RuleAddedPayload
 }
 
 interface StreamEvent {
@@ -89,8 +97,13 @@ const defaultQuestions: Record<ChatMode, { icon: ReactNode; title: string; conte
     },
     {
       icon: <Wand2 className="h-4 w-4" />,
-      title: '调整限上社零',
-      content: '把限上社零额当月增速调到 8%',
+      title: '随机调整零售',
+      content: '帮我将零售当月增速随机调整 5%',
+    },
+    {
+      icon: <BookPlus className="h-4 w-4" />,
+      title: '添加规则',
+      content: '帮我加一条规则：批发当月增速不能超过 20%',
     },
   ],
 }
@@ -187,6 +200,18 @@ export function ChatPanelView({
                           {formatAppliedRuleDescription(rule)}
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {message.ruleAdded && (
+                    <div className="mt-3 border-t border-border/60 pt-3">
+                      <div className="flex items-center gap-2 rounded-xl bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                        <BookPlus className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          已添加规则：{message.ruleAdded.text}
+                          {message.ruleAdded.status === 'converting' && ' — 正在转换中…'}
+                          {message.ruleAdded.status === 'error' && ' — 添加失败'}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -371,6 +396,13 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied }: ChatP
   }
 
   const applyResult = (result: StreamResultPayload) => {
+    if (result.ruleAdded) {
+      if (result.ruleAdded.status === 'converting') {
+        toast.success('规则添加成功，正在转换为 JSON…')
+      } else {
+        toast.error('规则添加失败')
+      }
+    }
     setMessages((prev) => {
       const last = prev[prev.length - 1]
       if (!last || last.role !== 'assistant') {
@@ -381,6 +413,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied }: ChatP
             role: 'assistant',
             content: result.reply,
             appliedRules: result.appliedRules ?? [],
+            ruleAdded: result.ruleAdded,
           },
         ]
       }
@@ -391,6 +424,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied }: ChatP
           content: last.content || result.reply,
           streaming: false,
           appliedRules: result.appliedRules ?? last.appliedRules,
+          ruleAdded: result.ruleAdded ?? last.ruleAdded,
         },
       ]
     })

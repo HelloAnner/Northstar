@@ -272,8 +272,8 @@ func TestNewClient(t *testing.T) {
 					if client.prompt != tt.prompt {
 						t.Errorf("提示词不匹配: 期望 '%s'，实际 '%s'", tt.prompt, client.prompt)
 					}
-					if len(client.tools) != 2 {
-						t.Errorf("工具数量不正确: 期望 2，实际 %d", len(client.tools))
+					if len(client.tools) != 3 {
+						t.Errorf("工具数量不正确: 期望 3，实际 %d", len(client.tools))
 					}
 				}
 			}
