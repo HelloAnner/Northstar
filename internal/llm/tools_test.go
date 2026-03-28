@@ -18,8 +18,8 @@ func TestTools(t *testing.T) {
 	tools := Tools()
 
 	// 验证工具数量
-	if len(tools) != 2 {
-		t.Errorf("期望 2 个工具，实际 %d", len(tools))
+	if len(tools) != 3 {
+		t.Errorf("期望 3 个工具，实际 %d", len(tools))
 	}
 
 	// 验证工具名称
@@ -35,6 +35,9 @@ func TestTools(t *testing.T) {
 	}
 	if !toolNames[ToolUpdateCompanies] {
 		t.Error("缺少 update_companies 工具")
+	}
+	if !toolNames[ToolAddRule] {
+		t.Error("缺少 add_rule 工具")
 	}
 }
 

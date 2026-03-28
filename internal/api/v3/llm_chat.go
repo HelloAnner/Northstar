@@ -41,7 +41,13 @@ type llmResultPayload struct {
 	Mode         string                   `json:"mode"`
 	Reply        string                   `json:"reply"`
 	Groups       []dagcalc.IndicatorGroup `json:"groups,omitempty"`
-	AppliedRules []dagcalc.AppliedRule    `json:"appliedRules,omitempty"`
+	AppliedRules []dagcalc.AppliedRule     `json:"appliedRules,omitempty"`
+	RuleAdded    *ruleAddedPayload         `json:"ruleAdded,omitempty"`
+}
+
+type ruleAddedPayload struct {
+	Text   string `json:"text"`
+	Status string `json:"status"`
 }
 
 type llmStreamEvent struct {
@@ -205,9 +211,22 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return h.runChatMode(stream, chatCtx)
 	}
 
-	targets := make(map[string]float64, len(plan.Actions))
-	for _, action := range plan.Actions {
-		targets[action.IndicatorID] = action.Value
+	// 分离三类动作
+	targets, ruleActions := splitActions(plan.Actions, buildIndicatorValueMap(chatCtx.groups))
+
+	// 先处理规则添加
+	var ruleAdded *ruleAddedPayload
+	for _, action := range ruleActions {
+		ruleAdded, err = h.addRuleFromChat(action.RuleText)
+		if err != nil {
+			log.Printf("add rule from chat error: %v", err)
+			ruleAdded = &ruleAddedPayload{Text: action.RuleText, Status: "error"}
+		}
+	}
+
+	// 如果只有规则操作没有调整目标，生成规则添加的总结
+	if len(targets) == 0 {
+		return h.buildRuleOnlyResult(stream, chatCtx, userMsg, ruleActions, ruleAdded)
 	}
 
 	h.engine.SetPeriod(chatCtx.year, chatCtx.month)
@@ -242,6 +261,83 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		Reply:        reply,
 		Groups:       resp.Groups,
 		AppliedRules: resp.AppliedRules,
+		RuleAdded:    ruleAdded,
+	}, nil
+}
+
+// splitActions 将 actions 分为目标调整（set_target + adjust_percent→set_target）和规则添加两组
+func splitActions(actions []llm.AdjustmentAction, currentValues map[string]float64) (map[string]float64, []llm.AdjustmentAction) {
+	targets := make(map[string]float64)
+	var ruleActions []llm.AdjustmentAction
+	for _, action := range actions {
+		switch action.Type {
+		case "set_target":
+			targets[action.IndicatorID] = action.Value
+		case "adjust_percent":
+			current := currentValues[action.IndicatorID]
+			targets[action.IndicatorID] = current * (1 + action.Percent/100)
+		case "add_rule":
+			ruleActions = append(ruleActions, action)
+		}
+	}
+	return targets, ruleActions
+}
+
+// addRuleFromChat 通过聊天添加规则，复用规则管理 API 逻辑
+func (h *Handler) addRuleFromChat(ruleText string) (*ruleAddedPayload, error) {
+	repo := h.rulesRepo
+	if repo == nil {
+		return nil, fmt.Errorf("规则管理未初始化")
+	}
+	items, err := repo.ReadRules()
+	if err != nil {
+		return nil, err
+	}
+	items = append(items, RuleItem{Index: len(items) + 1, Text: strings.TrimSpace(ruleText)})
+	reindexRules(items)
+	if err := repo.WriteRules(items); err != nil {
+		return nil, err
+	}
+	content, err := repo.ReadContent()
+	if err != nil {
+		return nil, err
+	}
+	h.triggerRuleConvert(content)
+	return &ruleAddedPayload{Text: ruleText, Status: "converting"}, nil
+}
+
+// buildRuleOnlyResult 仅添加规则时生成回复
+func (h *Handler) buildRuleOnlyResult(
+	stream *llmStreamWriter,
+	chatCtx llmChatContext,
+	userMsg string,
+	ruleActions []llm.AdjustmentAction,
+	ruleAdded *ruleAddedPayload,
+) (*llmResultPayload, error) {
+	summaryClient, err := h.newLLMClient(h.buildChatPrompt(chatCtx.year, chatCtx.month, chatCtx.groups, chatCtx.userPrompt))
+	if err != nil {
+		return nil, err
+	}
+	ruleTexts := make([]string, 0, len(ruleActions))
+	for _, a := range ruleActions {
+		ruleTexts = append(ruleTexts, a.RuleText)
+	}
+	summaryMsg := fmt.Sprintf(
+		"用户请求：%s\n\n系统已添加以下规则：\n%s\n\n规则正在异步转换为结构化 JSON，转换完成后将自动生效。请用简洁中文告知用户规则已添加并正在转换中。",
+		userMsg, strings.Join(ruleTexts, "\n"),
+	)
+	reply, err := h.streamReply(stream, summaryClient, llm.ChatRequest{
+		Messages: []llm.ChatMessage{{Role: "user", Content: summaryMsg}},
+		Year:     chatCtx.year,
+		Month:    chatCtx.month,
+	}, chatCtx.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &llmResultPayload{
+		Mode:      "adjust",
+		Reply:     reply,
+		RuleAdded: ruleAdded,
 	}, nil
 }
 

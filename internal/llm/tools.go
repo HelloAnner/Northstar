@@ -14,6 +14,8 @@ const (
 	ToolSetIndicatorTargets = "set_indicator_targets"
 	// ToolUpdateCompanies 企业修改工具
 	ToolUpdateCompanies = "update_companies"
+	// ToolAddRule 添加持久规则工具
+	ToolAddRule = "add_rule"
 )
 
 var indicatorTargetsSchema = map[string]any{
@@ -83,9 +85,20 @@ var updateCompaniesSchema = map[string]any{
 	"required": []string{"updates"},
 }
 
+var addRuleSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"ruleText": map[string]any{
+			"type":        "string",
+			"description": "自然语言规则描述，如：限制批发当月增速不超过15%",
+		},
+	},
+	"required": []string{"ruleText"},
+}
+
 // Tools 返回工具定义
 func Tools() []llms.Tool {
-	return []llms.Tool{indicatorTargetsTool(), updateCompaniesTool()}
+	return []llms.Tool{indicatorTargetsTool(), updateCompaniesTool(), addRuleTool()}
 }
 
 func indicatorTargetsTool() llms.Tool {
@@ -106,6 +119,17 @@ func updateCompaniesTool() llms.Tool {
 			Name:        ToolUpdateCompanies,
 			Description: "批量修改企业明细字段（必须提供 id 与 patch）",
 			Parameters:  updateCompaniesSchema,
+		},
+	}
+}
+
+func addRuleTool() llms.Tool {
+	return llms.Tool{
+		Type: "function",
+		Function: &llms.FunctionDefinition{
+			Name:        ToolAddRule,
+			Description: "添加一条持久生效的调整规则，系统会将自然语言转换为结构化 JSON 规则并自动生效",
+			Parameters:  addRuleSchema,
 		},
 	}
 }
