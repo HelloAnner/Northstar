@@ -18,7 +18,7 @@ func NewFieldMapper(currentYear, currentMonth int) *FieldMapper {
 	}
 }
 
-// MapWholesaleRetail 映射批发零售字段
+// MapWholesaleRetail 映射批发零售字段（两遍扫描：先映射值列，再基于已映射结果推断增速列）
 func (m *FieldMapper) MapWholesaleRetail(columnNames []string) map[int]FieldMapping {
 	mappings := make(map[int]FieldMapping)
 
@@ -27,13 +27,27 @@ func (m *FieldMapper) MapWholesaleRetail(columnNames []string) map[int]FieldMapp
 		normalized[i] = NormalizeColumnName(col)
 	}
 
-	for idx, col := range columnNames {
-		col = normalized[idx]
+	// 第一遍：映射所有非增速列
+	var rateIndices []int
+	for idx := range columnNames {
+		col := normalized[idx]
 		if col == "" {
 			continue
 		}
-
+		if strings.Contains(col, "增速") {
+			rateIndices = append(rateIndices, idx)
+			continue
+		}
 		mapping := m.mapWRColumnWithContext(col, idx, normalized)
+		if mapping.DBField != "" {
+			mappings[idx] = mapping
+		}
+	}
+
+	// 第二遍：增速列基于已映射的值列推断归属
+	for _, idx := range rateIndices {
+		col := normalized[idx]
+		mapping := m.mapWRRateWithMappedContext(col, idx, mappings)
 		if mapping.DBField != "" {
 			mappings[idx] = mapping
 		}
@@ -42,7 +56,7 @@ func (m *FieldMapper) MapWholesaleRetail(columnNames []string) map[int]FieldMapp
 	return mappings
 }
 
-// MapAccommodationCatering 映射住宿餐饮字段
+// MapAccommodationCatering 映射住宿餐饮字段（两遍扫描：先映射值列，再推断增速列）
 func (m *FieldMapper) MapAccommodationCatering(columnNames []string) map[int]FieldMapping {
 	mappings := make(map[int]FieldMapping)
 
@@ -51,13 +65,27 @@ func (m *FieldMapper) MapAccommodationCatering(columnNames []string) map[int]Fie
 		normalized[i] = NormalizeColumnName(col)
 	}
 
-	for idx, col := range columnNames {
-		col = normalized[idx]
+	// 第一遍：映射所有非增速列
+	var rateIndices []int
+	for idx := range columnNames {
+		col := normalized[idx]
 		if col == "" {
 			continue
 		}
-
+		if strings.Contains(col, "增速") {
+			rateIndices = append(rateIndices, idx)
+			continue
+		}
 		mapping := m.mapACColumnWithContext(col, idx, normalized)
+		if mapping.DBField != "" {
+			mappings[idx] = mapping
+		}
+	}
+
+	// 第二遍：增速列基于已映射的值列推断归属
+	for _, idx := range rateIndices {
+		col := normalized[idx]
+		mapping := m.mapACRateWithMappedContext(col, idx, mappings)
 		if mapping.DBField != "" {
 			mappings[idx] = mapping
 		}
@@ -66,29 +94,11 @@ func (m *FieldMapper) MapAccommodationCatering(columnNames []string) map[int]Fie
 	return mappings
 }
 
-// mapWRColumnWithContext 映射批零单个列（支持根据上下文推断“增速”口径归属）
+// mapWRColumnWithContext 映射批零单个非增速列
 func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []string) FieldMapping {
 	mapping := FieldMapping{
 		ColumnIndex: idx,
 		ColumnName:  col,
-	}
-
-	// 增速字段（优先导入；为空时由系统计算/补齐）
-	if strings.Contains(col, "增速") {
-		isCum := strings.Contains(col, "累计") || strings.Contains(col, "1-") || strings.Contains(col, "1—")
-		if strings.Contains(col, "销售额") {
-			mapping.DBField = pickRateField("sales", isCum)
-			return mapping
-		}
-		if strings.Contains(col, "零售额") {
-			mapping.DBField = pickRateField("retail", isCum)
-			return mapping
-		}
-		metric, inferredCum, ok := inferWRRateMetric(columns, idx)
-		if ok {
-			mapping.DBField = pickRateField(metric, isCum || inferredCum)
-		}
-		return mapping
 	}
 
 	// 基础信息字段
@@ -188,24 +198,11 @@ func (m *FieldMapper) mapWRColumnWithContext(col string, idx int, columns []stri
 	return mapping
 }
 
-// mapACColumnWithContext 映射住餐单个列（支持根据上下文推断“增速”口径归属）
+// mapACColumnWithContext 映射住餐单个非增速列
 func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []string) FieldMapping {
 	mapping := FieldMapping{
 		ColumnIndex: idx,
 		ColumnName:  col,
-	}
-
-	// 增速字段（优先导入；为空时由系统计算/补齐）
-	if strings.Contains(col, "增速") {
-		isCum := strings.Contains(col, "累计") || strings.Contains(col, "1-") || strings.Contains(col, "1—")
-		if strings.Contains(col, "营业额") {
-			mapping.DBField = pickRateField("revenue", isCum)
-			return mapping
-		}
-		if _, inferredCum, ok := inferACRevenueRate(columns, idx); ok {
-			mapping.DBField = pickRateField("revenue", isCum || inferredCum)
-		}
-		return mapping
 	}
 
 	// 基础信息字段
@@ -263,7 +260,7 @@ func (m *FieldMapper) mapACColumnWithContext(col string, idx int, columns []stri
 		return mapping
 	}
 
-	// 营业额（注意：列名可能包含“营业额总计;客房收入/餐费收入/商品销售额”，已在上面更具体字段优先匹配）
+	// 营业额（注意：列名可能包含"营业额总计;客房收入/餐费收入/商品销售额"，已在上面更具体字段优先匹配）
 	if strings.Contains(col, "营业额") {
 		timeType := InferFieldTimeType(col, m.currentYear, m.currentMonth)
 		mapping.TimeType = timeType
@@ -326,43 +323,65 @@ func pickRateField(metric string, isCumulative bool) string {
 	}
 }
 
-func inferWRRateMetric(columns []string, idx int) (metric string, isCumulative bool, ok bool) {
-	// 典型列：...;商品销售额;千元 + "1-12月增速"（无“销售额/零售额”字样），靠前一列判断
-	for back := 1; back <= 4; back++ {
-		j := idx - back
-		if j < 0 || j >= len(columns) {
-			continue
-		}
-		prev := columns[j]
-		if prev == "" {
-			continue
-		}
-		if strings.Contains(prev, "销售额") {
-			return "sales", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
-		}
-		if strings.Contains(prev, "零售额") {
-			return "retail", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
-		}
+// mapWRRateWithMappedContext 基于已映射的值列推断增速归属（两遍扫描第二遍）
+func (m *FieldMapper) mapWRRateWithMappedContext(col string, idx int, mappings map[int]FieldMapping) FieldMapping {
+	mapping := FieldMapping{ColumnIndex: idx, ColumnName: col}
+	isCum := strings.Contains(col, "\u7d2f\u8ba1") || strings.Contains(col, "1-") || strings.Contains(col, "1\u2014")
+
+	if strings.Contains(col, "\u9500\u552e\u989d") {
+		mapping.DBField = pickRateField("sales", isCum)
+		return mapping
 	}
-	return "", false, false
+	if strings.Contains(col, "\u96f6\u552e\u989d") {
+		mapping.DBField = pickRateField("retail", isCum)
+		return mapping
+	}
+
+	metric := findNearestMappedMetric(idx, mappings, []string{"sales_", "retail_"})
+	if metric != "" {
+		mapping.DBField = pickRateField(metric, isCum)
+	}
+	return mapping
 }
 
-func inferACRevenueRate(columns []string, idx int) (metric string, isCumulative bool, ok bool) {
-	// 住宿/餐饮主表的增速列通常是 “12月增速”“1-12月增速”，不带“营业额”字样。
-	for back := 1; back <= 4; back++ {
-		j := idx - back
-		if j < 0 || j >= len(columns) {
+// mapACRateWithMappedContext \u57fa\u4e8e\u5df2\u6620\u5c04\u7684\u503c\u5217\u63a8\u65ad\u4f4f\u9910\u589e\u901f\u5f52\u5c5e
+func (m *FieldMapper) mapACRateWithMappedContext(col string, idx int, mappings map[int]FieldMapping) FieldMapping {
+	mapping := FieldMapping{ColumnIndex: idx, ColumnName: col}
+	isCum := strings.Contains(col, "\u7d2f\u8ba1") || strings.Contains(col, "1-") || strings.Contains(col, "1\u2014")
+
+	if strings.Contains(col, "\u8425\u4e1a\u989d") {
+		mapping.DBField = pickRateField("revenue", isCum)
+		return mapping
+	}
+
+	metric := findNearestMappedMetric(idx, mappings, []string{"revenue_"})
+	if metric != "" {
+		mapping.DBField = pickRateField(metric, isCum)
+	}
+	return mapping
+}
+
+// findNearestMappedMetric 向前查找最近的已映射值列，返回指标前缀
+func findNearestMappedMetric(idx int, mappings map[int]FieldMapping, prefixes []string) string {
+	bestDist := int(^uint(0) >> 1) // MaxInt
+	bestMetric := ""
+	for colIdx, m := range mappings {
+		if colIdx >= idx {
 			continue
 		}
-		prev := columns[j]
-		if prev == "" {
+		dist := idx - colIdx
+		if dist >= bestDist {
 			continue
 		}
-		if strings.Contains(prev, "营业额") {
-			return "revenue", strings.Contains(prev, "累计") || strings.Contains(prev, "1-") || strings.Contains(prev, "1—"), true
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(m.DBField, prefix) && !strings.HasSuffix(m.DBField, "_rate") {
+				bestDist = dist
+				bestMetric = strings.TrimSuffix(prefix, "_")
+				break
+			}
 		}
 	}
-	return "", false, false
+	return bestMetric
 }
 
 // mapSalesField 映射销售额字段

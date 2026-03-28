@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, MessageCircle, Settings2, Upload } from 'lucide-react'
 import ChatPanel from '@/components/ChatPanel'
 import ExportDialog from '@/components/ExportDialog'
+import ImportDialog from '@/components/ImportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
 import ThemeToggle from '@/components/app/ThemeToggle'
 import NorthstarIcon from '@/components/app/NorthstarIcon'
@@ -67,6 +68,7 @@ export default function DashboardV3() {
   const clearUndo = useUndoStore((state) => state.clear)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showConfigDialog, setShowConfigDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [showChatDialog, setShowChatDialog] = useState(false)
   const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
   const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
@@ -318,10 +320,12 @@ export default function DashboardV3() {
     }
   }
 
-  // 空状态
-  if (status && !status.initialized) {
-    return <Navigate to="/import" replace />
-  }
+  // 空状态：自动弹出导入弹窗
+  useEffect(() => {
+    if (status && !status.initialized) {
+      setShowImportDialog(true)
+    }
+  }, [status])
 
   const hasDraft = Object.keys(draftTargets).length > 0
   const applySingle = async (id: string, raw: string) => {
@@ -436,7 +440,7 @@ export default function DashboardV3() {
               撤销
             </Button>
 
-            <Button onClick={() => navigate('/import')} variant="outline" className="gap-2">
+            <Button onClick={() => setShowImportDialog(true)} variant="outline" className="gap-2">
               <Upload className="h-4 w-4" />
               导入
             </Button>
@@ -538,6 +542,16 @@ export default function DashboardV3() {
 
         <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
         <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} />
+
+        {/* 导入弹窗 */}
+        <ImportDialog
+          open={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onSuccess={() => {
+            setShowImportDialog(false)
+            window.location.reload()
+          }}
+        />
       </div>
     </div>
   )

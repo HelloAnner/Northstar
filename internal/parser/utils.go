@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"log"
 	"math"
 	"regexp"
 	"strconv"
@@ -262,11 +263,13 @@ func parseRatePercentPtr(s string) *float64 {
 
 	// Excel 百分比单元格可能返回 0.1234（显示 12.34%），做一次轻量兼容
 	if !hasPercent && math.Abs(v) <= 1 {
+		if v != 0 {
+			log.Printf("[parser] parseRate auto-convert decimal to percent: raw=%q, %f -> %f", s, v, v*100)
+		}
 		v = v * 100
 	}
 
-	val := math.Round(v)
-	return &val
+	return &v
 }
 
 // ContainsAny 检查字符串是否包含任意一个关键词

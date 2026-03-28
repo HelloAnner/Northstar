@@ -2,7 +2,7 @@ package parser
 
 import (
 	"fmt"
-	"math"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -241,11 +241,18 @@ func parseInt(s string) int {
 	return i
 }
 
-// parseFloat 安全转换为浮点数
+// parseFloat 安全转换为浮点数（保留完整精度，不做四舍五入）
 func parseFloat(s string) float64 {
 	s = normalizeNumberText(s)
 	s = strings.ReplaceAll(s, "％", "%")
 	s = strings.ReplaceAll(s, "%", "")
-	f, _ := strconv.ParseFloat(s, 64)
-	return math.Round(f)
+	if s == "" {
+		return 0
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Printf("[parser] parseFloat failed: raw=%q, err=%v", s, err)
+		return 0
+	}
+	return f
 }

@@ -48,13 +48,14 @@ type FieldMapping struct {
 
 // ParseResult 解析结果
 type ParseResult struct {
-	SheetName      string   `json:"sheetName"`
-	SheetType      SheetType `json:"sheetType"`
-	Status         string   `json:"status"`     // imported/skipped/error
-	ImportedRows   int      `json:"importedRows"`
-	ErrorRows      int      `json:"errorRows"`
-	Errors         []string `json:"errors,omitempty"`
-	Duration       time.Duration `json:"duration"`
+	SheetName    string        `json:"sheetName"`
+	SheetType    SheetType     `json:"sheetType"`
+	Status       string        `json:"status"` // imported/skipped/error
+	ImportedRows int           `json:"importedRows"`
+	ErrorRows    int           `json:"errorRows"`
+	Errors       []string      `json:"errors,omitempty"`
+	Warnings     []string      `json:"warnings,omitempty"`
+	Duration     time.Duration `json:"duration"`
 }
 
 // ImportReport 导入报告

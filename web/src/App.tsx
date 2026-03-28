@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/app/AppShell'
 import DashboardV3 from '@/pages/DashboardV3'
 import HelpDocument from '@/pages/HelpDocument'
-import ImportV3 from '@/pages/ImportV3'
 import Settings from '@/pages/Settings'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -13,7 +12,6 @@ function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/" element={<DashboardV3 />} />
-          <Route path="/import" element={<ImportV3 />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="/help" element={<HelpDocument />} />
