@@ -21,7 +21,7 @@ export interface RuleItem {
 }
 
 export interface RuleStatus {
-  status: 'idle' | 'running' | 'ok' | 'error'
+  status: 'idle' | 'pending' | 'running' | 'ok' | 'error'
   updatedAt: string
   error: string
   step: string

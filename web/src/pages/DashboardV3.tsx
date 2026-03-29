@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -73,6 +73,22 @@ export default function DashboardV3() {
   const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
   const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
   const [suggestions, setSuggestions] = useState<{ chat: { title: string; content: string }[]; adjust: { title: string; content: string }[] } | null>(null)
+  /** 最近调整变化的指标 ID（绿色高亮，3 秒后自动消失） */
+  const [changedIndicators, setChangedIndicators] = useState<Record<string, boolean>>({})
+  const changedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** 设置绿色高亮指标，3 秒后自动消失 */
+  const flashChangedIndicators = useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+    const next: Record<string, boolean> = {}
+    for (const id of ids) next[id] = true
+    setChangedIndicators(next)
+    if (changedTimerRef.current) clearTimeout(changedTimerRef.current)
+    changedTimerRef.current = setTimeout(() => {
+      setChangedIndicators({})
+      changedTimerRef.current = null
+    }, 3000)
+  }, [])
 
   const showOptimizeNotices = (notices?: OptimizeNotice[]) => {
     if (!Array.isArray(notices) || notices.length === 0) return
@@ -268,6 +284,7 @@ export default function DashboardV3() {
 
     try {
       await applyOptimize(targets, undefined, { type: 'optimize', summary: '智能调整' })
+      flashChangedIndicators(Object.keys(targets))
     } catch (err) {
       console.error(err)
     }
@@ -312,9 +329,12 @@ export default function DashboardV3() {
   }
 
   const handleExport = () => setShowExportDialog(true)
-  const handleChatDataChanged = () => {
+  const handleChatDataChanged = (changedIndicatorIds?: string[]) => {
     loadIndicators()
     setReloadToken((x) => x + 1)
+    if (changedIndicatorIds && changedIndicatorIds.length > 0) {
+      flashChangedIndicators(changedIndicatorIds)
+    }
   }
 
   const previewLinkage = async (anchor: any) => {
@@ -361,6 +381,7 @@ export default function DashboardV3() {
       const v = Number(String(raw).replaceAll(',', '').trim())
       if (!Number.isFinite(v)) return
       await applyOptimize({ [id]: v }, [id], { type: 'indicator', summary: '指标调整' })
+      flashChangedIndicators([id])
     } catch (err) {
       console.error(err)
     }
@@ -513,6 +534,7 @@ export default function DashboardV3() {
                 onApplySingle={applySingle}
                 onPreviewIndicator={(id) => previewLinkage({ indicatorId: id })}
                 highlightIndicators={highlightIndicators}
+                changedIndicators={changedIndicators}
                 disabled={optimizing}
               />
             ))}
@@ -598,6 +620,7 @@ function IndicatorGroupCard(props: {
   onApplySingle: (id: string, value: string) => Promise<void>
   onPreviewIndicator: (id: string) => void
   highlightIndicators: Record<string, boolean>
+  changedIndicators: Record<string, boolean>
 }) {
   return (
     <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
@@ -616,6 +639,7 @@ function IndicatorGroupCard(props: {
             onApplySingle={props.onApplySingle}
             onPreviewIndicator={props.onPreviewIndicator}
             highlightIndicators={props.highlightIndicators}
+            changedIndicators={props.changedIndicators}
             disabled={props.disabled}
           />
         ))}
@@ -634,6 +658,7 @@ function MetricRow(props: {
   onApplySingle: (id: string, value: string) => Promise<void>
   onPreviewIndicator: (id: string) => void
   highlightIndicators: Record<string, boolean>
+  changedIndicators: Record<string, boolean>
 }) {
   const value = props.indicator?.value ?? 0
   const type = props.type ?? 'value'
@@ -648,11 +673,16 @@ function MetricRow(props: {
   const displayValue = draft !== undefined ? draft : text
   const dirty = draft !== undefined && draft !== text
   const highlighted = !!(id && props.highlightIndicators[id])
-  const borderTone = highlighted
-    ? 'border-yellow-400 ring-1 ring-yellow-400/50'
-    : dirty
-      ? 'border-orange-400/70 ring-1 ring-orange-400/40'
-      : 'border-border/60'
+  const changed = !!(id && props.changedIndicators[id])
+
+  // 优先级：绿色变更高亮 > 黄色联动高亮 > 橙色草稿 > 默认
+  const borderTone = changed
+    ? 'border-emerald-400 ring-2 ring-emerald-400/50 transition-all duration-300'
+    : highlighted
+      ? 'border-yellow-400 ring-1 ring-yellow-400/50'
+      : dirty
+        ? 'border-orange-400/70 ring-1 ring-orange-400/40'
+        : 'border-border/60'
 
   return (
     <div className="flex items-center gap-3">
@@ -676,7 +706,7 @@ function MetricRow(props: {
             if (!id) return
             props.onPreviewIndicator(id)
           }}
-          className={`h-9 w-[150px] rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${tone} ${borderTone}`}
+          className={`h-9 rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${type === 'value' ? 'w-[170px]' : 'w-[120px]'} ${tone} ${borderTone}`}
         />
         <span className="w-10 text-right text-xs text-muted-foreground">{unit}</span>
       </div>

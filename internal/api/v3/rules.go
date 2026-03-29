@@ -139,23 +139,23 @@ func (h *Handler) GetRules(c *gin.Context) {
 	c.JSON(http.StatusOK, items)
 }
 
-// CreateRule 新增规则。
+// CreateRule 新增规则，仅保存不自动转换。
 func (h *Handler) CreateRule(c *gin.Context) {
 	req, ok := bindRuleTextRequest(c)
 	if !ok {
 		return
 	}
-	items, content, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
+	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
 		return append(items, RuleItem{Index: len(items) + 1, Text: req.Text}), true
 	})
 	if !ok {
 		return
 	}
-	h.triggerRuleConvert(content)
+	h.markRulesPending()
 	c.JSON(http.StatusCreated, items)
 }
 
-// UpdateRule 更新指定规则。
+// UpdateRule 更新指定规则，仅保存不自动转换。
 func (h *Handler) UpdateRule(c *gin.Context) {
 	req, ok := bindRuleTextRequest(c)
 	if !ok {
@@ -165,7 +165,7 @@ func (h *Handler) UpdateRule(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, content, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
+	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
 		if index < 1 || index > len(items) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
 			return nil, false
@@ -176,17 +176,17 @@ func (h *Handler) UpdateRule(c *gin.Context) {
 	if !ok {
 		return
 	}
-	h.triggerRuleConvert(content)
+	h.markRulesPending()
 	c.JSON(http.StatusOK, items)
 }
 
-// DeleteRule 删除指定规则。
+// DeleteRule 删除指定规则，仅保存不自动转换。
 func (h *Handler) DeleteRule(c *gin.Context) {
 	index, ok := parseRuleIndex(c)
 	if !ok {
 		return
 	}
-	items, content, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
+	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
 		if index < 1 || index > len(items) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
 			return nil, false
@@ -198,7 +198,7 @@ func (h *Handler) DeleteRule(c *gin.Context) {
 	if !ok {
 		return
 	}
-	h.triggerRuleConvert(content)
+	h.markRulesPending()
 	c.JSON(http.StatusOK, items)
 }
 
@@ -217,14 +217,33 @@ func (h *Handler) ConvertRules(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "running"})
 }
 
-// GetRuleStatus 获取转换状态，包含进度步骤和重试次数。
+// GetRuleStatus 获取转换状态，单次查询返回全部状态字段。
 func (h *Handler) GetRuleStatus(c *gin.Context) {
+	keys := []string{
+		"rules_convert_status", "rules_convert_at",
+		"rules_convert_error", "rules_convert_step", "rules_convert_attempt",
+	}
+	values, err := h.store.GetConfigBatch(keys)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取状态失败"})
+		return
+	}
+	fallback := func(key string) string {
+		if v, ok := values[key]; ok {
+			return v
+		}
+		return ""
+	}
+	status := fallback("rules_convert_status")
+	if status == "" {
+		status = "idle"
+	}
 	c.JSON(http.StatusOK, rulesStatusResponse{
-		Status:    h.getRuleConfig("rules_convert_status", "idle"),
-		UpdatedAt: h.getRuleConfig("rules_convert_at", ""),
-		Error:     h.getRuleConfig("rules_convert_error", ""),
-		Step:      h.getRuleConfig("rules_convert_step", ""),
-		Attempt:   h.getRuleConfig("rules_convert_attempt", ""),
+		Status:    status,
+		UpdatedAt: fallback("rules_convert_at"),
+		Error:     fallback("rules_convert_error"),
+		Step:      fallback("rules_convert_step"),
+		Attempt:   fallback("rules_convert_attempt"),
 	})
 }
 
@@ -310,6 +329,11 @@ func (h *Handler) newRuleConverter() (RuleConverter, error) {
 		return nil, nil
 	}
 	return h.ruleConverterFactory()
+}
+
+// markRulesPending 标记规则已修改、待转换。
+func (h *Handler) markRulesPending() {
+	_ = h.store.SetConfig("rules_convert_status", "pending")
 }
 
 func (h *Handler) getRuleConfig(key string, fallback string) string {

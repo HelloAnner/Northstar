@@ -449,6 +449,10 @@ func attachReverseEdges(g *Graph, wrRecords []*model.WholesaleRetail, acRecords 
 		g.AddReverseEdge(n("salesMonthRate"), n("salesLastYearMonth"))
 		g.AddReverseEdge(n("salesCumulativeRate"), n("salesCurrentCumulative"))
 		g.AddReverseEdge(n("salesCumulativeRate"), n("salesLastYearCumulative"))
+		g.AddReverseEdge(n("retailMonthRate"), n("retailCurrentMonth"))
+		g.AddReverseEdge(n("retailMonthRate"), n("retailLastYearMonth"))
+		g.AddReverseEdge(n("retailCumulativeRate"), n("retailCurrentCumulative"))
+		g.AddReverseEdge(n("retailCumulativeRate"), n("retailLastYearCumulative"))
 		g.AddReverseEdge(n("retailCurrentMonth"), n("foodCurrentMonth"))
 		g.AddReverseEdge(n("retailCurrentMonth"), n("goodsCurrentMonth"))
 		g.AddReverseEdge(n("retailLastYearMonth"), n("foodLastYearMonth"))
@@ -504,11 +508,13 @@ func attachIndicatorReverseEdges(g *Graph, wrRecords []*model.WholesaleRetail, a
 		}
 	}
 
-	for _, id := range []string{"totalSocial_cumulative_value", "totalSocial_cumulative_rate"} {
-		node := indicatorNode(id)
-		g.AddReverseEdge(node, indicatorNode("limitAbove_cumulative_value"))
-		g.AddReverseEdge(node, indicatorNode("limitAbove_cumulative_rate"))
-	}
+	// totalSocial_cumulative_value 上游: limitAbove_cumulative_value, microSmall_month_rate
+	g.AddReverseEdge(indicatorNode("totalSocial_cumulative_value"), indicatorNode("limitAbove_cumulative_value"))
+	g.AddReverseEdge(indicatorNode("totalSocial_cumulative_value"), indicatorNode("microSmall_month_rate"))
+
+	// totalSocial_cumulative_rate 上游: totalSocial_cumulative_value, limitAboveRetailLastCumSum
+	g.AddReverseEdge(indicatorNode("totalSocial_cumulative_rate"), indicatorNode("totalSocial_cumulative_value"))
+	g.AddReverseEdge(indicatorNode("totalSocial_cumulative_rate"), aggregateNode("limitAboveRetailLastCumSum"))
 }
 
 func attachIndicatorCoords(g *Graph, index *TemplateIndex) {

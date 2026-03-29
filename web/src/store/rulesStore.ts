@@ -10,7 +10,7 @@ import { useStore } from 'zustand'
 import { toast } from 'sonner'
 import { rulesApi, type RuleItem, type RuleStatus } from '@/services/api'
 
-export type RulesConvertStatus = 'idle' | 'running' | 'ok' | 'error'
+export type RulesConvertStatus = 'idle' | 'pending' | 'running' | 'ok' | 'error'
 
 export interface RulesStoreState {
   rules: RuleItem[]
@@ -32,7 +32,7 @@ export interface RulesStoreState {
   stopPolling: () => void
 }
 
-const pollingIntervalMs = 1500
+const pollingIntervalMs = 3000
 
 export function createRulesStore() {
   return createStore<RulesStoreState>((set, get) => ({
@@ -113,8 +113,7 @@ async function mutateRules(
   try {
     await action()
     await get().loadRules()
-    set({ status: 'running', statusError: '', statusStep: '', statusAttempt: '' })
-    get().startPolling()
+    set({ status: 'pending' })
   } finally {
     set({ submitting: false })
   }
@@ -126,8 +125,12 @@ function applyRuleStatus(
   status: RuleStatus
 ) {
   const prevStatus = get().status
+  // pending 是客户端状态（规则已修改未转换），只有 running 到来时才覆盖
+  const nextStatus = prevStatus === 'pending' && status.status !== 'running'
+    ? 'pending'
+    : status.status
   set({
-    status: status.status,
+    status: nextStatus,
     statusError: status.error,
     statusUpdatedAt: status.updatedAt,
     statusStep: status.step ?? '',

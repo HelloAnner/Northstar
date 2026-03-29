@@ -36,7 +36,7 @@ const STEP_META: Record<string, { progress: number; label: string }> = {
 
 interface RuleListViewProps {
   rules: RuleItem[]
-  status: 'idle' | 'running' | 'ok' | 'error'
+  status: 'idle' | 'pending' | 'running' | 'ok' | 'error'
   statusError: string
   statusUpdatedAt: string
   statusStep: string
@@ -147,7 +147,7 @@ export function RuleListView({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <p className="text-sm text-muted-foreground">
-              每次新增、编辑或删除后都会自动触发规则转换与热重载。
+              编辑完成后点击「转换规则」按钮统一生效。
             </p>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
@@ -160,9 +160,14 @@ export function RuleListView({
               <RefreshCw className="h-3.5 w-3.5" />
               刷新
             </Button>
-            <Button size="sm" variant="outline" onClick={() => void handleConvert()} disabled={submitting || status === 'running'}>
+            <Button
+              size="sm"
+              variant={status === 'pending' ? 'default' : 'outline'}
+              onClick={() => void handleConvert()}
+              disabled={submitting || status === 'running'}
+            >
               <RefreshCw className="h-3.5 w-3.5" />
-              重新转换
+              {status === 'pending' ? '转换规则' : '重新转换'}
             </Button>
             <Button size="sm" onClick={openCreate} disabled={submitting}>
               <Plus className="h-3.5 w-3.5" />
@@ -338,6 +343,9 @@ export default function RuleList() {
 function buildStatusMeta(status: RuleListViewProps['status']) {
   if (status === 'idle') {
     return { label: '待转换', variant: 'outline' as const }
+  }
+  if (status === 'pending') {
+    return { label: '规则已修改', variant: 'secondary' as const }
   }
   if (status === 'running') {
     return { label: '转换中', variant: 'secondary' as const }
