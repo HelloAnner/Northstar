@@ -36,6 +36,8 @@ type rulesStatusResponse struct {
 	Status    string `json:"status"`
 	UpdatedAt string `json:"updatedAt"`
 	Error     string `json:"error"`
+	Step      string `json:"step,omitempty"`
+	Attempt   string `json:"attempt,omitempty"`
 }
 
 type ruleTextRequest struct {
@@ -215,12 +217,14 @@ func (h *Handler) ConvertRules(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "running"})
 }
 
-// GetRuleStatus 获取转换状态。
+// GetRuleStatus 获取转换状态，包含进度步骤和重试次数。
 func (h *Handler) GetRuleStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, rulesStatusResponse{
 		Status:    h.getRuleConfig("rules_convert_status", "idle"),
 		UpdatedAt: h.getRuleConfig("rules_convert_at", ""),
 		Error:     h.getRuleConfig("rules_convert_error", ""),
+		Step:      h.getRuleConfig("rules_convert_step", ""),
+		Attempt:   h.getRuleConfig("rules_convert_attempt", ""),
 	})
 }
 

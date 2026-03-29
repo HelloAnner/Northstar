@@ -49,6 +49,9 @@ var allowedFilterModes = map[string]struct{}{
 	"exclude_small_micro": {},
 }
 
+// LLM 调用超时时间
+const llmCallTimeout = 90 * time.Second
+
 type ConverterClient interface {
 	Chat(ctx context.Context, req llm.ChatRequest, stream func(string) error) (llm.ChatResult, error)
 }
@@ -119,7 +122,13 @@ func (c *Converter) ConvertAsync(mdContent string) {
 		return
 	}
 	_ = c.writeRunning()
+	_ = c.writeStep("initializing")
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = c.writeError(fmt.Errorf("转换异常中断: %v", r))
+			}
+		}()
 		if err := c.convertAndApply(mdContent); err != nil {
 			_ = c.writeError(err)
 		}
@@ -127,13 +136,16 @@ func (c *Converter) ConvertAsync(mdContent string) {
 }
 
 func (c *Converter) convertAndApply(mdContent string) error {
+	_ = c.writeStep("calling_llm")
 	jsonStr, err := c.convert(mdContent)
 	if err != nil {
 		return err
 	}
+	_ = c.writeStep("writing_json")
 	if err := c.writeRoleJSON(jsonStr); err != nil {
 		return err
 	}
+	_ = c.writeStep("reloading")
 	if c.engine != nil {
 		if err := c.engine.ReloadRules(); err != nil {
 			return err
@@ -161,10 +173,14 @@ func (c *Converter) convert(mdContent string) (string, error) {
 		Content: buildConvertUserMessage(content),
 	}}
 	for attempt := 0; attempt < 3; attempt++ {
-		result, err := c.llm.Chat(context.Background(), llm.ChatRequest{Messages: messages}, nil)
+		_ = c.writeAttempt(attempt+1, 3)
+		ctx, cancel := context.WithTimeout(context.Background(), llmCallTimeout)
+		result, err := c.llm.Chat(ctx, llm.ChatRequest{Messages: messages}, nil)
+		cancel()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("LLM 调用失败 (第%d次): %w", attempt+1, err)
 		}
+		_ = c.writeStep("validating")
 		jsonStr, err := extractJSON(result.Content)
 		if err != nil {
 			messages = appendRetryMessages(messages, result.Content,
@@ -409,6 +425,8 @@ func (c *Converter) writeSuccess() error {
 	if err := c.store.SetConfig("rules_convert_at", time.Now().Format(time.RFC3339)); err != nil {
 		return err
 	}
+	_ = c.store.SetConfig("rules_convert_step", "")
+	_ = c.store.SetConfig("rules_convert_attempt", "")
 	return c.store.SetConfig("rules_convert_error", "")
 }
 
@@ -419,5 +437,23 @@ func (c *Converter) writeError(err error) error {
 	if setErr := c.store.SetConfig("rules_convert_status", "error"); setErr != nil {
 		return setErr
 	}
+	_ = c.store.SetConfig("rules_convert_step", "")
+	_ = c.store.SetConfig("rules_convert_attempt", "")
 	return c.store.SetConfig("rules_convert_error", err.Error())
+}
+
+// writeStep 写入当前转换步骤，用于前端展示进度。
+func (c *Converter) writeStep(step string) error {
+	if c.store == nil {
+		return nil
+	}
+	return c.store.SetConfig("rules_convert_step", step)
+}
+
+// writeAttempt 写入当前重试次数，格式 "1/3"。
+func (c *Converter) writeAttempt(current int, total int) error {
+	if c.store == nil {
+		return nil
+	}
+	return c.store.SetConfig("rules_convert_attempt", fmt.Sprintf("%d/%d", current, total))
 }

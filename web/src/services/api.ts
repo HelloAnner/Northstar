@@ -24,6 +24,8 @@ export interface RuleStatus {
   status: 'idle' | 'running' | 'ok' | 'error'
   updatedAt: string
   error: string
+  step: string
+  attempt: string
 }
 
 export interface UserPromptPayload {

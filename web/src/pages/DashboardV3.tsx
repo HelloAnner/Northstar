@@ -72,6 +72,7 @@ export default function DashboardV3() {
   const [showChatDialog, setShowChatDialog] = useState(false)
   const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
   const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
+  const [suggestions, setSuggestions] = useState<{ chat: { title: string; content: string }[]; adjust: { title: string; content: string }[] } | null>(null)
 
   const showOptimizeNotices = (notices?: OptimizeNotice[]) => {
     if (!Array.isArray(notices) || notices.length === 0) return
@@ -79,8 +80,19 @@ export default function DashboardV3() {
       const title = notice.indicatorName
         ? `${notice.indicatorName}：${notice.message}`
         : notice.message || '智能调整提示'
-      const description = notice.suggestion || undefined
-      const payload = { description, duration: 3000 }
+
+      // 构建详细描述：包含目标值、调整前后变化、建议
+      const descParts: string[] = []
+      if (notice.target !== undefined && notice.before !== undefined) {
+        descParts.push(`目标 ${notice.target}，调整前 ${notice.before} → 调整后 ${notice.after}`)
+      }
+      if (notice.suggestion) {
+        descParts.push(notice.suggestion)
+      }
+      const description = descParts.length > 0 ? descParts.join('。') : undefined
+
+      const duration = notice.level === 'error' ? 6000 : 4000
+      const payload = { description, duration }
       if (notice.level === 'error') {
         toast.error(title, payload)
       } else if (notice.level === 'warn') {
@@ -132,11 +144,27 @@ export default function DashboardV3() {
     }
   }
 
+  // 后台加载推荐问题
+  const loadSuggestions = async () => {
+    try {
+      const res = await fetch('/api/llm/suggestions')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.chat?.length > 0 || data.adjust?.length > 0) {
+          setSuggestions(data)
+        }
+      }
+    } catch {
+      /* 静默失败，使用默认推荐 */
+    }
+  }
+
   // 初始加载
   useEffect(() => {
     loadStatus()
     loadIndicators()
     loadMonths()
+    loadSuggestions()
   }, [])
 
   useEffect(() => {
@@ -376,8 +404,8 @@ export default function DashboardV3() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
-      <div className="mx-auto w-full max-w-none space-y-6 p-6">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-b from-background via-background to-muted/20">
+      <div className="min-w-0 flex-1 space-y-6 overflow-y-auto p-6">
         {/* 顶部栏 */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -460,7 +488,7 @@ export default function DashboardV3() {
 
         {/* 指标面板 */}
         {loading ? (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className={`grid grid-cols-1 gap-4 ${showChatDialog ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
             {[...Array(4)].map((_, i) => (
               <Card key={i} className="border-border/60 bg-card/60 backdrop-blur">
                 <CardHeader className="pb-3">
@@ -475,7 +503,7 @@ export default function DashboardV3() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className={`grid grid-cols-1 gap-4 ${showChatDialog ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
             {groups.map((g) => (
               <IndicatorGroupCard
                 key={g.name}
@@ -522,13 +550,15 @@ export default function DashboardV3() {
           reloadToken={reloadToken}
         />
 
-        <Button
-          onClick={() => setShowChatDialog(true)}
-          size="icon"
-          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg transition hover:scale-105"
-        >
-          <MessageCircle className="h-5 w-5" />
-        </Button>
+        {!showChatDialog && (
+          <Button
+            onClick={() => setShowChatDialog(true)}
+            size="icon"
+            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg transition hover:scale-105"
+          >
+            <MessageCircle className="h-5 w-5" />
+          </Button>
+        )}
 
         {/* 导出弹窗 */}
         {showExportDialog && (
@@ -541,7 +571,6 @@ export default function DashboardV3() {
         )}
 
         <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
-        <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} />
 
         {/* 导入弹窗 */}
         <ImportDialog
@@ -553,6 +582,10 @@ export default function DashboardV3() {
           }}
         />
       </div>
+
+      {showChatDialog && (
+        <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} suggestions={suggestions} />
+      )}
     </div>
   )
 }
