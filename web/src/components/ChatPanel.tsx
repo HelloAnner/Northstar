@@ -1,5 +1,5 @@
 /**
- * AI 对话面板（支持历史会话存储与恢复）
+ * AI 对话面板（统一对话模式，支持查询与调整）
  *
  * @author Anner
  * Created on 2026/3/14
@@ -9,13 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
-import { BookPlus, Clock, MessageCircle, Plus, Sparkles, Target, Trash2, TrendingUp, Wand2, X } from 'lucide-react'
+import { BookPlus, Clock, Eraser, MessageCircle, Plus, Sparkles, Square, Target, Trash2, TrendingUp, Wand2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
-export type ChatMode = 'chat' | 'adjust'
 
 export interface AppliedRule {
   ruleId: string
@@ -36,6 +33,8 @@ export interface ChatPanelMessage {
   streaming?: boolean
   appliedRules?: AppliedRule[]
   ruleAdded?: RuleAddedPayload
+  /** 本次调整涉及的指标 ID 列表 */
+  changedIndicatorIds?: string[]
 }
 
 interface RuleAddedPayload {
@@ -44,10 +43,12 @@ interface RuleAddedPayload {
 }
 
 interface StreamResultPayload {
-  mode: ChatMode
+  mode: string
   reply: string
   appliedRules?: AppliedRule[]
   ruleAdded?: RuleAddedPayload
+  /** 直接调整的指标 ID 列表（后端返回，用于绿色高亮） */
+  adjustedTargets?: string[]
 }
 
 interface StreamEvent {
@@ -73,7 +74,8 @@ interface SuggestionsData {
 interface ChatPanelProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdjustApplied?: () => void
+  /** 调整完成后回调，传入变化的指标 ID 列表 */
+  onAdjustApplied?: (changedIndicatorIds?: string[]) => void
   suggestions?: SuggestionsData | null
 }
 
@@ -103,37 +105,35 @@ function pollRuleConvertStatus(onDone: (status: 'ok' | 'error') => void) {
 
 // ─── 常量 ───────────────────────────────────────────────
 
-const defaultQuestions: Record<ChatMode, { icon: ReactNode; title: string; content: string }[]> = {
-  chat: [
-    {
-      icon: <Sparkles className="h-4 w-4" />,
-      title: '解释批发增速',
-      content: '解释一下当前批发当月增速代表什么，以及它对整体指标有什么影响。',
-    },
-    {
-      icon: <TrendingUp className="h-4 w-4" />,
-      title: '分析零售走势',
-      content: '当前零售业销售额增速偏低，可能是什么原因？',
-    },
-  ],
-  adjust: [
-    {
-      icon: <Target className="h-4 w-4" />,
-      title: '调整批发增速',
-      content: '把批发当月增速调到 15%',
-    },
-    {
-      icon: <Wand2 className="h-4 w-4" />,
-      title: '随机调整零售',
-      content: '帮我将零售当月增速随机调整 5%',
-    },
-    {
-      icon: <BookPlus className="h-4 w-4" />,
-      title: '添加规则',
-      content: '帮我加一条规则：批发当月增速不能超过 20%',
-    },
-  ],
-}
+const defaultQuestions: { icon: ReactNode; title: string; content: string }[] = [
+  {
+    icon: <Sparkles className="h-4 w-4" />,
+    title: '解释批发增速',
+    content: '解释一下当前批发当月增速代表什么，以及它对整体指标有什么影响。',
+  },
+  {
+    icon: <TrendingUp className="h-4 w-4" />,
+    title: '分析零售走势',
+    content: '当前零售业销售额增速偏低，可能是什么原因？',
+  },
+  {
+    icon: <Target className="h-4 w-4" />,
+    title: '调整批发增速',
+    content: '把批发当月增速调到 15%',
+  },
+  {
+    icon: <Wand2 className="h-4 w-4" />,
+    title: '随机调整零售',
+    content: '帮我将零售当月增速随机调整 5%',
+  },
+  {
+    icon: <BookPlus className="h-4 w-4" />,
+    title: '添加规则',
+    content: '帮我加一条规则：批发当月增速不能超过 20%',
+  },
+]
+
+const ASSISTANT_INTRO = '我是 Northstar 数据助手，可以帮你查看和分析当前经济指标数据，也可以直接帮你调整指标目标值或添加约束规则。你可以直接对我说需求，例如"当前零售增速为什么偏低？"或"把批发当月增速调到 15%"。'
 
 // ─── 工具函数 ────────────────────────────────────────────
 
@@ -171,6 +171,17 @@ export function formatAppliedRuleDescription(rule: AppliedRule) {
   return `${rule.ruleId}：${rule.type}`
 }
 
+/** 从 appliedRules 中提取变化的指标 ID 列表 */
+function extractChangedIndicatorIds(rules?: AppliedRule[]): string[] {
+  if (!rules || rules.length === 0) return []
+  const ids = new Set<string>()
+  for (const rule of rules) {
+    if (rule.indicatorId) ids.add(rule.indicatorId)
+    if (rule.ensureId) ids.add(rule.ensureId)
+  }
+  return Array.from(ids)
+}
+
 // ─── 滑动删除行 ─────────────────────────────────────────
 
 function SwipeRow({
@@ -197,7 +208,6 @@ function SwipeRow({
     if (!swiping.current) return
     currentX.current = x
     const dx = currentX.current - startX.current
-    // 只允许左滑（负值），最多滑 threshold
     const clamped = Math.max(-threshold, Math.min(0, dx))
     setOffset(clamped)
   }
@@ -205,7 +215,6 @@ function SwipeRow({
   const handleEnd = () => {
     if (!swiping.current) return
     swiping.current = false
-    // 滑动超过一半阈值则锁定展开，否则回弹
     if (offset < -threshold / 2) {
       setOffset(-threshold)
     } else {
@@ -213,7 +222,6 @@ function SwipeRow({
     }
   }
 
-  // 点击其他地方关闭
   useEffect(() => {
     if (offset === 0) return
     const close = (e: MouseEvent) => {
@@ -227,7 +235,6 @@ function SwipeRow({
 
   return (
     <div ref={rowRef} className="relative overflow-hidden rounded-lg">
-      {/* 底层删除按钮 */}
       <div className="absolute inset-y-0 right-0 flex w-[70px] items-center justify-center bg-destructive text-destructive-foreground">
         <button
           className="flex h-full w-full items-center justify-center gap-1 text-xs font-medium"
@@ -237,7 +244,6 @@ function SwipeRow({
           删除
         </button>
       </div>
-      {/* 上层内容 */}
       <div
         className="relative bg-background transition-transform duration-150 ease-out"
         style={{ transform: `translateX(${offset}px)`, transition: swiping.current ? 'none' : undefined }}
@@ -305,31 +311,51 @@ function HistoryListView({
 // ─── 消息气泡 ────────────────────────────────────────────
 
 function MessageBubble({ message }: { message: ChatPanelMessage }) {
+  const isUser = message.role === 'user'
+  const changedCount = message.changedIndicatorIds?.length ?? 0
+
   return (
-    <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+    <div className="flex justify-start">
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-          message.role === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'border border-border bg-muted text-foreground'
+        className={`max-w-[88%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+          isUser
+            ? 'bg-primary/10 text-foreground'
+            : 'bg-muted/60 text-foreground'
         }`}
       >
-        <div className="prose prose-sm max-w-none text-inherit prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-inherit prose-strong:text-inherit dark:prose-invert">
+        {/* 角色标签 + 指标更新徽标 */}
+        <div className={`mb-1.5 flex items-center gap-2 text-xs font-medium ${isUser ? 'text-primary' : 'text-muted-foreground'}`}>
+          <span>{isUser ? '我' : '助手'}</span>
+          {!isUser && changedCount > 0 && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+              {changedCount} 项指标已更新
+            </span>
+          )}
+        </div>
+
+        <div className="prose prose-sm max-w-none break-words text-inherit prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-inherit prose-strong:text-inherit dark:prose-invert">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdownBold(message.content)}</ReactMarkdown>
         </div>
         {message.streaming && <span className="ml-1 animate-pulse">▍</span>}
+
+        {/* 调整结果：绿色高亮样式 */}
         {message.appliedRules && message.appliedRules.length > 0 && (
-          <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+          <div className="mt-3 space-y-1.5 border-t border-emerald-200/60 pt-3 dark:border-emerald-800/40">
+            <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">已执行调整：</div>
             {message.appliedRules.map((rule, index) => (
-              <div key={`${rule.ruleId}-${index}`} className="rounded-xl bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+              <div
+                key={`${rule.ruleId}-${index}`}
+                className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+              >
                 {formatAppliedRuleDescription(rule)}
               </div>
             ))}
           </div>
         )}
+
         {message.ruleAdded && (
           <div className="mt-3 border-t border-border/60 pt-3">
-            <div className="flex items-center gap-2 rounded-xl bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300">
               <BookPlus className="h-3.5 w-3.5 shrink-0" />
               <span>
                 已添加规则：{message.ruleAdded.text}
@@ -349,20 +375,19 @@ function MessageBubble({ message }: { message: ChatPanelMessage }) {
 
 export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggestions }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatPanelMessage[]>([])
-  const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
-  const [mode, setMode] = useState<ChatMode>('chat')
   const [sessionId, setSessionId] = useState<string>(crypto.randomUUID())
+  const [streaming, setStreaming] = useState(false)
+  const [input, setInput] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const endRef = useRef<HTMLDivElement | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!open) return
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  // 面板打开时加载历史列表
   useEffect(() => {
     if (open) {
       loadSessions()
@@ -379,35 +404,30 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     }
   }
 
-  // 保存当前会话到后端
-  const saveSession = useCallback(
-    async (msgs: ChatPanelMessage[]) => {
-      if (msgs.length === 0) return
-      try {
-        await fetch('/api/chat/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            mode,
-            messages: msgs.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              appliedRules: m.appliedRules,
-              ruleAdded: m.ruleAdded,
-            })),
-          }),
-        })
-        loadSessions()
-      } catch {
-        /* ignore */
-      }
-    },
-    [sessionId, mode],
-  )
+  const saveSession = async (msgs: ChatPanelMessage[]) => {
+    if (msgs.length === 0) return
+    try {
+      await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          mode: 'adjust',
+          messages: msgs.map((msg) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            appliedRules: msg.appliedRules,
+            ruleAdded: msg.ruleAdded,
+          })),
+        }),
+      })
+      loadSessions()
+    } catch {
+      /* ignore */
+    }
+  }
 
-  // 恢复历史会话
   const restoreSession = async (id: string) => {
     try {
       const res = await fetch(`/api/chat/sessions/${id}`)
@@ -422,11 +442,6 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
       setSessionId(id)
       setMessages(msgs)
       setInput('')
-      // 从 sessions 中找到 mode
-      const session = sessions.find((s) => s.id === id)
-      if (session) {
-        setMode(session.mode as ChatMode)
-      }
       setShowHistory(false)
     } catch {
       toast.error('恢复会话失败')
@@ -437,9 +452,9 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     try {
       await fetch(`/api/chat/sessions/${id}`, { method: 'DELETE' })
       setSessions((prev) => prev.filter((s) => s.id !== id))
-      // 如果删除的是当前会话，重置
       if (id === sessionId) {
-        resetSession()
+        setMessages([])
+        setSessionId(crypto.randomUUID())
       }
     } catch {
       toast.error('删除会话失败')
@@ -447,27 +462,21 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   }
 
   const resetSession = () => {
+    handleStop()
     setMessages([])
     setInput('')
-    setMode('chat')
     setSessionId(crypto.randomUUID())
   }
 
-  const handleModeChange = (newMode: ChatMode) => {
-    if (newMode !== mode) {
-      // 切换模式前保存当前会话（如果有消息）
-      if (messages.length > 0) {
-        saveSession(messages)
-      }
-      setMessages([])
-      setInput('')
-      setSessionId(crypto.randomUUID())
+  const handleStop = () => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
     }
-    setMode(newMode)
   }
 
-  const handleSend = async () => {
-    const trimmed = input.trim()
+  const handleSend = async (directContent?: string) => {
+    const trimmed = (directContent ?? input).trim()
     if (!trimmed || streaming) return
     const nextMessage: ChatPanelMessage = { id: crypto.randomUUID(), role: 'user', content: trimmed }
     const nextMessages = [...messages, nextMessage]
@@ -478,12 +487,16 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
 
   const startStream = async (history: ChatPanelMessage[]) => {
     setStreaming(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const res = await fetch('/api/llm/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
-          mode,
+          mode: 'adjust',
           messages: history.map((message) => ({ role: message.role, content: message.content })),
         }),
       })
@@ -511,10 +524,15 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         }
       }
     } catch (error) {
-      appendAssistantMessage(error instanceof Error ? error.message : '对话失败')
+      if (!controller.signal.aborted) {
+        appendAssistantMessage(error instanceof Error ? error.message : '对话失败')
+      }
     } finally {
       finalizeAssistantMessage()
       setStreaming(false)
+      if (abortRef.current === controller) {
+        abortRef.current = null
+      }
     }
   }
 
@@ -548,6 +566,12 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     if (event.type === 'result' && event.result) {
       applyResult(event.result)
       if (event.result.mode === 'adjust') {
+        // 合并：直接调整的目标 ID + 规则联动触发的 ID
+        const fromTargets = event.result.adjustedTargets ?? []
+        const fromRules = extractChangedIndicatorIds(event.result.appliedRules)
+        const changedIds = [...new Set([...fromTargets, ...fromRules])]
+        onAdjustApplied?.(changedIds)
+      } else if (event.result.ruleAdded) {
         onAdjustApplied?.()
       }
       return
@@ -601,6 +625,9 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         toast.error('规则添加失败')
       }
     }
+
+    const changedIds = extractChangedIndicatorIds(result.appliedRules)
+
     setMessages((prev) => {
       const last = prev[prev.length - 1]
       if (!last || last.role !== 'assistant') {
@@ -612,6 +639,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
             content: result.reply,
             appliedRules: result.appliedRules ?? [],
             ruleAdded: result.ruleAdded,
+            changedIndicatorIds: changedIds,
           },
         ]
       }
@@ -623,6 +651,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
           streaming: false,
           appliedRules: result.appliedRules ?? last.appliedRules,
           ruleAdded: result.ruleAdded ?? last.ruleAdded,
+          changedIndicatorIds: changedIds.length > 0 ? changedIds : last.changedIndicatorIds,
         },
       ]
     })
@@ -631,19 +660,24 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   if (!open) return null
 
   // 动态推荐优先，静态兜底
-  const chatIcons = [<Sparkles className="h-4 w-4" />, <TrendingUp className="h-4 w-4" />]
-  const adjustIcons = [<Target className="h-4 w-4" />, <Wand2 className="h-4 w-4" />, <BookPlus className="h-4 w-4" />]
-  const dynamicItems = suggestions?.[mode]
-  const fallbackItems = defaultQuestions[mode]
-  const icons = mode === 'chat' ? chatIcons : adjustIcons
-  const questions = (dynamicItems && dynamicItems.length > 0)
-    ? dynamicItems.map((item, i) => ({ icon: icons[i % icons.length], ...item }))
-    : fallbackItems
+  const suggestionIcons = [
+    <Sparkles className="h-4 w-4" />,
+    <TrendingUp className="h-4 w-4" />,
+    <Target className="h-4 w-4" />,
+    <Wand2 className="h-4 w-4" />,
+    <BookPlus className="h-4 w-4" />,
+  ]
+  const dynamicChat = suggestions?.chat ?? []
+  const dynamicAdjust = suggestions?.adjust ?? []
+  const dynamicAll = [...dynamicChat, ...dynamicAdjust]
+  const questions = (dynamicAll.length > 0)
+    ? dynamicAll.map((item, i) => ({ icon: suggestionIcons[i % suggestionIcons.length], ...item }))
+    : defaultQuestions
 
   // 历史列表视图
   if (showHistory) {
     return (
-      <div className="flex h-full w-[420px] shrink-0 flex-col border-l border-border bg-background shadow-lg">
+      <div className="flex h-full w-[400px] shrink-0 flex-col border-l border-border bg-background shadow-lg">
         <HistoryListView
           sessions={sessions}
           onSelect={restoreSession}
@@ -656,13 +690,17 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
 
   // 对话视图
   return (
-    <div className="flex h-full w-[420px] shrink-0 flex-col border-l border-border bg-background shadow-lg">
+    <div className="flex h-full w-[400px] shrink-0 flex-col border-l border-border bg-background shadow-lg overflow-hidden">
+      {/* 顶部栏 */}
       <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-2">
           <MessageCircle className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold">数据对话助手</span>
+          <span className="text-sm font-semibold">数据助手</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetSession} disabled={streaming || messages.length === 0} title="清空对话">
+            <Eraser className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetSession} disabled={streaming} title="新建对话">
             <Plus className="h-4 w-4" />
           </Button>
@@ -675,30 +713,22 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         </div>
       </div>
 
-      <div className="border-b border-border px-4 py-3">
-        <Tabs value={mode} onValueChange={(value) => handleModeChange(value as ChatMode)}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="chat">聊天</TabsTrigger>
-            <TabsTrigger value="adjust">调整</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <ScrollArea className="flex-1 px-4 py-3">
-        <div className="space-y-3">
+      {/* 消息区 */}
+      <ScrollArea className="flex-1 overflow-x-hidden">
+        <div className="space-y-3 p-4">
           {messages.length === 0 && (
-            <div className="space-y-3">
-              <p className="px-1 text-sm text-muted-foreground">
-                {mode === 'adjust'
-                  ? '直接描述要调整到的指标目标值，系统会先解析意图，再调用调整引擎执行。'
-                  : '直接提问当前指标含义、走势分析或规则影响，AI 会基于当前指标和规则结果回答。'}
-              </p>
+            <div className="space-y-4">
+              {/* 角色介绍 */}
+              <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                {ASSISTANT_INTRO}
+              </div>
+              {/* 推荐问题 */}
               <div className="grid grid-cols-1 gap-2">
                 {questions.map((question) => (
                   <button
                     key={question.title}
-                    onClick={() => setInput(question.content)}
-                    className="group flex items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-accent hover:bg-accent"
+                    onClick={() => void handleSend(question.content)}
+                    className="group flex items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                   >
                     <div className="mt-0.5 text-muted-foreground group-hover:text-primary">{question.icon}</div>
                     <div className="min-w-0 flex-1">
@@ -718,12 +748,13 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         </div>
       </ScrollArea>
 
+      {/* 输入区 */}
       <div className="border-t border-border bg-muted/30 p-3">
         <div className="flex gap-2">
           <Input
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder={mode === 'adjust' ? '输入你的调整需求…' : '输入你的咨询问题…'}
+            placeholder="输入问题或调整指令…"
             disabled={streaming}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
@@ -733,9 +764,16 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
             }}
             className="flex-1"
           />
-          <Button onClick={() => void handleSend()} disabled={streaming || !input.trim()}>
-            {streaming ? '…' : '发送'}
-          </Button>
+          {streaming ? (
+            <Button variant="destructive" onClick={handleStop} className="shrink-0">
+              <Square className="mr-1 h-3 w-3" />
+              停止
+            </Button>
+          ) : (
+            <Button onClick={() => void handleSend()} disabled={!input.trim()}>
+              发送
+            </Button>
+          )}
         </div>
         <div className="mt-2 text-center text-xs text-muted-foreground">按 Enter 发送，Shift+Enter 换行</div>
       </div>

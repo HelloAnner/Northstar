@@ -109,6 +109,34 @@ tests/e2e-result/
 northstar
 **/*.zip
 
+# 图片
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.svg
+!web/src/**/*.svg
+!web/public/**
+
+# 视频
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# 测试报告
+tests/e2e_playwright/reports/
+**/*.html
+*.log
+.playwright-mcp/
+
+# 数据库
+data/
+*.db
+
 # 前端源代码需要纳入版本控制
 !web/src/lib/
 !web/src/lib/**

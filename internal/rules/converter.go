@@ -172,6 +172,7 @@ func (c *Converter) convert(mdContent string) (string, error) {
 		Role:    "user",
 		Content: buildConvertUserMessage(content),
 	}}
+	var lastError string
 	for attempt := 0; attempt < 3; attempt++ {
 		_ = c.writeAttempt(attempt+1, 3)
 		ctx, cancel := context.WithTimeout(context.Background(), llmCallTimeout)
@@ -183,6 +184,7 @@ func (c *Converter) convert(mdContent string) (string, error) {
 		_ = c.writeStep("validating")
 		jsonStr, err := extractJSON(result.Content)
 		if err != nil {
+			lastError = fmt.Sprintf("第%d次: 输出无法提取为 JSON: %v", attempt+1, err)
 			messages = appendRetryMessages(messages, result.Content,
 				fmt.Sprintf("输出无法提取为 JSON，错误：%v，请只输出纯 JSON。", err))
 			continue
@@ -191,9 +193,10 @@ func (c *Converter) convert(mdContent string) (string, error) {
 		if len(errs) == 0 {
 			return normalizeRoleJSON(jsonStr, c.mdPath, time.Now().UTC())
 		}
+		lastError = fmt.Sprintf("第%d次: %s", attempt+1, buildValidationErrorMessage(errs))
 		messages = appendRetryMessages(messages, result.Content, buildValidationErrorMessage(errs))
 	}
-	return "", fmt.Errorf("3次重试仍失败")
+	return "", fmt.Errorf("3次重试仍失败，最后一次错误: %s", lastError)
 }
 
 func appendRetryMessages(messages []llm.ChatMessage, assistant string, user string) []llm.ChatMessage {
@@ -307,28 +310,61 @@ func buildConvertSystemPrompt() string {
 	return strings.TrimSpace(`
 你是 Northstar 的规则转换器。
 
-任务：
-1. 读取用户提供的 rules.md 内容
-2. 将自然语言规则转换为如下 JSON：
+任务：将 rules.md 中的自然语言规则转成 JSON。只输出纯 JSON，不要 Markdown 或解释。
+
+## 输出格式
+
 {
   "version": "1.0",
-  "updatedAt": "2026-03-14T10:00:00Z",
-  "sourceFile": "config/rules.md",
-  "rules": [
-    {
-      "id": "rule_1",
-      "name": "规则摘要",
-      "description": "原始自然语言描述",
-      "type": "clamp_target|filter_allocation|compensate"
-    }
-  ]
+  "rules": [...]
 }
 
-约束：
-- 只能输出纯 JSON，不要输出 Markdown 或解释
-- indicator / trigger / ensure 只能使用系统允许的 16 个指标 ID
-- filter 只能使用 positive_current、negative_current、large_scale_only、exclude_small_micro
-- relation 只能使用 gte 或 lte
+## 规则类型
+
+### 1. clamp_target — 值域约束
+字段：id, name, description, type, indicator, min(可选), max(可选)
+示例：
+{"id":"clamp_limitAbove_month_rate","name":"限上社零额月增速范围约束","description":"限上社零额月增速不低于 -30%，不高于 50%","type":"clamp_target","indicator":"limitAbove_month_rate","min":-30,"max":50}
+
+### 2. filter_allocation — 过滤分配
+字段：id, name, description, type, indicator, filter
+filter 枚举：positive_current | negative_current | large_scale_only | exclude_small_micro
+示例：
+{"id":"filter_retail_positive","name":"零售仅正增长企业","description":"零售业仅正增长企业参与分配","type":"filter_allocation","indicator":"retail_month_rate","filter":"positive_current"}
+
+### 3. compensate — 联动补偿
+字段：id, name, description, type, trigger, ensure, relation, tolerance
+relation 枚举：gte | lte
+示例：
+{"id":"compensate_limitAbove_to_totalSocial","name":"限上累计增速联动社零总额增速","description":"调整限上社零额累计增速后，社零总额累计增速不得低于限上增速 2 个百分点以内","type":"compensate","trigger":"limitAbove_cumulative_rate","ensure":"totalSocial_cumulative_rate","relation":"gte","tolerance":2}
+
+## 允许的 16 个指标 ID（只能用这些，不要自创）
+
+| 指标 ID | 中文含义 |
+|---|---|
+| limitAbove_month_value | 限上社零额月值 |
+| limitAbove_month_rate | 限上社零额月增速 |
+| limitAbove_cumulative_value | 限上社零额累计值 |
+| limitAbove_cumulative_rate | 限上社零额累计增速 |
+| eatWearUse_month_rate | 吃穿用月增速 |
+| microSmall_month_rate | 小微企业月增速 |
+| wholesale_month_rate | 批发业月增速 |
+| wholesale_cumulative_rate | 批发业累计增速 |
+| retail_month_rate | 零售业月增速 |
+| retail_cumulative_rate | 零售业累计增速 |
+| accommodation_month_rate | 住宿业月增速 |
+| accommodation_cumulative_rate | 住宿业累计增速 |
+| catering_month_rate | 餐饮业月增速 |
+| catering_cumulative_rate | 餐饮业累计增速 |
+| totalSocial_cumulative_value | 社零总额累计值 |
+| totalSocial_cumulative_rate | 社零总额累计增速 |
+
+## 约束
+- min 和 max 是数值，不带百分号（如 -30 表示 -30%）
+- min 或 max 可以只填一个，但不能同时为空
+- "不低于 X" → min=X；"不高于 X" → max=X
+- "不低于 0" → min=0（不需要 max）
+- tolerance 是数值，表示允许偏差的百分点
 `)
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // GetConfig 获取配置项
@@ -67,6 +68,34 @@ func (s *Store) EnsureConfig(key string, value string) error {
 		return err
 	}
 	return s.SetConfig(key, value)
+}
+
+// GetConfigBatch 批量获取配置项，单次查询返回多个 key 的值。
+func (s *Store) GetConfigBatch(keys []string) (map[string]string, error) {
+	if len(keys) == 0 {
+		return map[string]string{}, nil
+	}
+	placeholders := make([]string, len(keys))
+	args := make([]interface{}, len(keys))
+	for i, k := range keys {
+		placeholders[i] = "?"
+		args[i] = k
+	}
+	query := "SELECT key, value FROM config WHERE key IN (" + strings.Join(placeholders, ",") + ")"
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]string, len(keys))
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		result[k] = v
+	}
+	return result, rows.Err()
 }
 
 // GetAllConfig 获取所有配置项
