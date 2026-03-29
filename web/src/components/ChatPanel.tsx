@@ -77,6 +77,30 @@ interface ChatPanelProps {
   suggestions?: SuggestionsData | null
 }
 
+// ─── 规则转换轮询 ──────────────────────────────────────────
+
+/**
+ * 轮询规则转换状态，结束后回调最终状态
+ */
+function pollRuleConvertStatus(onDone: (status: 'ok' | 'error') => void) {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/v1/rules/status')
+      const data = await res.json()
+      if (data.status === 'ok' || data.status === 'error') {
+        clearInterval(interval)
+        onDone(data.status)
+      }
+    } catch {
+      // 网络错误继续重试
+    }
+  }, 1500)
+  // 安全超时：90 秒后强制停止
+  setTimeout(() => {
+    clearInterval(interval)
+  }, 90_000)
+}
+
 // ─── 常量 ───────────────────────────────────────────────
 
 const defaultQuestions: Record<ChatMode, { icon: ReactNode; title: string; content: string }[]> = {
@@ -309,8 +333,9 @@ function MessageBubble({ message }: { message: ChatPanelMessage }) {
               <BookPlus className="h-3.5 w-3.5 shrink-0" />
               <span>
                 已添加规则：{message.ruleAdded.text}
-                {message.ruleAdded.status === 'converting' && ' — 正在转换中…'}
-                {message.ruleAdded.status === 'error' && ' — 添加失败'}
+                {message.ruleAdded.status === 'converting' && ' — ⏳ 正在转换中…'}
+                {message.ruleAdded.status === 'ok' && ' — ✅ 已生效'}
+                {message.ruleAdded.status === 'error' && ' — ❌ 转换失败'}
               </span>
             </div>
           </div>
@@ -558,6 +583,20 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     if (result.ruleAdded) {
       if (result.ruleAdded.status === 'converting') {
         toast.success('规则添加成功，正在转换为 JSON…')
+        pollRuleConvertStatus((finalStatus) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.ruleAdded?.status === 'converting'
+                ? { ...m, ruleAdded: { ...m.ruleAdded, status: finalStatus } }
+                : m
+            )
+          )
+          if (finalStatus === 'ok') {
+            toast.success('规则转换成功，已生效')
+          } else {
+            toast.error('规则转换失败')
+          }
+        })
       } else {
         toast.error('规则添加失败')
       }
