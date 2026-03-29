@@ -7,6 +7,7 @@
 
 import AIPreferenceForm from '@/components/AIPreferenceForm'
 import RuleList from '@/components/RuleList'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Settings() {
@@ -27,7 +28,14 @@ export default function Settings() {
             <TabsTrigger value="ai">AI 偏好</TabsTrigger>
           </TabsList>
           <TabsContent value="rules">
-            <RuleList />
+            <Card>
+              <CardHeader>
+                <CardTitle>调整规则</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RuleList />
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="ai">
             <AIPreferenceForm />

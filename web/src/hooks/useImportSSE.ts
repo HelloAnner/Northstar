@@ -34,9 +34,9 @@ export function useImportSSE() {
   const totalSheetsRef = useRef(0)
   const doneSheetsRef = useRef(new Set<string>())
   const lastEventTimeRef = useRef(0)
-  const warnTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
-  const abortRef = useRef<AbortController>()
+  const warnTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval>>(undefined)
+  const abortRef = useRef<AbortController>(undefined)
 
   const clearTimers = useCallback(() => {
     if (warnTimerRef.current) clearTimeout(warnTimerRef.current)

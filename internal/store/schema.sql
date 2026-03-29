@@ -591,3 +591,31 @@ BEGIN
     UPDATE config SET updated_at = CURRENT_TIMESTAMP
     WHERE key = NEW.key;
 END;
+
+-- ============================================================================
+-- 15. chat_sessions - 对话会话表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id TEXT PRIMARY KEY,                          -- UUID
+    title TEXT NOT NULL DEFAULT '',                -- 会话标题（取首条用户消息）
+    mode TEXT NOT NULL DEFAULT 'chat',             -- chat / adjust
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- 16. chat_messages - 对话消息表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY,                          -- UUID
+    session_id TEXT NOT NULL,                     -- 关联会话
+    role TEXT NOT NULL,                           -- user / assistant
+    content TEXT NOT NULL DEFAULT '',
+    applied_rules TEXT,                           -- JSON，appliedRules
+    rule_added TEXT,                              -- JSON，ruleAdded
+    seq INTEGER NOT NULL,                         -- 消息序号
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, seq);

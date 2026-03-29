@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -29,7 +30,7 @@ func (h *Handler) Optimize(c *gin.Context) {
 	h.engine.SetPeriod(year, month)
 	resp, err := runOptimize(h.engine, h.store, year, month, req.Targets)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "智能调整失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("智能调整失败：%v", err)})
 		return
 	}
 	c.JSON(http.StatusOK, resp)

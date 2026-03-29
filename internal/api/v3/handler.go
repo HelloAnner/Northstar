@@ -75,6 +75,12 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/optimize", h.Optimize)
 	// LLM 对话
 	router.POST("/llm/chat/stream", h.StreamLLMChat)
+	router.GET("/llm/suggestions", h.GetSuggestions)
+	// 对话历史
+	router.GET("/chat/sessions", h.ListChatSessions)
+	router.POST("/chat/sessions", h.SaveChatSession)
+	router.GET("/chat/sessions/:id", h.GetChatSession)
+	router.DELETE("/chat/sessions/:id", h.DeleteChatSession)
 
 	// 数据导出
 	router.POST("/export", h.Export)

@@ -17,6 +17,8 @@ export interface RulesStoreState {
   status: RulesConvertStatus
   statusError: string
   statusUpdatedAt: string
+  statusStep: string
+  statusAttempt: string
   loading: boolean
   submitting: boolean
   pollingTimer: number | null
@@ -30,7 +32,7 @@ export interface RulesStoreState {
   stopPolling: () => void
 }
 
-const pollingIntervalMs = 2000
+const pollingIntervalMs = 1500
 
 export function createRulesStore() {
   return createStore<RulesStoreState>((set, get) => ({
@@ -38,6 +40,8 @@ export function createRulesStore() {
     status: 'idle',
     statusError: '',
     statusUpdatedAt: '',
+    statusStep: '',
+    statusAttempt: '',
     loading: false,
     submitting: false,
     pollingTimer: null,
@@ -68,8 +72,8 @@ export function createRulesStore() {
       set({ submitting: true })
       try {
         await rulesApi.convert()
-        set({ status: 'running', statusError: '' })
-        await get().loadStatus()
+        set({ status: 'running', statusError: '', statusStep: '', statusAttempt: '' })
+        get().startPolling()
       } finally {
         set({ submitting: false })
       }
@@ -109,8 +113,7 @@ async function mutateRules(
   try {
     await action()
     await get().loadRules()
-    set({ status: 'running', statusError: '' })
-    toast.info('正在转换规则为 JSON…')
+    set({ status: 'running', statusError: '', statusStep: '', statusAttempt: '' })
     get().startPolling()
   } finally {
     set({ submitting: false })
@@ -127,11 +130,13 @@ function applyRuleStatus(
     status: status.status,
     statusError: status.error,
     statusUpdatedAt: status.updatedAt,
+    statusStep: status.step ?? '',
+    statusAttempt: status.attempt ?? '',
   })
 
   // 状态变化时发送 Toast 通知
   if (prevStatus === 'running' && status.status === 'ok') {
-    toast.success('JSON 规则转换成功，规则已生效')
+    toast.success('规则转换成功，已生效')
   } else if (prevStatus === 'running' && status.status === 'error') {
     toast.error('规则转换失败：' + (status.error || '未知错误'))
   }

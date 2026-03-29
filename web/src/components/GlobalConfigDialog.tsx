@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import RuleList from '@/components/RuleList'
 
 interface GlobalConfigDialogProps {
   open: boolean
@@ -16,6 +18,35 @@ interface ConfigFormState {
 }
 
 export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigDialogProps) {
+  const [activeTab, setActiveTab] = useState('llm')
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl h-[70vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>全局配置</DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="w-fit shrink-0">
+            <TabsTrigger value="llm">模型配置</TabsTrigger>
+            <TabsTrigger value="rules">规则列表</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="llm" className="flex-1 min-h-0 overflow-auto mt-4">
+            <LLMConfigPanel open={open} onOpenChange={onOpenChange} />
+          </TabsContent>
+
+          <TabsContent value="rules" className="flex-1 min-h-0 mt-4 flex flex-col">
+            <RuleList />
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function LLMConfigPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -82,67 +113,59 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>全局配置</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="llm-base-url">接口地址</Label>
-            <Input
-              id="llm-base-url"
-              value={form.baseUrl}
-              onChange={(e) => updateField('baseUrl', e.target.value)}
-              placeholder="例如：https://api.openai.com/v1"
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="llm-model">模型名称</Label>
-            <Input
-              id="llm-model"
-              value={form.model}
-              onChange={(e) => updateField('model', e.target.value)}
-              placeholder="例如：gpt-4o-mini"
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="llm-api-key">API 密钥</Label>
-            <div className="flex gap-2">
-              <Input
-                id="llm-api-key"
-                type={showApiKey ? 'text' : 'password'}
-                value={form.apiKey}
-                onChange={(e) => updateField('apiKey', e.target.value)}
-                placeholder="例如：sk-..."
-                disabled={loading}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowApiKey((prev) => !prev)}
-                disabled={loading}
-              >
-                {showApiKey ? '隐藏' : '显示'}
-              </Button>
-            </div>
-          </div>
-
-          {error && <div className="text-sm text-destructive">{error}</div>}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="llm-base-url">接口地址</Label>
+        <Input
+          id="llm-base-url"
+          value={form.baseUrl}
+          onChange={(e) => updateField('baseUrl', e.target.value)}
+          placeholder="例如：https://api.openai.com/v1"
+          disabled={loading}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="llm-model">模型名称</Label>
+        <Input
+          id="llm-model"
+          value={form.model}
+          onChange={(e) => updateField('model', e.target.value)}
+          placeholder="例如：gpt-4o-mini"
+          disabled={loading}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="llm-api-key">API 密钥</Label>
+        <div className="flex gap-2">
+          <Input
+            id="llm-api-key"
+            type={showApiKey ? 'text' : 'password'}
+            value={form.apiKey}
+            onChange={(e) => updateField('apiKey', e.target.value)}
+            placeholder="例如：sk-..."
+            disabled={loading}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowApiKey((prev) => !prev)}
+            disabled={loading}
+          >
+            {showApiKey ? '隐藏' : '显示'}
+          </Button>
         </div>
+      </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            取消
-          </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
-            {saving ? '保存中…' : '保存'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {error && <div className="text-sm text-destructive">{error}</div>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          取消
+        </Button>
+        <Button onClick={handleSave} disabled={saving || loading}>
+          {saving ? '保存中…' : '保存'}
+        </Button>
+      </div>
+    </div>
   )
 }
