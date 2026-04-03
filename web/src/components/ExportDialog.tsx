@@ -135,6 +135,8 @@ export default function ExportDialog({ open, onClose, year, month }: ExportDialo
     try {
       const response = await fetch('/api/export/stream', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: year || undefined, month: month || undefined }),
         signal: controller.signal,
       })
       if (!response.ok) throw new Error('导出请求失败')

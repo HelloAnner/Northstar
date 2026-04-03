@@ -10,8 +10,8 @@ function App() {
     <BrowserRouter>
       <Toaster />
       <Routes>
+        <Route path="/" element={<DashboardV3 />} />
         <Route element={<AppShell />}>
-          <Route path="/" element={<DashboardV3 />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="/help" element={<HelpDocument />} />

@@ -72,14 +72,15 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/indicators", h.GetIndicators)
 	router.GET("/indicator-definitions", h.ListIndicatorDefinitions)
 	router.PATCH("/indicator-definitions/:code", h.UpsertIndicatorDefinition)
-	router.GET("/rules", h.ListRules)
-	router.GET("/rules/evaluate", h.EvaluateRules)
-	router.PATCH("/rules/:code", h.UpsertRule)
+	router.GET("/rule-definitions", h.ListRules)
+	router.GET("/rule-definitions/evaluate", h.EvaluateRules)
+	router.PATCH("/rule-definitions/:code", h.UpsertRule)
 	// 联动预览
 	router.POST("/linkage/preview", h.PreviewLinkage)
 	// 智能调整
 	router.POST("/optimize", h.Optimize)
 	// LLM 对话
+	router.POST("/config/llm/test", h.TestLLMConfig)
 	router.POST("/llm/chat/stream", h.StreamLLMChat)
 	router.GET("/llm/suggestions", h.GetSuggestions)
 	// 对话历史

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -34,6 +35,7 @@ type llmChatMessage struct {
 type llmChatRequest struct {
 	SessionID string           `json:"sessionId"`
 	Mode      string           `json:"mode"`
+	Reasoning bool             `json:"reasoning"`
 	Messages  []llmChatMessage `json:"messages"`
 }
 
@@ -70,6 +72,7 @@ type llmChatContext struct {
 	year       int
 	month      int
 	userPrompt string
+	reasoning  bool
 	groups     []dagcalc.IndicatorGroup
 }
 
@@ -130,6 +133,7 @@ func (h *Handler) buildLLMChatContext(ctx context.Context, req llmChatRequest) (
 		year:       year,
 		month:      month,
 		userPrompt: h.getConfigValue("llm_user_prompt", ""),
+		reasoning:  req.Reasoning,
 		groups:     groups,
 	}, nil
 }
@@ -181,11 +185,16 @@ func (h *Handler) runLLMChat(stream *llmStreamWriter, chatCtx llmChatContext) (*
 }
 
 func (h *Handler) runChatMode(stream *llmStreamWriter, chatCtx llmChatContext) (*llmResultPayload, error) {
-	client, err := h.newLLMClient(h.buildChatPrompt(chatCtx.year, chatCtx.month, chatCtx.groups, chatCtx.userPrompt))
+	_ = stream.Send(llmStreamEvent{Type: "thinking"})
+	prompt := h.buildChatPrompt(chatCtx.year, chatCtx.month, chatCtx.groups, chatCtx.userPrompt)
+	if chatCtx.reasoning {
+		prompt += reasoningSuffix
+	}
+	client, err := h.newLLMClient(prompt)
 	if err != nil {
 		return nil, err
 	}
-	reply, err := h.streamReply(stream, client, toLLMChatRequest(chatCtx.request, chatCtx.year, chatCtx.month), chatCtx.ctx)
+	reply, err := h.streamReplyWithReasoning(stream, client, toLLMChatRequest(chatCtx.request, chatCtx.year, chatCtx.month), chatCtx.ctx, chatCtx.reasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +204,27 @@ func (h *Handler) runChatMode(stream *llmStreamWriter, chatCtx llmChatContext) (
 	}, nil
 }
 
+const reasoningSuffix = `
+
+# 深度思考模式（必须遵守）
+你现在处于深度思考模式。你必须严格按以下格式输出：
+
+1. 先输出 <think> 标签
+2. 在标签内写出完整的分析推理过程（数据对比、逻辑推导、可能原因）
+3. 输出 </think> 标签结束推理
+4. 然后输出正式的简洁回答
+
+示例格式：
+<think>
+用户问的是批发增速问题...当前值是15%...对比上月...
+</think>
+
+根据分析，批发当月增速...
+
+重要：必须先输出 <think> 再输出 </think>，不可省略。`
+
 func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext) (*llmResultPayload, error) {
+	_ = stream.Send(llmStreamEvent{Type: "thinking"})
 	userMsg, err := lastUserMessage(chatCtx.request.Messages)
 	if err != nil {
 		return nil, err
@@ -237,11 +266,15 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
-	summaryClient, err := h.newLLMClient(h.buildChatPrompt(chatCtx.year, chatCtx.month, resp.Groups, chatCtx.userPrompt))
+	summaryPrompt := h.buildChatPrompt(chatCtx.year, chatCtx.month, resp.Groups, chatCtx.userPrompt)
+	if chatCtx.reasoning {
+		summaryPrompt += reasoningSuffix
+	}
+	summaryClient, err := h.newLLMClient(summaryPrompt)
 	if err != nil {
 		return nil, err
 	}
-	reply, err := h.streamReply(stream, summaryClient, llm.ChatRequest{
+	reply, err := h.streamReplyWithReasoning(stream, summaryClient, llm.ChatRequest{
 		Messages: []llm.ChatMessage{{
 			Role: "user",
 			Content: buildAdjustSummaryMessage(
@@ -253,7 +286,7 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		}},
 		Year:  chatCtx.year,
 		Month: chatCtx.month,
-	}, chatCtx.ctx)
+	}, chatCtx.ctx, chatCtx.reasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -335,11 +368,11 @@ func (h *Handler) buildRuleOnlyResult(
 		"用户请求：%s\n\n系统已添加以下规则：\n%s\n\n规则正在异步转换为结构化 JSON，转换完成后将自动生效。请用简洁中文告知用户规则已添加并正在转换中。",
 		userMsg, strings.Join(ruleTexts, "\n"),
 	)
-	reply, err := h.streamReply(stream, summaryClient, llm.ChatRequest{
+	reply, err := h.streamReplyWithReasoning(stream, summaryClient, llm.ChatRequest{
 		Messages: []llm.ChatMessage{{Role: "user", Content: summaryMsg}},
 		Year:     chatCtx.year,
 		Month:    chatCtx.month,
-	}, chatCtx.ctx)
+	}, chatCtx.ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -384,22 +417,69 @@ func (h *Handler) streamReply(
 	req llm.ChatRequest,
 	ctx context.Context,
 ) (string, error) {
+	return h.streamReplyWithReasoning(stream, client, req, ctx, false)
+}
+
+func (h *Handler) streamReplyWithReasoning(
+	stream *llmStreamWriter,
+	client LLMChatClient,
+	req llm.ChatRequest,
+	ctx context.Context,
+	reasoning bool,
+) (string, error) {
 	var builder strings.Builder
 	streamed := false
+
+	// 深度思考模式使用 reasoning parser 拆分 <think> 标签
+	var parser *reasoningParser
+	if reasoning {
+		parser = newReasoningParser(stream)
+	}
+
 	result, err := client.Chat(ctx, req, func(chunk string) error {
 		streamed = true
 		builder.WriteString(chunk)
+		if parser != nil {
+			return parser.Feed(chunk)
+		}
 		return stream.SendDelta(chunk)
 	})
 	if err != nil {
 		return "", err
 	}
 
+	// 刷新 parser 缓冲区
+	if parser != nil {
+		_ = parser.Flush()
+	}
+
 	content := strings.TrimSpace(result.Content)
 	if !streamed && content != "" {
-		builder.WriteString(content)
-		if err := stream.SendDelta(content); err != nil {
-			return "", err
+		// LLM 未走流式回调，将完整内容分小块逐步推送，模拟流式体验
+		runes := []rune(content)
+		chunkSize := 8
+		for i := 0; i < len(runes); i += chunkSize {
+			end := i + chunkSize
+			if end > len(runes) {
+				end = len(runes)
+			}
+			chunk := string(runes[i:end])
+			builder.WriteString(chunk)
+			if parser != nil {
+				if err := parser.Feed(chunk); err != nil {
+					return "", err
+				}
+			} else {
+				if err := stream.SendDelta(chunk); err != nil {
+					return "", err
+				}
+			}
+			if end < len(runes) {
+				time.Sleep(20 * time.Millisecond)
+			}
+		}
+		if parser != nil {
+			_ = parser.Flush()
 		}
 	}
 	reply := strings.TrimSpace(builder.String())

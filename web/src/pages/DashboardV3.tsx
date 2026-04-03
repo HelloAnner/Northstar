@@ -1,24 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, MessageCircle, Settings2, Upload } from 'lucide-react'
 import ChatPanel from '@/components/ChatPanel'
 import ExportDialog from '@/components/ExportDialog'
 import ImportDialog from '@/components/ImportDialog'
 import CompaniesTable, { type IndicatorGroup } from '@/components/CompaniesTable'
+import IndicatorCards from '@/components/dashboard/IndicatorCards'
 import ThemeToggle from '@/components/app/ThemeToggle'
 import NorthstarIcon from '@/components/app/NorthstarIcon'
 import GlobalConfigDialog from '@/components/GlobalConfigDialog'
 import { toast } from 'sonner'
 import { buildCompanySnapshot, buildUndoChanges, buildUndoUpdates, type CompanySnapshot } from '@/lib/undo'
 import { useUndoStore } from '@/store/undoStore'
-
-type Indicator = IndicatorGroup['indicators'][number]
 
 interface SystemStatus {
   initialized: boolean
@@ -51,7 +48,6 @@ interface OptimizeNotice {
 }
 
 export default function DashboardV3() {
-  const navigate = useNavigate()
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [groups, setGroups] = useState<IndicatorGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,12 +68,11 @@ export default function DashboardV3() {
   const [showChatDialog, setShowChatDialog] = useState(false)
   const [highlightCells, setHighlightCells] = useState<Record<string, boolean>>({})
   const [highlightIndicators, setHighlightIndicators] = useState<Record<string, boolean>>({})
+  const [failedIndicators, setFailedIndicators] = useState<Record<string, boolean>>({})
   const [suggestions, setSuggestions] = useState<{ chat: { title: string; content: string }[]; adjust: { title: string; content: string }[] } | null>(null)
-  /** 最近调整变化的指标 ID（绿色高亮，3 秒后自动消失） */
   const [changedIndicators, setChangedIndicators] = useState<Record<string, boolean>>({})
   const changedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  /** 设置绿色高亮指标，3 秒后自动消失 */
   const flashChangedIndicators = useCallback((ids: string[]) => {
     if (ids.length === 0) return
     const next: Record<string, boolean> = {}
@@ -90,6 +85,20 @@ export default function DashboardV3() {
     }, 3000)
   }, [])
 
+  const deriveFailedIndicators = (notices?: OptimizeNotice[]) => {
+    if (!Array.isArray(notices) || notices.length === 0) {
+      setFailedIndicators({})
+      return
+    }
+    const failed: Record<string, boolean> = {}
+    for (const n of notices) {
+      if (n.level === 'warn' || n.level === 'error') {
+        failed[n.indicatorId] = true
+      }
+    }
+    setFailedIndicators(failed)
+  }
+
   const showOptimizeNotices = (notices?: OptimizeNotice[]) => {
     if (!Array.isArray(notices) || notices.length === 0) return
     for (const notice of notices) {
@@ -97,7 +106,6 @@ export default function DashboardV3() {
         ? `${notice.indicatorName}：${notice.message}`
         : notice.message || '智能调整提示'
 
-      // 构建详细描述：包含目标值、调整前后变化、建议
       const descParts: string[] = []
       if (notice.target !== undefined && notice.before !== undefined) {
         descParts.push(`目标 ${notice.target}，调整前 ${notice.before} → 调整后 ${notice.after}`)
@@ -119,7 +127,6 @@ export default function DashboardV3() {
     }
   }
 
-  // 加载系统状态
   const loadStatus = async () => {
     try {
       const res = await fetch('/api/status')
@@ -130,7 +137,6 @@ export default function DashboardV3() {
     }
   }
 
-  // 加载可用月份（用于切换整个平台年月）
   const loadMonths = async () => {
     setMonthsLoading(true)
     try {
@@ -146,7 +152,6 @@ export default function DashboardV3() {
     }
   }
 
-  // 加载指标数据
   const loadIndicators = async () => {
     setLoading(true)
     try {
@@ -160,7 +165,6 @@ export default function DashboardV3() {
     }
   }
 
-  // 后台加载推荐问题
   const loadSuggestions = async () => {
     try {
       const res = await fetch('/api/llm/suggestions')
@@ -171,11 +175,10 @@ export default function DashboardV3() {
         }
       }
     } catch {
-      /* 静默失败，使用默认推荐 */
+      /* silent */
     }
   }
 
-  // 初始加载
   useEffect(() => {
     loadStatus()
     loadIndicators()
@@ -197,9 +200,7 @@ export default function DashboardV3() {
     q.set('page', '1')
     q.set('pageSize', '2000')
     const res = await fetch(`/api/companies?${q.toString()}`)
-    if (!res.ok) {
-      throw new Error('加载企业数据失败')
-    }
+    if (!res.ok) throw new Error('加载企业数据失败')
     const data = (await res.json()) as { items: any[] }
     return buildCompanySnapshot(Array.isArray(data.items) ? data.items : [])
   }
@@ -233,9 +234,10 @@ export default function DashboardV3() {
         body: JSON.stringify({ targets }),
       })
       const data = await res.json()
-      if (data?.notices) {
-        showOptimizeNotices(data.notices as OptimizeNotice[])
-      }
+      const notices = data?.notices as OptimizeNotice[] | undefined
+      showOptimizeNotices(notices)
+      deriveFailedIndicators(notices)
+
       if (!res.ok) {
         throw new Error(data?.error || '智能调整失败')
       }
@@ -247,9 +249,7 @@ export default function DashboardV3() {
       } else {
         setDraftTargets((prev) => {
           const next = { ...prev }
-          for (const id of clearIds) {
-            delete next[id]
-          }
+          for (const id of clearIds) delete next[id]
           return next
         })
       }
@@ -276,15 +276,24 @@ export default function DashboardV3() {
     const targets: Record<string, number> = {}
     for (const [id, raw] of entries) {
       const v = Number(String(raw).replaceAll(',', '').trim())
-      if (Number.isFinite(v)) {
-        targets[id] = v
-      }
+      if (Number.isFinite(v)) targets[id] = v
     }
     if (Object.keys(targets).length === 0) return
 
     try {
       await applyOptimize(targets, undefined, { type: 'optimize', summary: '智能调整' })
       flashChangedIndicators(Object.keys(targets))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const applySingle = async (id: string, raw: string) => {
+    try {
+      const v = Number(String(raw).replaceAll(',', '').trim())
+      if (!Number.isFinite(v)) return
+      await applyOptimize({ [id]: v }, [id], { type: 'indicator', summary: '指标调整' })
+      flashChangedIndicators([id])
     } catch (err) {
       console.error(err)
     }
@@ -314,13 +323,10 @@ export default function DashboardV3() {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || '切换月份失败')
 
-      if (data.status) {
-        setStatus(data.status as SystemStatus)
-      }
-      if (Array.isArray(data.groups)) {
-        setGroups(data.groups as IndicatorGroup[])
-      }
+      if (data.status) setStatus(data.status as SystemStatus)
+      if (Array.isArray(data.groups)) setGroups(data.groups as IndicatorGroup[])
       setDraftTargets({})
+      setFailedIndicators({})
       setReloadToken((x) => x + 1)
       clearUndo()
     } catch (err) {
@@ -328,7 +334,6 @@ export default function DashboardV3() {
     }
   }
 
-  const handleExport = () => setShowExportDialog(true)
   const handleChatDataChanged = (changedIndicatorIds?: string[]) => {
     loadIndicators()
     setReloadToken((x) => x + 1)
@@ -345,9 +350,7 @@ export default function DashboardV3() {
         body: JSON.stringify({ anchor }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data?.error || '联动预览失败')
-      }
+      if (!res.ok) throw new Error(data?.error || '联动预览失败')
       const nodes = Array.isArray(data.nodes) ? data.nodes : []
       const nextCells: Record<string, boolean> = {}
       const nextIndicators: Record<string, boolean> = {}
@@ -376,17 +379,6 @@ export default function DashboardV3() {
   }, [status])
 
   const hasDraft = Object.keys(draftTargets).length > 0
-  const applySingle = async (id: string, raw: string) => {
-    try {
-      const v = Number(String(raw).replaceAll(',', '').trim())
-      if (!Number.isFinite(v)) return
-      await applyOptimize({ [id]: v }, [id], { type: 'indicator', summary: '指标调整' })
-      flashChangedIndicators([id])
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
   const canUndo = undoStack.length > 0 && !undoing
 
   const handleUndo = async () => {
@@ -407,13 +399,12 @@ export default function DashboardV3() {
         body: JSON.stringify({ updates }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data?.error || '撤销失败')
-      }
+      if (!res.ok) throw new Error(data?.error || '撤销失败')
       if (Array.isArray(data.groups)) {
         setGroups(data.groups as IndicatorGroup[])
       }
       setDraftTargets({})
+      setFailedIndicators({})
       setReloadToken((x) => x + 1)
       popUndoStep()
     } catch (err) {
@@ -423,6 +414,27 @@ export default function DashboardV3() {
       setUndoing(false)
     }
   }
+
+  const monthSelector = (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">月份</span>
+      <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
+        <SelectTrigger className="h-9 w-[180px]">
+          <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
+        </SelectTrigger>
+        <SelectContent>
+          {months.map((it) => {
+            const key = `${it.year}-${String(it.month).padStart(2, '0')}`
+            return (
+              <SelectItem key={key} value={key}>
+                {it.year}年{it.month}月 · {it.totalCompanies} 家
+              </SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-b from-background via-background to-muted/20">
@@ -457,24 +469,7 @@ export default function DashboardV3() {
               )}
             </Badge>
 
-            <div className="flex items-center gap-2">
-              <span className="hidden text-xs text-muted-foreground lg:inline">月份</span>
-              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
-                <SelectTrigger className="h-9 w-[180px]">
-                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((it) => {
-                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
-                    return (
-                      <SelectItem key={key} value={key}>
-                        {it.year}年{it.month}月 · {it.totalCompanies} 家
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+            {monthSelector}
 
             <Button
               disabled={!hasDraft || optimizing}
@@ -494,7 +489,7 @@ export default function DashboardV3() {
               导入
             </Button>
 
-            <Button onClick={handleExport} variant="outline" className="gap-2" disabled={saving}>
+            <Button onClick={() => setShowExportDialog(true)} variant="outline" className="gap-2" disabled={saving}>
               <Download className="h-4 w-4" />
               导出
             </Button>
@@ -517,58 +512,34 @@ export default function DashboardV3() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {[...Array(4)].map((__, j) => (
-                    <Skeleton key={j} className="h-9 w-full" />
+                    <Skeleton key={j} className="h-8 w-full" />
                   ))}
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <div className={`grid grid-cols-1 gap-4 ${showChatDialog ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
-            {groups.map((g) => (
-              <IndicatorGroupCard
-                key={g.name}
-                group={g}
-                draftTargets={draftTargets}
-                onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
-                onApplySingle={applySingle}
-                onPreviewIndicator={(id) => previewLinkage({ indicatorId: id })}
-                highlightIndicators={highlightIndicators}
-                changedIndicators={changedIndicators}
-                disabled={optimizing}
-              />
-            ))}
-          </div>
+          <IndicatorCards
+            groups={groups}
+            draftTargets={draftTargets}
+            highlightIndicators={highlightIndicators}
+            changedIndicators={changedIndicators}
+            failedIndicators={failedIndicators}
+            disabled={optimizing}
+            compact={showChatDialog}
+            onDraftChange={(id, v) => setDraftTargets((prev) => ({ ...prev, [id]: v }))}
+            onEnterApply={applySingle}
+            onPreview={(id) => previewLinkage({ indicatorId: id })}
+          />
         )}
 
         {/* 明细表 */}
         <CompaniesTable
           onIndicatorsUpdate={(next) => setGroups(next)}
-          onSavingChange={(s) => {
-            setTableSaving(s)
-          }}
+          onSavingChange={(s) => setTableSaving(s)}
           onCellPreview={(rowId, columnKey) => previewLinkage({ ui: { rowId, columnKey } })}
           highlightCells={highlightCells}
-          monthSelector={
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">月份</span>
-              <Select value={currentMonthKey || undefined} onValueChange={selectMonth} disabled={!canSelectMonth}>
-                <SelectTrigger className="h-9 w-[180px]">
-                  <SelectValue placeholder={monthsLoading ? '加载中…' : '选择月份'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((it) => {
-                    const key = `${it.year}-${String(it.month).padStart(2, '0')}`
-                    return (
-                      <SelectItem key={key} value={key}>
-                        {it.year}年{it.month}月 · {it.totalCompanies} 家
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          }
+          monthSelector={monthSelector}
           reloadToken={reloadToken}
         />
 
@@ -582,7 +553,6 @@ export default function DashboardV3() {
           </Button>
         )}
 
-        {/* 导出弹窗 */}
         {showExportDialog && (
           <ExportDialog
             open={showExportDialog}
@@ -594,7 +564,6 @@ export default function DashboardV3() {
 
         <GlobalConfigDialog open={showConfigDialog} onOpenChange={setShowConfigDialog} />
 
-        {/* 导入弹窗 */}
         <ImportDialog
           open={showImportDialog}
           onClose={() => setShowImportDialog(false)}
@@ -608,108 +577,6 @@ export default function DashboardV3() {
       {showChatDialog && (
         <ChatPanel open={showChatDialog} onOpenChange={setShowChatDialog} onAdjustApplied={handleChatDataChanged} suggestions={suggestions} />
       )}
-    </div>
-  )
-}
-
-function IndicatorGroupCard(props: {
-  group: IndicatorGroup
-  disabled?: boolean
-  draftTargets: Record<string, string>
-  onDraftChange: (id: string, value: string) => void
-  onApplySingle: (id: string, value: string) => Promise<void>
-  onPreviewIndicator: (id: string) => void
-  highlightIndicators: Record<string, boolean>
-  changedIndicators: Record<string, boolean>
-}) {
-  return (
-    <Card className="border-border/60 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{props.group.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {props.group.indicators.map((it) => (
-          <MetricRow
-            key={it.id}
-            label={it.name}
-            indicator={it}
-            type={String(it.unit).includes('%') ? 'rate' : 'value'}
-            draftTargets={props.draftTargets}
-            onDraftChange={props.onDraftChange}
-            onApplySingle={props.onApplySingle}
-            onPreviewIndicator={props.onPreviewIndicator}
-            highlightIndicators={props.highlightIndicators}
-            changedIndicators={props.changedIndicators}
-            disabled={props.disabled}
-          />
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
-function MetricRow(props: {
-  label: string
-  indicator?: Indicator
-  type?: 'rate' | 'value'
-  disabled?: boolean
-  draftTargets: Record<string, string>
-  onDraftChange: (id: string, value: string) => void
-  onApplySingle: (id: string, value: string) => Promise<void>
-  onPreviewIndicator: (id: string) => void
-  highlightIndicators: Record<string, boolean>
-  changedIndicators: Record<string, boolean>
-}) {
-  const value = props.indicator?.value ?? 0
-  const type = props.type ?? 'value'
-  const unit = props.indicator?.unit ?? (type === 'rate' ? '%' : '')
-  const id = props.indicator?.id
-
-  const text = type === 'rate' ? `${Math.round(value)}` : Math.round(value).toLocaleString()
-  const positive = value >= 0
-  const tone = type === 'rate' ? (positive ? 'text-emerald-300' : 'text-rose-300') : 'text-foreground'
-
-  const draft = id ? props.draftTargets[id] : undefined
-  const displayValue = draft !== undefined ? draft : text
-  const dirty = draft !== undefined && draft !== text
-  const highlighted = !!(id && props.highlightIndicators[id])
-  const changed = !!(id && props.changedIndicators[id])
-
-  // 优先级：绿色变更高亮 > 黄色联动高亮 > 橙色草稿 > 默认
-  const borderTone = changed
-    ? 'border-emerald-400 ring-2 ring-emerald-400/50 transition-all duration-300'
-    : highlighted
-      ? 'border-yellow-400 ring-1 ring-yellow-400/50'
-      : dirty
-        ? 'border-orange-400/70 ring-1 ring-orange-400/40'
-        : 'border-border/60'
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="min-w-0 flex-1 whitespace-normal break-words text-xs text-muted-foreground">{props.label}</div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Input
-          value={displayValue}
-          disabled={props.disabled || !id}
-          onChange={(e) => {
-            if (!id) return
-            props.onDraftChange(id, e.target.value)
-          }}
-          onKeyDown={async (e) => {
-            if (!id) return
-            if (e.key !== 'Enter') return
-            e.preventDefault()
-            await props.onApplySingle(id, displayValue)
-          }}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!id) return
-            props.onPreviewIndicator(id)
-          }}
-          className={`h-9 rounded-full bg-muted/25 text-right font-mono text-sm tabular-nums ${type === 'value' ? 'w-[170px]' : 'w-[120px]'} ${tone} ${borderTone}`}
-        />
-        <span className="w-10 text-right text-xs text-muted-foreground">{unit}</span>
-      </div>
     </div>
   )
 }

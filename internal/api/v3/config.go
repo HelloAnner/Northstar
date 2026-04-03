@@ -44,9 +44,12 @@ type ConfigResponse struct {
 	LastYearLimitBelowCumulative float64 `json:"lastYearLimitBelowCumulative"` // 上年累计限下社零额
 
 	// 大模型配置
-	LlmBaseURL string `json:"llmBaseUrl"`
-	LlmModel   string `json:"llmModel"`
-	LlmApiKey  string `json:"llmApiKey"`
+	LlmBaseURL          string `json:"llmBaseUrl"`
+	LlmModel            string `json:"llmModel"`
+	LlmApiKey           string `json:"llmApiKey"`
+	LlmSupportsStreaming bool   `json:"llmSupportsStreaming"`
+	LlmSupportsTools     bool   `json:"llmSupportsTools"`
+	LlmSupportsReasoning bool   `json:"llmSupportsReasoning"`
 }
 
 // UpdateConfigRequest 更新配置请求
@@ -125,9 +128,12 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		LastYearLimitBelowCumulative: getFloat("last_year_limit_below_cumulative"),
 
 		// 大模型配置
-		LlmBaseURL: getString("llm_base_url"),
-		LlmModel:   getString("llm_model"),
-		LlmApiKey:  getString("llm_api_key"),
+		LlmBaseURL:          getString("llm_base_url"),
+		LlmModel:            getString("llm_model"),
+		LlmApiKey:           getString("llm_api_key"),
+		LlmSupportsStreaming: getString("llm_supports_streaming") == "true",
+		LlmSupportsTools:     getString("llm_supports_tools") == "true",
+		LlmSupportsReasoning: getString("llm_supports_reasoning") == "true",
 	}
 
 	c.JSON(http.StatusOK, response)

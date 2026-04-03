@@ -58,35 +58,28 @@ type IntentClient interface {
 
 // BuildIntentSystemPrompt 返回结构化意图解析提示词。
 func BuildIntentSystemPrompt() string {
-	return strings.TrimSpace(`
-你是 Northstar 的调整意图解析器。
+	return strings.TrimSpace(`你是意图解析器，从用户输入提取调整动作。只输出纯 JSON，不要输出其他任何文字。
 
-任务：
-1. 从用户输入中识别调整意图，分为三类：设定绝对目标值、按百分比调整、添加持久规则
-2. 只输出纯 JSON，不要输出解释、Markdown 或额外文本
-3. 若用户只是咨询，不要求系统执行调整，则返回 {“actions”:[]}
+分类规则：
+- “调到 X”、”设为 X” → set_target
+- “调整 X%”、”增加/减少 X%” → adjust_percent
+- “不能超过”、”限制”、”加一条规则” → add_rule
+- 打招呼、咨询、提问 → {“actions”:[]}（空数组，不要猜测动作）
 
-判断规则：
-- 如果用户说”调到 X”、”设为 X”，这是 set_target（设定绝对目标值）
-- 如果用户说”调整 X%”、”增加/减少 X%”、”随机调整 X%”，这是 adjust_percent（相对百分比调整）
-- 如果用户说”不能超过”、”不能低于”、”限制”、”只允许”、”帮我加一条规则”，或描述一种持久约束，这是 add_rule（添加持久规则）
-- 如果用户的意图是永久生效的约束而非一次性调整，应识别为 add_rule
+合法指标 ID（只能用这些）：
+limitAbove_month_value, limitAbove_month_rate, limitAbove_cumulative_value, limitAbove_cumulative_rate,
+eatWearUse_month_rate, microSmall_month_rate,
+wholesale_month_rate, wholesale_cumulative_rate, retail_month_rate, retail_cumulative_rate,
+accommodation_month_rate, accommodation_cumulative_rate, catering_month_rate, catering_cumulative_rate,
+totalSocial_cumulative_value, totalSocial_cumulative_rate
+
+常见中文名到 ID 映射：
+批发 → wholesale, 零售 → retail, 住宿 → accommodation, 餐饮 → catering,
+限上社零额 → limitAbove, 社零额 → totalSocial, 吃穿用 → eatWearUse, 小微 → microSmall,
+当月增速 → _month_rate, 累计增速 → _cumulative_rate, 当月值 → _month_value, 累计值 → _cumulative_value
 
 输出格式：
-{
-  “actions”: [
-    {“type”: “set_target”, “indicatorId”: “wholesale_month_rate”, “value”: 15},
-    {“type”: “adjust_percent”, “indicatorId”: “retail_month_rate”, “percent”: 5},
-    {“type”: “add_rule”, “ruleText”: “限制批发当月增速不超过15%”}
-  ]
-}
-
-约束：
-- type 只能是 set_target、adjust_percent、add_rule 三者之一
-- set_target 和 adjust_percent 的 indicatorId 只能使用系统提供的合法指标 ID
-- set_target 的 value 必须是数字
-- adjust_percent 的 percent 必须是数字（正数表示增加，负数表示减少）
-- add_rule 的 ruleText 必须是清晰的中文自然语言规则描述
+{“actions”:[{“type”:”set_target”,”indicatorId”:”wholesale_month_rate”,”value”:15}]}
 `)
 }
 

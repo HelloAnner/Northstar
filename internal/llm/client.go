@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -31,6 +32,11 @@ func NewClient(cfg Config, prompt string) (*Client, error) {
 // NewTextClient 创建不带工具的纯文本客户端。
 func NewTextClient(cfg Config, prompt string) (*Client, error) {
 	return newClient(cfg, prompt, nil)
+}
+
+// NewClientWithTools 创建带自定义工具的客户端。
+func NewClientWithTools(cfg Config, prompt string, tools []llms.Tool) (*Client, error) {
+	return newClient(cfg, prompt, tools)
 }
 
 func newClient(cfg Config, prompt string, tools []llms.Tool) (*Client, error) {
@@ -57,11 +63,32 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest, stream func(string) 
 		options = append(options, llms.WithTools(c.tools))
 	}
 	if stream != nil {
+		// UTF-8 安全缓冲：langchaingo 回调的 []byte 可能在多字节字符中间断开，
+		// 直接 string(chunk) 会产生乱码。先缓存不完整的尾部字节，下次拼接后再发送。
+		var trailing []byte
 		options = append(options, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-			if shouldSkipStreamChunk(chunk) {
+			buf := append(trailing, chunk...)
+			trailing = nil
+
+			if shouldSkipStreamChunk(buf) {
 				return nil
 			}
-			return stream(string(chunk))
+
+			// 找到最后一个完整 UTF-8 字符的边界
+			end := len(buf)
+			for end > 0 && !utf8.Valid(buf[:end]) {
+				end--
+			}
+			if end == 0 {
+				// 全部都是不完整字节，暂存
+				trailing = buf
+				return nil
+			}
+			if end < len(buf) {
+				trailing = make([]byte, len(buf)-end)
+				copy(trailing, buf[end:])
+			}
+			return stream(string(buf[:end]))
 		}))
 	}
 	resp, err := c.model.GenerateContent(ctx, messages, options...)

@@ -9,9 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
-import { BookPlus, Clock, Eraser, MessageCircle, Plus, Sparkles, Square, Target, Trash2, TrendingUp, Wand2, X } from 'lucide-react'
+import { ArrowRight, BookPlus, BrainCircuit, CheckCircle2, ChevronDown, ChevronRight, Clock, Eraser, MessageCircle, Plus, Send, Sparkles, Square, Target, Trash2, TrendingUp, Wand2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export interface AppliedRule {
@@ -31,6 +30,8 @@ export interface ChatPanelMessage {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
+  reasoning?: string
+  reasoningDone?: boolean
   appliedRules?: AppliedRule[]
   ruleAdded?: RuleAddedPayload
   /** 本次调整涉及的指标 ID 列表 */
@@ -82,58 +83,68 @@ interface ChatPanelProps {
 // ─── 规则转换轮询 ──────────────────────────────────────────
 
 /**
- * 轮询规则转换状态，结束后回调最终状态
+ * 轮询规则转换状态，结束后回调最终状态。
+ * 返回 cleanup 函数，调用方可在组件卸载时取消轮询。
  */
-function pollRuleConvertStatus(onDone: (status: 'ok' | 'error') => void) {
+function pollRuleConvertStatus(onDone: (status: 'ok' | 'error') => void): () => void {
+  let stopped = false
   const interval = setInterval(async () => {
+    if (stopped) return
     try {
       const res = await fetch('/api/v1/rules/status')
       const data = await res.json()
       if (data.status === 'ok' || data.status === 'error') {
+        stopped = true
         clearInterval(interval)
+        clearTimeout(timeout)
         onDone(data.status)
       }
     } catch {
       // 网络错误继续重试
     }
   }, 1500)
-  // 安全超时：90 秒后强制停止
-  setTimeout(() => {
+  const timeout = setTimeout(() => {
+    stopped = true
     clearInterval(interval)
   }, 90_000)
+  return () => {
+    stopped = true
+    clearInterval(interval)
+    clearTimeout(timeout)
+  }
 }
 
 // ─── 常量 ───────────────────────────────────────────────
 
 const defaultQuestions: { icon: ReactNode; title: string; content: string }[] = [
   {
-    icon: <Sparkles className="h-4 w-4" />,
+    icon: <Sparkles className="h-3.5 w-3.5" />,
     title: '解释批发增速',
     content: '解释一下当前批发当月增速代表什么，以及它对整体指标有什么影响。',
   },
   {
-    icon: <TrendingUp className="h-4 w-4" />,
+    icon: <TrendingUp className="h-3.5 w-3.5" />,
     title: '分析零售走势',
     content: '当前零售业销售额增速偏低，可能是什么原因？',
   },
   {
-    icon: <Target className="h-4 w-4" />,
+    icon: <Target className="h-3.5 w-3.5" />,
     title: '调整批发增速',
     content: '把批发当月增速调到 15%',
   },
   {
-    icon: <Wand2 className="h-4 w-4" />,
+    icon: <Wand2 className="h-3.5 w-3.5" />,
     title: '随机调整零售',
     content: '帮我将零售当月增速随机调整 5%',
   },
   {
-    icon: <BookPlus className="h-4 w-4" />,
+    icon: <BookPlus className="h-3.5 w-3.5" />,
     title: '添加规则',
     content: '帮我加一条规则：批发当月增速不能超过 20%',
   },
 ]
 
-const ASSISTANT_INTRO = '我是 Northstar 数据助手，可以帮你查看和分析当前经济指标数据，也可以直接帮你调整指标目标值或添加约束规则。你可以直接对我说需求，例如"当前零售增速为什么偏低？"或"把批发当月增速调到 15%"。'
+const ASSISTANT_INTRO = '我是数据助手，可以帮你查看、分析经济指标，也能直接调整目标值或添加约束规则。'
 
 // ─── 工具函数 ────────────────────────────────────────────
 
@@ -180,6 +191,23 @@ function extractChangedIndicatorIds(rules?: AppliedRule[]): string[] {
     if (rule.ensureId) ids.add(rule.ensureId)
   }
   return Array.from(ids)
+}
+
+// ─── 思考指示器 ─────────────────────────────────────────
+
+function ThinkingIndicator() {
+  return (
+    <div className="flex items-start gap-3 px-1">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800">
+        <Sparkles className="h-3.5 w-3.5 text-stone-500 dark:text-stone-400" />
+      </div>
+      <div className="flex items-center gap-1 pt-1.5">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-stone-400 dark:bg-stone-500" style={{ animationDelay: '0ms' }} />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-stone-400 dark:bg-stone-500" style={{ animationDelay: '150ms' }} />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-stone-400 dark:bg-stone-500" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  )
 }
 
 // ─── 滑动删除行 ─────────────────────────────────────────
@@ -276,27 +304,27 @@ function HistoryListView({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
-        <span className="text-sm font-semibold">历史对话</span>
-        <Button variant="ghost" size="sm" onClick={onBack}>
+      <div className="flex items-center justify-between border-b border-stone-200/60 px-5 py-3.5 dark:border-stone-700/40">
+        <span className="text-sm font-medium text-stone-700 dark:text-stone-300">历史对话</span>
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-stone-500 hover:text-stone-700 dark:text-stone-400">
           返回
         </Button>
       </div>
       <ScrollArea className="flex-1">
         {sessions.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">暂无历史对话</div>
+          <div className="px-5 py-12 text-center text-sm text-stone-400">暂无历史对话</div>
         ) : (
-          <div className="space-y-1 p-2">
+          <div className="space-y-0.5 p-2">
             {sessions.map((s) => (
               <SwipeRow key={s.id} onDelete={() => onDelete(s.id)}>
                 <div
-                  className="flex cursor-pointer items-center gap-2 px-3 py-2.5 transition-colors hover:bg-muted"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/50"
                   onClick={() => onSelect(s.id)}
                 >
-                  <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <MessageCircle className="h-4 w-4 shrink-0 text-stone-400" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm">{s.title || '新对话'}</div>
-                    <div className="text-xs text-muted-foreground">{formatTimeAgo(s.updatedAt)}</div>
+                    <div className="truncate text-sm text-stone-700 dark:text-stone-300">{s.title || '新对话'}</div>
+                    <div className="text-xs text-stone-400">{formatTimeAgo(s.updatedAt)}</div>
                   </div>
                 </div>
               </SwipeRow>
@@ -308,64 +336,201 @@ function HistoryListView({
   )
 }
 
+// ─── 调整结果卡片 ──────────────────────────────────────────
+
+function AdjustmentCard({ rules }: { rules: AppliedRule[] }) {
+  const [open, setOpen] = useState(false)
+  if (!rules || rules.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-b from-emerald-50/60 to-emerald-50/30 dark:border-emerald-800/40 dark:from-emerald-950/30 dark:to-emerald-950/10">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2.5 px-3.5 py-2.5"
+      >
+        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+          已执行 {rules.length} 项调整
+        </span>
+        {open ? <ChevronDown className="ml-auto h-3.5 w-3.5 text-emerald-500" /> : <ChevronRight className="ml-auto h-3.5 w-3.5 text-emerald-500" />}
+      </button>
+      {open && (
+        <div className="border-t border-emerald-200/50 dark:border-emerald-800/30">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-emerald-600/70 dark:text-emerald-400/60">
+                <th className="px-3.5 py-2 text-left font-medium">类型</th>
+                <th className="px-3.5 py-2 text-left font-medium">指标</th>
+                <th className="px-3.5 py-2 text-right font-medium">变更</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rules.map((rule, i) => (
+                <tr key={`${rule.ruleId}-${i}`} className="border-t border-emerald-100/60 dark:border-emerald-800/20">
+                  <td className="px-3.5 py-2 text-emerald-600 dark:text-emerald-400">
+                    {rule.type === 'clamp_target' && '裁剪'}
+                    {rule.type === 'filter_allocation' && '过滤'}
+                    {rule.type === 'compensate' && '联动'}
+                    {!['clamp_target', 'filter_allocation', 'compensate'].includes(rule.type) && rule.type}
+                  </td>
+                  <td className="px-3.5 py-2 text-stone-600 dark:text-stone-400">
+                    {rule.indicatorId || rule.ensureId || rule.ruleId}
+                  </td>
+                  <td className="px-3.5 py-2 text-right">
+                    <RuleChangeValue rule={rule} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RuleChangeValue({ rule }: { rule: AppliedRule }) {
+  if (rule.type === 'clamp_target') {
+    return (
+      <span className="inline-flex items-center gap-1 text-stone-600 dark:text-stone-400">
+        <span>{Math.round(rule.beforeValue ?? 0)}</span>
+        <ArrowRight className="h-3 w-3 text-emerald-500" />
+        <span className="font-semibold text-emerald-700 dark:text-emerald-400">{Math.round(rule.afterValue ?? 0)}</span>
+      </span>
+    )
+  }
+  if (rule.type === 'filter_allocation') {
+    return (
+      <span className="inline-flex items-center gap-1 text-stone-600 dark:text-stone-400">
+        <span>{rule.beforeCount ?? 0} 家</span>
+        <ArrowRight className="h-3 w-3 text-emerald-500" />
+        <span className="font-semibold text-emerald-700 dark:text-emerald-400">{rule.afterCount ?? 0} 家</span>
+      </span>
+    )
+  }
+  if (rule.type === 'compensate') {
+    return (
+      <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+        → {Math.round(rule.targetValue ?? 0)}
+      </span>
+    )
+  }
+  return <span className="text-stone-500">{rule.type}</span>
+}
+
+// ─── 规则添加卡片 ──────────────────────────────────────────
+
+function RuleAddedCard({ ruleAdded }: { ruleAdded: RuleAddedPayload }) {
+  const statusMap = {
+    converting: { text: '转换中', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200/60 dark:border-amber-800/30' },
+    ok: { text: '已生效', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-200/60 dark:border-emerald-800/30' },
+    error: { text: '转换失败', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200/60 dark:border-red-800/30' },
+  }
+  const s = statusMap[ruleAdded.status as keyof typeof statusMap] ?? statusMap.converting
+
+  return (
+    <div className={`rounded-xl border ${s.border} ${s.bg} px-3.5 py-3`}>
+      <div className="flex items-center gap-2">
+        <BookPlus className={`h-4 w-4 shrink-0 ${s.color}`} />
+        <span className={`text-xs font-semibold ${s.color}`}>新增规则 · {s.text}</span>
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-400">{ruleAdded.text}</p>
+    </div>
+  )
+}
+
 // ─── 消息气泡 ────────────────────────────────────────────
+
+const proseClasses = [
+  'prose prose-sm max-w-none',
+  'text-stone-700 dark:text-stone-300',
+  // 段落间距
+  'prose-p:my-2 prose-p:leading-[1.75]',
+  // 列表
+  'prose-ul:my-2.5 prose-ol:my-2.5 prose-li:my-0.5',
+  // 标题
+  'prose-headings:my-3 prose-headings:text-stone-800 prose-headings:font-semibold dark:prose-headings:text-stone-200',
+  // 加粗
+  'prose-strong:text-stone-800 dark:prose-strong:text-stone-200',
+  // 分割线
+  'prose-hr:my-4 prose-hr:border-stone-200 dark:prose-hr:border-stone-700',
+  // 表格
+  'prose-table:my-3 prose-th:px-3 prose-th:py-1.5 prose-th:text-left prose-th:font-medium prose-th:text-stone-600 dark:prose-th:text-stone-400',
+  'prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-stone-100 dark:prose-td:border-stone-800',
+].join(' ')
 
 function MessageBubble({ message }: { message: ChatPanelMessage }) {
   const isUser = message.role === 'user'
   const changedCount = message.changedIndicatorIds?.length ?? 0
+  const [reasoningOpen, setReasoningOpen] = useState(true)
+  const [userToggled, setUserToggled] = useState(false)
+
+  useEffect(() => {
+    if (message.reasoningDone && !userToggled) {
+      setReasoningOpen(false)
+    }
+  }, [message.reasoningDone])
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/90 px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
+          {message.content}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex justify-start">
-      <div
-        className={`max-w-[88%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
-          isUser
-            ? 'bg-primary/10 text-foreground'
-            : 'bg-muted/60 text-foreground'
-        }`}
-      >
-        {/* 角色标签 + 指标更新徽标 */}
-        <div className={`mb-1.5 flex items-center gap-2 text-xs font-medium ${isUser ? 'text-primary' : 'text-muted-foreground'}`}>
-          <span>{isUser ? '我' : '助手'}</span>
-          {!isUser && changedCount > 0 && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-              {changedCount} 项指标已更新
-            </span>
-          )}
-        </div>
+    <div className="flex items-start gap-3 px-1">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800">
+        <Sparkles className="h-3.5 w-3.5 text-stone-500 dark:text-stone-400" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-3">
+        {/* 指标更新徽标 */}
+        {changedCount > 0 && (
+          <span className="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+            {changedCount} 项指标已更新
+          </span>
+        )}
 
-        <div className="prose prose-sm max-w-none break-words text-inherit prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-inherit prose-strong:text-inherit dark:prose-invert">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdownBold(message.content)}</ReactMarkdown>
-        </div>
-        {message.streaming && <span className="ml-1 animate-pulse">▍</span>}
-
-        {/* 调整结果：绿色高亮样式 */}
-        {message.appliedRules && message.appliedRules.length > 0 && (
-          <div className="mt-3 space-y-1.5 border-t border-emerald-200/60 pt-3 dark:border-emerald-800/40">
-            <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">已执行调整：</div>
-            {message.appliedRules.map((rule, index) => (
-              <div
-                key={`${rule.ruleId}-${index}`}
-                className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300"
-              >
-                {formatAppliedRuleDescription(rule)}
+        {/* 深度思考过程 */}
+        {message.reasoning && (
+          <div className="rounded-xl border border-amber-200/60 bg-gradient-to-b from-amber-50/50 to-amber-50/20 dark:border-amber-800/30 dark:from-amber-950/20 dark:to-transparent">
+            <button
+              onClick={() => { setReasoningOpen((v) => !v); setUserToggled(true) }}
+              className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-400"
+            >
+              <BrainCircuit className="h-3.5 w-3.5" />
+              <span>思考过程</span>
+              {!message.reasoningDone && (
+                <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+              )}
+              {reasoningOpen ? <ChevronDown className="ml-auto h-3.5 w-3.5" /> : <ChevronRight className="ml-auto h-3.5 w-3.5" />}
+            </button>
+            {reasoningOpen && (
+              <div className="border-t border-amber-200/40 px-3.5 py-2.5 text-xs leading-[1.7] text-amber-800/70 dark:border-amber-800/20 dark:text-amber-300/60">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.reasoning}</ReactMarkdown>
               </div>
-            ))}
+            )}
           </div>
         )}
 
-        {message.ruleAdded && (
-          <div className="mt-3 border-t border-border/60 pt-3">
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-              <BookPlus className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                已添加规则：{message.ruleAdded.text}
-                {message.ruleAdded.status === 'converting' && ' — ⏳ 正在转换中…'}
-                {message.ruleAdded.status === 'ok' && ' — ✅ 已生效'}
-                {message.ruleAdded.status === 'error' && ' — ❌ 转换失败'}
-              </span>
-            </div>
+        {/* 正文 */}
+        {message.content.trim() && (
+          <div className={proseClasses}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdownBold(message.content)}</ReactMarkdown>
           </div>
         )}
+        {message.streaming && <span className="inline-block h-4 w-0.5 animate-pulse bg-stone-400" />}
+
+        {/* 调整结果卡片 */}
+        {message.appliedRules && message.appliedRules.length > 0 && (
+          <AdjustmentCard rules={message.appliedRules} />
+        )}
+
+        {/* 规则添加卡片 */}
+        {message.ruleAdded && <RuleAddedCard ruleAdded={message.ruleAdded} />}
       </div>
     </div>
   )
@@ -377,22 +542,54 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   const [messages, setMessages] = useState<ChatPanelMessage[]>([])
   const [sessionId, setSessionId] = useState<string>(crypto.randomUUID())
   const [streaming, setStreaming] = useState(false)
+  const [thinking, setThinking] = useState(false)
+  const [reasoning, setReasoning] = useState(false)
+  const [reasoningSupported, setReasoningSupported] = useState(false)
   const [input, setInput] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const endRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const pollCleanupRef = useRef<(() => void) | null>(null)
+  const userScrolledUp = useRef(false)
 
   useEffect(() => {
-    if (!open) return
+    return () => { pollCleanupRef.current?.() }
+  }, [])
+
+  // 只在用户未手动上滑时自动滚到底部
+  useEffect(() => {
+    if (!open || userScrolledUp.current) return
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, open])
+  }, [messages, open, thinking])
+
+  // 用户发送新消息时重置滚动状态
+  const resetScrollLock = () => { userScrolledUp.current = false }
+
+  // 监听滚动区域，检测用户是否上滑
+  const handleScrollAreaScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    userScrolledUp.current = !atBottom
+  }
 
   useEffect(() => {
     if (open) {
       loadSessions()
+      loadCapabilities()
+      setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [open])
+
+  const loadCapabilities = async () => {
+    try {
+      const res = await fetch('/api/config')
+      const data = await res.json()
+      setReasoningSupported(data.llmSupportsReasoning === true)
+    } catch { /* ignore */ }
+  }
 
   const loadSessions = async () => {
     try {
@@ -465,6 +662,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     handleStop()
     setMessages([])
     setInput('')
+    setThinking(false)
     setSessionId(crypto.randomUUID())
   }
 
@@ -473,11 +671,13 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
       abortRef.current.abort()
       abortRef.current = null
     }
+    setThinking(false)
   }
 
   const handleSend = async (directContent?: string) => {
     const trimmed = (directContent ?? input).trim()
     if (!trimmed || streaming) return
+    resetScrollLock()
     const nextMessage: ChatPanelMessage = { id: crypto.randomUUID(), role: 'user', content: trimmed }
     const nextMessages = [...messages, nextMessage]
     setMessages(nextMessages)
@@ -487,6 +687,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
 
   const startStream = async (history: ChatPanelMessage[]) => {
     setStreaming(true)
+    setThinking(true)
     const controller = new AbortController()
     abortRef.current = controller
 
@@ -497,6 +698,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         signal: controller.signal,
         body: JSON.stringify({
           mode: 'adjust',
+          reasoning,
           messages: history.map((message) => ({ role: message.role, content: message.content })),
         }),
       })
@@ -530,6 +732,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     } finally {
       finalizeAssistantMessage()
       setStreaming(false)
+      setThinking(false)
       if (abortRef.current === controller) {
         abortRef.current = null
       }
@@ -559,14 +762,46 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   }
 
   const applyStreamEvent = (event: StreamEvent) => {
+    if (event.type === 'thinking') {
+      setThinking(true)
+      return
+    }
+    if (event.type === 'reasoning_start') {
+      setThinking(false)
+      // 确保有一条 assistant 消息来承载 reasoning
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (!last || last.role !== 'assistant') {
+          return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: '', streaming: true, reasoning: '', reasoningDone: false }]
+        }
+        return prev
+      })
+      return
+    }
+    if (event.type === 'reasoning_delta' && event.content) {
+      setThinking(false)
+      appendReasoningDelta(event.content)
+      return
+    }
+    if (event.type === 'reasoning_done') {
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant') {
+          return [...prev.slice(0, -1), { ...last, reasoningDone: true }]
+        }
+        return prev
+      })
+      return
+    }
     if (event.type === 'message_delta' && event.content) {
+      setThinking(false)
       appendAssistantDelta(event.content)
       return
     }
     if (event.type === 'result' && event.result) {
+      setThinking(false)
       applyResult(event.result)
       if (event.result.mode === 'adjust') {
-        // 合并：直接调整的目标 ID + 规则联动触发的 ID
         const fromTargets = event.result.adjustedTargets ?? []
         const fromRules = extractChangedIndicatorIds(event.result.appliedRules)
         const changedIds = [...new Set([...fromTargets, ...fromRules])]
@@ -577,8 +812,19 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
       return
     }
     if (event.type === 'error' && event.error) {
+      setThinking(false)
       appendAssistantMessage(`**错误**：${event.error}`)
     }
+  }
+
+  const appendReasoningDelta = (chunk: string) => {
+    setMessages((prev) => {
+      const last = prev[prev.length - 1]
+      if (!last || last.role !== 'assistant') {
+        return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: '', streaming: true, reasoning: chunk, reasoningDone: false }]
+      }
+      return [...prev.slice(0, -1), { ...last, reasoning: (last.reasoning ?? '') + chunk }]
+    })
   }
 
   const appendAssistantDelta = (chunk: string) => {
@@ -607,7 +853,8 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     if (result.ruleAdded) {
       if (result.ruleAdded.status === 'converting') {
         toast.success('规则添加成功，正在转换为 JSON…')
-        pollRuleConvertStatus((finalStatus) => {
+        pollCleanupRef.current?.()
+        pollCleanupRef.current = pollRuleConvertStatus((finalStatus) => {
           setMessages((prev) =>
             prev.map((m) =>
               m.ruleAdded?.status === 'converting'
@@ -657,15 +904,23 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
     })
   }
 
+  // 自适应输入框高度
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }
+
   if (!open) return null
 
   // 动态推荐优先，静态兜底
   const suggestionIcons = [
-    <Sparkles className="h-4 w-4" />,
-    <TrendingUp className="h-4 w-4" />,
-    <Target className="h-4 w-4" />,
-    <Wand2 className="h-4 w-4" />,
-    <BookPlus className="h-4 w-4" />,
+    <Sparkles className="h-3.5 w-3.5" />,
+    <TrendingUp className="h-3.5 w-3.5" />,
+    <Target className="h-3.5 w-3.5" />,
+    <Wand2 className="h-3.5 w-3.5" />,
+    <BookPlus className="h-3.5 w-3.5" />,
   ]
   const dynamicChat = suggestions?.chat ?? []
   const dynamicAdjust = suggestions?.adjust ?? []
@@ -677,7 +932,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   // 历史列表视图
   if (showHistory) {
     return (
-      <div className="flex h-full w-[400px] shrink-0 flex-col border-l border-border bg-background shadow-lg">
+      <div className="flex h-full w-[420px] shrink-0 flex-col border-l border-stone-200/60 bg-white shadow-xl dark:border-stone-700/40 dark:bg-stone-900">
         <HistoryListView
           sessions={sessions}
           onSelect={restoreSession}
@@ -690,51 +945,77 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
 
   // 对话视图
   return (
-    <div className="flex h-full w-[400px] shrink-0 flex-col border-l border-border bg-background shadow-lg overflow-hidden">
+    <div className="flex h-full w-[420px] shrink-0 flex-col border-l border-stone-200/60 bg-white shadow-xl dark:border-stone-700/40 dark:bg-stone-900 overflow-hidden">
       {/* 顶部栏 */}
-      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold">数据助手</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetSession} disabled={streaming || messages.length === 0} title="清空对话">
+      <div className="flex items-center justify-between px-5 py-3.5">
+        <span className="text-[15px] font-semibold tracking-tight text-stone-800 dark:text-stone-200">数据助手</span>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+            onClick={resetSession}
+            disabled={streaming || messages.length === 0}
+            title="清空对话"
+          >
             <Eraser className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetSession} disabled={streaming} title="新建对话">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+            onClick={resetSession}
+            disabled={streaming}
+            title="新建对话"
+          >
             <Plus className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowHistory(true)} title="历史对话">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+            onClick={() => setShowHistory(true)}
+            title="历史对话"
+          >
             <Clock className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+            onClick={() => onOpenChange(false)}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
+      <div className="mx-5 border-b border-stone-100 dark:border-stone-800" />
+
       {/* 消息区 */}
-      <ScrollArea className="flex-1 overflow-x-hidden">
-        <div className="space-y-3 p-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden" onScroll={handleScrollAreaScroll}>
+        <div className="space-y-5 px-5 py-5">
           {messages.length === 0 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* 角色介绍 */}
-              <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-                {ASSISTANT_INTRO}
+              <div className="flex items-start gap-3 px-1">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800">
+                  <Sparkles className="h-3.5 w-3.5 text-stone-500 dark:text-stone-400" />
+                </div>
+                <p className="pt-0.5 text-[13px] leading-relaxed text-stone-500 dark:text-stone-400">
+                  {ASSISTANT_INTRO}
+                </p>
               </div>
               {/* 推荐问题 */}
-              <div className="grid grid-cols-1 gap-2">
+              <div className="space-y-2 pl-10">
                 {questions.map((question) => (
                   <button
                     key={question.title}
                     onClick={() => void handleSend(question.content)}
-                    className="group flex items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    className="group flex w-full items-center gap-2.5 rounded-xl border border-stone-150 bg-stone-50/50 px-3.5 py-2.5 text-left transition-all hover:border-stone-300 hover:bg-stone-100/60 dark:border-stone-700/50 dark:bg-stone-800/30 dark:hover:border-stone-600 dark:hover:bg-stone-800/60"
                   >
-                    <div className="mt-0.5 text-muted-foreground group-hover:text-primary">{question.icon}</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-foreground">{question.title}</div>
-                      <div className="truncate text-xs text-muted-foreground">{question.content}</div>
-                    </div>
+                    <div className="text-stone-400 group-hover:text-stone-600 dark:text-stone-500 dark:group-hover:text-stone-300">{question.icon}</div>
+                    <span className="text-[13px] text-stone-600 dark:text-stone-400">{question.title}</span>
                   </button>
                 ))}
               </div>
@@ -744,38 +1025,68 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
+
+          {thinking && <ThinkingIndicator />}
+
           <div ref={endRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* 输入区 */}
-      <div className="border-t border-border bg-muted/30 p-3">
-        <div className="flex gap-2">
-          <Input
+      <div className="border-t border-stone-100 px-4 py-3 dark:border-stone-800">
+        <div className="flex items-end gap-2 rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 transition-colors focus-within:border-stone-300 focus-within:bg-white dark:border-stone-700 dark:bg-stone-800/50 dark:focus-within:border-stone-600 dark:focus-within:bg-stone-800">
+          <textarea
+            ref={inputRef}
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={handleInputChange}
             placeholder="输入问题或调整指令…"
             disabled={streaming}
+            rows={1}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
                 void handleSend()
               }
             }}
-            className="flex-1"
+            className="flex-1 resize-none bg-transparent text-sm leading-relaxed text-stone-700 outline-none placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-300 dark:placeholder:text-stone-500"
+            style={{ maxHeight: '120px' }}
           />
           {streaming ? (
-            <Button variant="destructive" onClick={handleStop} className="shrink-0">
-              <Square className="mr-1 h-3 w-3" />
-              停止
-            </Button>
+            <button
+              onClick={handleStop}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+            >
+              <Square className="h-3 w-3" />
+            </button>
           ) : (
-            <Button onClick={() => void handleSend()} disabled={!input.trim()}>
-              发送
-            </Button>
+            <button
+              onClick={() => void handleSend()}
+              disabled={!input.trim()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-800 text-white transition-all hover:bg-stone-700 disabled:opacity-30 dark:bg-stone-200 dark:text-stone-800 dark:hover:bg-stone-300"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
-        <div className="mt-2 text-center text-xs text-muted-foreground">按 Enter 发送，Shift+Enter 换行</div>
+        <div className="mt-2 flex items-center justify-between">
+          {reasoningSupported ? (
+            <button
+              onClick={() => setReasoning((v) => !v)}
+              disabled={streaming}
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
+                reasoning
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                  : 'text-stone-400 hover:bg-stone-100 hover:text-stone-500 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-400'
+              } disabled:opacity-50`}
+            >
+              <BrainCircuit className="h-3 w-3" />
+              深度思考
+            </button>
+          ) : (
+            <div />
+          )}
+          <span className="text-[11px] text-stone-400 dark:text-stone-600">Enter 发送 · Shift+Enter 换行</span>
+        </div>
       </div>
     </div>
   )

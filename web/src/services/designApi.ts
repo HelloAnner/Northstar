@@ -45,7 +45,7 @@ export const designApi = {
       query.set('enabledOnly', 'false')
     }
     const suffix = query.toString() ? `?${query.toString()}` : ''
-    const payload = await jsonRequest<{ items: RuleDetail[] }>(`/api/rules${suffix}`)
+    const payload = await jsonRequest<{ items: RuleDetail[] }>(`/api/rule-definitions${suffix}`)
     if (!Array.isArray(payload.items)) {
       return []
     }
@@ -64,11 +64,11 @@ export const designApi = {
       query.set('enabledOnly', 'false')
     }
     const suffix = query.toString() ? `?${query.toString()}` : ''
-    const payload = await jsonRequest<{ items: RuleEvaluation[] }>(`/api/rules/evaluate${suffix}`)
+    const payload = await jsonRequest<{ items: RuleEvaluation[] }>(`/api/rule-definitions/evaluate${suffix}`)
     return Array.isArray(payload.items) ? payload.items : []
   },
   upsertRule: async (code: string, body: UpsertRulePayload) => {
-    return jsonRequest<{ message: string }>(`/api/rules/${encodeURIComponent(code)}`, {
+    return jsonRequest<{ message: string }>(`/api/rule-definitions/${encodeURIComponent(code)}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     })

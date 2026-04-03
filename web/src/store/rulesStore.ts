@@ -74,6 +74,10 @@ export function createRulesStore() {
         await rulesApi.convert()
         set({ status: 'running', statusError: '', statusStep: '', statusAttempt: '' })
         get().startPolling()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '触发规则转换失败'
+        set({ status: 'error', statusError: msg })
+        toast.error(msg)
       } finally {
         set({ submitting: false })
       }

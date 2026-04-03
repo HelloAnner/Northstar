@@ -23,10 +23,21 @@ type exportProgressEvent struct {
 // ExportStream 导出 Excel（SSE 进度 + 完成后提供下载地址）
 // POST /api/export/stream
 func (h *Handler) ExportStream(c *gin.Context) {
-	year, month, err := h.store.GetCurrentYearMonth()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前年月失败"})
-		return
+	var req struct {
+		Year  int `json:"year"`
+		Month int `json:"month"`
+	}
+	// 允许空 body（向后兼容），忽略绑定错误
+	_ = c.ShouldBindJSON(&req)
+
+	year, month := req.Year, req.Month
+	if year == 0 || month == 0 {
+		var err error
+		year, month, err = h.store.GetCurrentYearMonth()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前年月失败"})
+			return
+		}
 	}
 
 	c.Header("Content-Type", "text/event-stream")
