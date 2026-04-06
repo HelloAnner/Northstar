@@ -302,10 +302,12 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
-	// 收集直接调整的指标及其目标值
+	// 收集直接调整的指标，使用引擎执行后的实际值（而非意图目标值）
+	actualValues := buildIndicatorValueMap(resp.Groups)
 	adjustedList := make([]adjustedTarget, 0, len(targets))
-	for id, val := range targets {
-		adjustedList = append(adjustedList, adjustedTarget{IndicatorID: id, Value: val})
+	for id := range targets {
+		actual := actualValues[id]
+		adjustedList = append(adjustedList, adjustedTarget{IndicatorID: id, Value: actual})
 	}
 
 	return &llmResultPayload{
@@ -328,12 +330,22 @@ func splitActions(actions []llm.AdjustmentAction, currentValues map[string]float
 			targets[action.IndicatorID] = action.Value
 		case "adjust_percent":
 			current := currentValues[action.IndicatorID]
-			targets[action.IndicatorID] = current * (1 + action.Percent/100)
+			targets[action.IndicatorID] = adjustByPercent(action.IndicatorID, current, action.Percent)
 		case "add_rule":
 			ruleActions = append(ruleActions, action)
 		}
 	}
 	return targets, ruleActions
+}
+
+// adjustByPercent 按指标类型计算调整后的目标值。
+// 增速指标（_rate）：加法，增加百分点（-100 + 5 = -95）
+// 数值指标（_value）：乘法，增长百分比（1000 * 1.05 = 1050）
+func adjustByPercent(indicatorID string, current float64, percent float64) float64 {
+	if strings.HasSuffix(indicatorID, "_rate") {
+		return current + percent
+	}
+	return current * (1 + percent/100)
 }
 
 // addRuleFromChat 通过聊天添加自然语言规则，直接写入数据库
