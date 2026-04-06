@@ -29,23 +29,21 @@ type orderedTarget struct {
 
 // Engine DAG 计算引擎
 type Engine struct {
-	graph    *Graph
-	store    *store.Store
-	year     int
-	month    int
-	rules    *rules.RuleSet
-	mu       sync.RWMutex
-	rulePath string
+	graph *Graph
+	store *store.Store
+	year  int
+	month int
+	rules *rules.RuleSet
+	mu    sync.RWMutex
 }
 
 // NewEngine 创建引擎
-func NewEngine(graph *Graph, st *store.Store, year, month int, rulePath string) *Engine {
+func NewEngine(graph *Graph, st *store.Store, year, month int) *Engine {
 	return &Engine{
-		graph:    graph,
-		store:    st,
-		year:     year,
-		month:    month,
-		rulePath: rulePath,
+		graph: graph,
+		store: st,
+		year:  year,
+		month: month,
 	}
 }
 
@@ -96,13 +94,13 @@ func (e *Engine) SetPeriod(year, month int) {
 	e.month = month
 }
 
-// ReloadRules 重新加载规则文件。
+// ReloadRules 从数据库重新加载硬约束。
 func (e *Engine) ReloadRules() error {
 	if e == nil {
 		return fmt.Errorf("missing engine")
 	}
 
-	rs, err := rules.Load(e.rulePath)
+	rs, err := rules.LoadFromStore(e.store)
 	if err != nil {
 		return err
 	}
@@ -164,13 +162,18 @@ func (e *Engine) getRules() *rules.RuleSet {
 	return e.rules
 }
 
-// RuleCount 返回当前已加载规则总数。
-func (e *Engine) RuleCount() int {
+// ConstraintCount 返回当前已加载硬约束总数。
+func (e *Engine) ConstraintCount() int {
 	rs := e.getRules()
 	if rs == nil {
 		return 0
 	}
 	return len(rs.Clamps) + len(rs.Filters) + len(rs.Compensates)
+}
+
+// RuleCount is an alias for ConstraintCount for backward compatibility.
+func (e *Engine) RuleCount() int {
+	return e.ConstraintCount()
 }
 
 func orderEngineTargets(targets map[string]float64) []orderedTarget {

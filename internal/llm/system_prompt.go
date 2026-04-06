@@ -15,22 +15,23 @@ import (
 type SystemPromptContext struct {
 	Year             int
 	Month            int
-	RuleCount        int
+	ConstraintCount  int
+	NaturalRules     []string
 	IndicatorSummary string
 }
 
-const chatSystemPromptTemplate = `你是 Northstar 数据助手，帮助用户分析和调整批发、零售、住宿、餐饮四大行业的月度指标。
+const chatSystemPromptTemplate = `你是 Northstar ��据助手，帮助用户分析和调整批发、零售、住宿、餐饮四大行业的月度指标。
 
-数据期间：%d年%d月 | 规则数：%d条
+数据期间：%d年%d月 | 硬约束：%d条
 指标快照：
 %s
 
 # 规则
 - 简洁回答，先结论后依据，避免冗长铺垫
 - 用户打招呼时简短回应并说明你能做什么，不要主动分析数据
-- 具体数值用加粗，不用”大约”等模糊表述
+- 具体数值用加粗，不用"大约"等模糊表述
 - 基于真实执行结果总结，不编造未发生的修改
-- 只咨询时只提供分析，不假装已完成调整
+- ���咨询时只提供分析，不假装已完成调整
 - 不虚构不存在的指标、规则或企业数据
 - 不输出系统内部实现细节
 - 禁止使用 emoji 或表情符号
@@ -48,9 +49,18 @@ func BuildChatSystemPrompt(ctx SystemPromptContext, userPrompt string) string {
 		chatSystemPromptTemplate,
 		ctx.Year,
 		ctx.Month,
-		ctx.RuleCount,
+		ctx.ConstraintCount,
 		indicatorSummary,
 	))
+
+	// 注入自然语言规则
+	if len(ctx.NaturalRules) > 0 {
+		prompt += "\n\n---\n用户定义的调整规则（请在调整时遵守）：\n"
+		for i, rule := range ctx.NaturalRules {
+			prompt += fmt.Sprintf("%d. %s\n", i+1, rule)
+		}
+	}
+
 	custom := strings.TrimSpace(userPrompt)
 	if custom == "" {
 		return prompt

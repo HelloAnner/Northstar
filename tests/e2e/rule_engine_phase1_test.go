@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -63,7 +62,7 @@ type indicatorValue struct {
 }
 
 func TestRuleEnginePhase1E2E_ClampTarget(t *testing.T) {
-	env := newPhase1Env(t, `{"version":"1.0","rules":[{"id":"c1","name":"clamp","type":"clamp_target","indicator":"wholesale_month_rate","max":15}]}`)
+	env := newPhase1Env(t, clampConstraint("wholesale_month_rate", nil, float64Ptr(15)))
 	insertWRRateRow(t, env.store, "W1", "wholesale", 100, 100)
 
 	resp := env.postOptimize(t, map[string]float64{"wholesale_month_rate": 20})
@@ -75,7 +74,7 @@ func TestRuleEnginePhase1E2E_ClampTarget(t *testing.T) {
 }
 
 func TestRuleEnginePhase1E2E_FilterAllocation(t *testing.T) {
-	env := newPhase1Env(t, `{"version":"1.0","rules":[{"id":"f1","name":"filter","type":"filter_allocation","indicator":"retail_month_rate","filter":"positive_current"}]}`)
+	env := newPhase1Env(t, filterConstraint("retail_month_rate", "positive_current"))
 	insertWRRateRow(t, env.store, "R1", "retail", 110, 100)
 	insertWRRateRow(t, env.store, "R2", "retail", 80, 100)
 
@@ -89,7 +88,7 @@ func TestRuleEnginePhase1E2E_FilterAllocation(t *testing.T) {
 }
 
 func TestRuleEnginePhase1E2E_Compensate(t *testing.T) {
-	env := newPhase1Env(t, `{"version":"1.0","rules":[{"id":"p1","name":"compensate","type":"compensate","trigger":"retail_month_rate","ensure":"wholesale_month_rate","relation":"gte","tolerance":0}]}`)
+	env := newPhase1Env(t, compensateConstraint("retail_month_rate", "wholesale_month_rate", "gte"))
 	insertWRRateRow(t, env.store, "W1", "wholesale", 100, 100)
 	insertWRRateRow(t, env.store, "R1", "retail", 100, 100)
 
@@ -104,8 +103,8 @@ func TestRuleEnginePhase1E2E_Compensate(t *testing.T) {
 	}
 }
 
-func TestRuleEnginePhase1E2E_MissingRoleFileFallsBack(t *testing.T) {
-	env := newPhase1Env(t, "")
+func TestRuleEnginePhase1E2E_NoConstraintsFallsBack(t *testing.T) {
+	env := newPhase1Env(t)
 	insertWRRateRow(t, env.store, "W1", "wholesale", 100, 100)
 
 	resp := env.postOptimize(t, map[string]float64{"wholesale_month_rate": 10})
@@ -115,20 +114,10 @@ func TestRuleEnginePhase1E2E_MissingRoleFileFallsBack(t *testing.T) {
 	assertFloatEqual(t, env.indicatorValue(t, "wholesale_month_rate"), 10)
 }
 
-func newPhase1Env(t *testing.T, roleJSON string) *phase1Env {
+func newPhase1Env(t *testing.T, constraints ...store.AdjustmentConstraint) *phase1Env {
 	t.Helper()
 
 	gin.SetMode(gin.ReleaseMode)
-	st, rulePath := newPhase1Store(t)
-	writeOptionalRoleJSON(t, rulePath, roleJSON)
-	engine := newPhase1Engine(t, st, rulePath)
-	server := newPhase1Server(t, st, engine)
-	return &phase1Env{baseURL: server.URL, store: st}
-}
-
-func newPhase1Store(t *testing.T) (*store.Store, string) {
-	t.Helper()
-
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "northstar.db")
 	st, err := store.New(dbPath)
@@ -141,46 +130,54 @@ func newPhase1Store(t *testing.T) (*store.Store, string) {
 	if err := st.SetCurrentYearMonth(2025, 12); err != nil {
 		t.Fatalf("set ym: %v", err)
 	}
-	return st, filepath.Join(tmpDir, "config", "role.json")
-}
 
-func writeOptionalRoleJSON(t *testing.T, path string, content string) {
-	t.Helper()
-
-	if content == "" {
-		return
+	for _, c := range constraints {
+		if _, err := st.CreateAdjustmentConstraint(c); err != nil {
+			t.Fatalf("create constraint: %v", err)
+		}
 	}
-	writeRoleJSON(t, path, content)
-}
 
-func newPhase1Engine(t *testing.T, st *store.Store, rulePath string) *dagcalc.Engine {
-	t.Helper()
-
-	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, rulePath)
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12)
 	if err := engine.ReloadRules(); err != nil {
 		t.Fatalf("reload rules: %v", err)
 	}
-	return engine
-}
-
-func newPhase1Server(t *testing.T, st *store.Store, engine *dagcalc.Engine) *httptest.Server {
-	t.Helper()
 
 	router := gin.New()
 	v3.NewHandlerWithEngine(st, "", engine).RegisterRoutes(router.Group("/api"))
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
-	return server
+
+	return &phase1Env{baseURL: server.URL, store: st}
 }
 
-func writeRoleJSON(t *testing.T, path string, content string) {
-	t.Helper()
+func float64Ptr(v float64) *float64 { return &v }
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("mkdir config: %v", err)
+func clampConstraint(indicator string, min *float64, max *float64) store.AdjustmentConstraint {
+	return store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: indicator,
+		MinValue:    min,
+		MaxValue:    max,
+		Enabled:     true,
 	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("write role.json: %v", err)
+}
+
+func filterConstraint(indicator string, filter string) store.AdjustmentConstraint {
+	return store.AdjustmentConstraint{
+		Type:        "filter_allocation",
+		IndicatorID: indicator,
+		FilterMode:  filter,
+		Enabled:     true,
+	}
+}
+
+func compensateConstraint(trigger string, ensure string, relation string) store.AdjustmentConstraint {
+	return store.AdjustmentConstraint{
+		Type:      "compensate",
+		TriggerID: trigger,
+		EnsureID:  ensure,
+		Relation:  relation,
+		Enabled:   true,
 	}
 }
 

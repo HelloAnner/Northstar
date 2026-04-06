@@ -325,27 +325,17 @@ func splitActions(actions []llm.AdjustmentAction, currentValues map[string]float
 	return targets, ruleActions
 }
 
-// addRuleFromChat 通过聊天添加规则，复用规则管理 API 逻辑
+// addRuleFromChat 通过聊天添加自然语言规则，直接写入数据库
 func (h *Handler) addRuleFromChat(ruleText string) (*ruleAddedPayload, error) {
-	repo := h.rulesRepo
-	if repo == nil {
-		return nil, fmt.Errorf("规则管理未初始化")
+	text := strings.TrimSpace(ruleText)
+	if text == "" {
+		return nil, fmt.Errorf("规则内容为空")
 	}
-	items, err := repo.ReadRules()
+	_, err := h.store.CreateNaturalRule(text)
 	if err != nil {
 		return nil, err
 	}
-	items = append(items, RuleItem{Index: len(items) + 1, Text: strings.TrimSpace(ruleText)})
-	reindexRules(items)
-	if err := repo.WriteRules(items); err != nil {
-		return nil, err
-	}
-	content, err := repo.ReadContent()
-	if err != nil {
-		return nil, err
-	}
-	h.triggerRuleConvert(content)
-	return &ruleAddedPayload{Text: ruleText, Status: "converting"}, nil
+	return &ruleAddedPayload{Text: text, Status: "ok"}, nil
 }
 
 // buildRuleOnlyResult 仅添加规则时生成回复
@@ -365,7 +355,7 @@ func (h *Handler) buildRuleOnlyResult(
 		ruleTexts = append(ruleTexts, a.RuleText)
 	}
 	summaryMsg := fmt.Sprintf(
-		"用户请求：%s\n\n系统已添加以下规则：\n%s\n\n规则正在异步转换为结构化 JSON，转换完成后将自动生效。请用简洁中文告知用户规则已添加并正在转换中。",
+		"用户请求：%s\n\n系统已添加以下自然语言规则：\n%s\n\n规则已保存，将在后续对话中自动生效。请用简洁中文告知用户规则已添加。",
 		userMsg, strings.Join(ruleTexts, "\n"),
 	)
 	reply, err := h.streamReplyWithReasoning(stream, summaryClient, llm.ChatRequest{
@@ -403,12 +393,26 @@ func (h *Handler) newLLMClient(prompt string) (LLMChatClient, error) {
 }
 
 func (h *Handler) buildChatPrompt(year, month int, groups []dagcalc.IndicatorGroup, userPrompt string) string {
+	naturalRules := h.loadNaturalRuleTexts()
 	return llm.BuildChatSystemPrompt(llm.SystemPromptContext{
 		Year:             year,
 		Month:            month,
-		RuleCount:        h.engine.RuleCount(),
+		ConstraintCount:  h.engine.ConstraintCount(),
+		NaturalRules:     naturalRules,
 		IndicatorSummary: buildIndicatorSummary(groups),
 	}, userPrompt)
+}
+
+func (h *Handler) loadNaturalRuleTexts() []string {
+	rules, err := h.store.ListNaturalRules(true)
+	if err != nil {
+		return nil
+	}
+	texts := make([]string, 0, len(rules))
+	for _, r := range rules {
+		texts = append(texts, r.Text)
+	}
+	return texts
 }
 
 func (h *Handler) streamReply(

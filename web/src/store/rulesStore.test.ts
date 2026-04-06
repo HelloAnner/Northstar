@@ -18,45 +18,30 @@ describe('rulesStore', () => {
     vi.restoreAllMocks()
   })
 
-  it('loads rules and stops polling after status becomes ok', async () => {
+  it('loads constraints', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse([{ index: 1, text: '零售增速不超过 15%' }]))
-      .mockResolvedValueOnce(jsonResponse({ status: 'running', updatedAt: '', error: '' }))
-      .mockResolvedValueOnce(jsonResponse({ status: 'ok', updatedAt: '2026-03-14T10:30:00Z', error: '' }))
+      .mockResolvedValueOnce(jsonResponse([
+        { id: 1, type: 'clamp_target', indicatorId: 'retail_month_rate', minValue: -5, maxValue: 10, enabled: true, tolerance: 0 },
+      ]))
     vi.stubGlobal('fetch', fetchMock)
 
     const store = createRulesStore()
-    await store.getState().loadRules()
-    expect(store.getState().rules).toEqual([{ index: 1, text: '零售增速不超过 15%' }])
-
-    await store.getState().loadStatus()
-    expect(store.getState().status).toBe('running')
-
-    store.getState().startPolling()
-    await vi.advanceTimersByTimeAsync(1500)
-
-    expect(store.getState().status).toBe('ok')
-    expect(store.getState().statusUpdatedAt).toBe('2026-03-14T10:30:00Z')
-    expect(store.getState().pollingTimer).toBeNull()
+    await store.getState().loadConstraints()
+    expect(store.getState().constraints).toHaveLength(1)
+    expect(store.getState().constraints[0].type).toBe('clamp_target')
   })
 
-  it('starts polling after manual convert', async () => {
+  it('loads natural rules', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ status: 'running' }))
-      .mockResolvedValueOnce(jsonResponse({ status: 'ok', updatedAt: '2026-03-14T11:00:00Z', error: '' }))
+      .mockResolvedValueOnce(jsonResponse([
+        { id: 1, text: '零售增速不超过 15%', enabled: true },
+      ]))
     vi.stubGlobal('fetch', fetchMock)
 
     const store = createRulesStore()
-    await store.getState().convertRules()
-
-    expect(store.getState().status).toBe('running')
-    expect(store.getState().pollingTimer).not.toBeNull()
-
-    await vi.advanceTimersByTimeAsync(1500)
-
-    expect(store.getState().status).toBe('ok')
-    expect(store.getState().statusUpdatedAt).toBe('2026-03-14T11:00:00Z')
-    expect(store.getState().pollingTimer).toBeNull()
+    await store.getState().loadNaturalRules()
+    expect(store.getState().naturalRules).toHaveLength(1)
+    expect(store.getState().naturalRules[0].text).toBe('零售增速不超过 15%')
   })
 })
 

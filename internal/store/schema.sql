@@ -619,3 +619,33 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, seq);
+
+-- ============================================================================
+-- 17. adjustment_constraints - 硬约束表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS adjustment_constraints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,                              -- clamp_target / filter_allocation / compensate
+    indicator_id TEXT,                               -- 目标指标 ID（clamp/filter）
+    min_value REAL,                                  -- 最小值（clamp）
+    max_value REAL,                                  -- 最大值（clamp）
+    filter_mode TEXT,                                -- 过滤模式（filter）
+    trigger_id TEXT,                                 -- 触发指标（compensate）
+    ensure_id TEXT,                                  -- 保障指标（compensate）
+    relation TEXT,                                   -- gte / lte（compensate）
+    tolerance REAL DEFAULT 0,                        -- 容差（compensate）
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- 18. natural_rules - 自然语言规则表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS natural_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

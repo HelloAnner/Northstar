@@ -1,5 +1,5 @@
 /**
- * 规则管理接口测试
+ * 约束与自然语言规则接口测试
  *
  * @author Anner
  * Created on 2026/3/14
@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,95 +21,158 @@ import (
 	"northstar/internal/store"
 )
 
-type fakeAsyncRuleConverter struct {
-	contents []string
-}
+func TestConstraintsCRUD(t *testing.T) {
+	handler, router, _ := newRulesTestRouter(t)
+	_ = handler
 
-func (f *fakeAsyncRuleConverter) ConvertAsync(mdContent string) {
-	f.contents = append(f.contents, mdContent)
-}
-
-func TestRulesFileRepoReadWrite(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "rules.md")
-	repo := &rulesFileRepo{path: path}
-
-	if err := repo.WriteRules([]RuleItem{
-		{Index: 1, Text: "零售增速不超过 15%"},
-		{Index: 2, Text: "批发增速不低于 0%"},
-	}); err != nil {
-		t.Fatalf("write rules: %v", err)
+	// Create
+	max := 15.0
+	createBody := store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: "wholesale_month_rate",
+		MaxValue:    &max,
+	}
+	resp := postJSON(t, router, http.MethodPost, "/api/constraints", createBody)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("unexpected create status: %d body=%s", resp.Code, resp.Body.String())
+	}
+	var created store.AdjustmentConstraint
+	if err := json.Unmarshal(resp.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created: %v", err)
+	}
+	if created.ID == 0 || created.IndicatorID != "wholesale_month_rate" {
+		t.Fatalf("unexpected created constraint: %+v", created)
 	}
 
-	items, err := repo.ReadRules()
-	if err != nil {
-		t.Fatalf("read rules: %v", err)
+	// List
+	listResp := postJSON(t, router, http.MethodGet, "/api/constraints", nil)
+	if listResp.Code != http.StatusOK {
+		t.Fatalf("unexpected list status: %d", listResp.Code)
+	}
+	var items []store.AdjustmentConstraint
+	if err := json.Unmarshal(listResp.Body.Bytes(), &items); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 constraint, got %d", len(items))
+	}
+
+	// Update
+	newMax := 10.0
+	updateBody := store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: "wholesale_month_rate",
+		MaxValue:    &newMax,
+		Enabled:     true,
+	}
+	updateResp := postJSON(t, router, http.MethodPut, "/api/constraints/1", updateBody)
+	if updateResp.Code != http.StatusOK {
+		t.Fatalf("unexpected update status: %d body=%s", updateResp.Code, updateResp.Body.String())
+	}
+
+	// Delete
+	deleteResp := postJSON(t, router, http.MethodDelete, "/api/constraints/1", nil)
+	if deleteResp.Code != http.StatusOK {
+		t.Fatalf("unexpected delete status: %d body=%s", deleteResp.Code, deleteResp.Body.String())
+	}
+
+	// Verify empty
+	listResp2 := postJSON(t, router, http.MethodGet, "/api/constraints", nil)
+	var afterDelete []store.AdjustmentConstraint
+	if err := json.Unmarshal(listResp2.Body.Bytes(), &afterDelete); err != nil {
+		t.Fatalf("decode after delete: %v", err)
+	}
+	if len(afterDelete) != 0 {
+		t.Fatalf("expected 0 constraints after delete, got %d", len(afterDelete))
+	}
+}
+
+func TestConstraintsValidation(t *testing.T) {
+	_, router, _ := newRulesTestRouter(t)
+
+	// Missing indicatorId for clamp_target
+	bad := store.AdjustmentConstraint{Type: "clamp_target"}
+	resp := postJSON(t, router, http.MethodPost, "/api/constraints", bad)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got %d body=%s", resp.Code, resp.Body.String())
+	}
+
+	// Unknown type
+	bad2 := store.AdjustmentConstraint{Type: "unknown"}
+	resp2 := postJSON(t, router, http.MethodPost, "/api/constraints", bad2)
+	if resp2.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for unknown type, got %d", resp2.Code)
+	}
+}
+
+func TestNaturalRulesCRUD(t *testing.T) {
+	_, router, _ := newRulesTestRouter(t)
+
+	// Create
+	resp := postJSON(t, router, http.MethodPost, "/api/natural-rules", naturalRuleRequest{Text: "零售增速不超过 15%"})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("unexpected create status: %d body=%s", resp.Code, resp.Body.String())
+	}
+	var created store.NaturalRule
+	if err := json.Unmarshal(resp.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created: %v", err)
+	}
+	if created.ID == 0 || created.Text != "零售增速不超过 15%" {
+		t.Fatalf("unexpected created rule: %+v", created)
+	}
+
+	// Create another
+	postJSON(t, router, http.MethodPost, "/api/natural-rules", naturalRuleRequest{Text: "批发增速不低于 0%"})
+
+	// List
+	listResp := postJSON(t, router, http.MethodGet, "/api/natural-rules", nil)
+	if listResp.Code != http.StatusOK {
+		t.Fatalf("unexpected list status: %d", listResp.Code)
+	}
+	var items []store.NaturalRule
+	if err := json.Unmarshal(listResp.Body.Bytes(), &items); err != nil {
+		t.Fatalf("decode list: %v", err)
 	}
 	if len(items) != 2 {
-		t.Fatalf("unexpected rule count: %d", len(items))
-	}
-	if items[0].Text != "零售增速不超过 15%" || items[1].Index != 2 {
-		t.Fatalf("unexpected rules: %+v", items)
-	}
-}
-
-func TestRulesCRUDAndStatusRoutes(t *testing.T) {
-	handler, repo, converter := newRulesTestHandler(t)
-	router := gin.New()
-	handler.RegisterRoutes(router.Group("/api"))
-
-	postRule(t, router, http.MethodPost, "/api/rules", map[string]string{"text": "零售增速不超过 15%"}, http.StatusCreated)
-	postRule(t, router, http.MethodPost, "/api/rules", map[string]string{"text": "批发增速不低于 0%"}, http.StatusCreated)
-
-	items := fetchRules(t, router)
-	if len(items) != 2 {
-		t.Fatalf("unexpected rule count: %d", len(items))
-	}
-	if len(converter.contents) != 2 {
-		t.Fatalf("expected convert async to be triggered twice, got %d", len(converter.contents))
+		t.Fatalf("expected 2 rules, got %d", len(items))
 	}
 
-	postRule(t, router, http.MethodPut, "/api/rules/1", map[string]string{"text": "零售增速不超过 10%"}, http.StatusOK)
-	items = fetchRules(t, router)
-	if items[0].Text != "零售增速不超过 10%" {
-		t.Fatalf("unexpected updated rule: %+v", items[0])
+	// Update
+	updateResp := postJSON(t, router, http.MethodPut, "/api/natural-rules/1", naturalRuleRequest{Text: "零售增速不超过 10%"})
+	if updateResp.Code != http.StatusOK {
+		t.Fatalf("unexpected update status: %d body=%s", updateResp.Code, updateResp.Body.String())
 	}
 
-	postRule(t, router, http.MethodDelete, "/api/rules/2", nil, http.StatusOK)
-	items = fetchRules(t, router)
-	if len(items) != 1 || items[0].Index != 1 {
-		t.Fatalf("unexpected rules after delete: %+v", items)
+	// Delete
+	deleteResp := postJSON(t, router, http.MethodDelete, "/api/natural-rules/2", nil)
+	if deleteResp.Code != http.StatusOK {
+		t.Fatalf("unexpected delete status: %d body=%s", deleteResp.Code, deleteResp.Body.String())
 	}
 
-	raw, err := os.ReadFile(repo.path)
-	if err != nil {
-		t.Fatalf("read rules file: %v", err)
+	// Verify
+	listResp2 := postJSON(t, router, http.MethodGet, "/api/natural-rules", nil)
+	var afterOps []store.NaturalRule
+	if err := json.Unmarshal(listResp2.Body.Bytes(), &afterOps); err != nil {
+		t.Fatalf("decode after ops: %v", err)
 	}
-	expected := "# 调整规则\n\n1. 零售增速不超过 10%\n"
-	if string(raw) != expected {
-		t.Fatalf("unexpected rules file:\n%s", string(raw))
-	}
-
-	status := fetchRulesStatus(t, router)
-	if status.Status != "idle" {
-		t.Fatalf("unexpected rules status: %+v", status)
+	if len(afterOps) != 1 || afterOps[0].Text != "零售增速不超过 10%" {
+		t.Fatalf("unexpected rules after ops: %+v", afterOps)
 	}
 }
 
-func TestRulesConvertRouteReturnsRunning(t *testing.T) {
-	handler, _, converter := newRulesTestHandler(t)
-	router := gin.New()
-	handler.RegisterRoutes(router.Group("/api"))
+func TestNaturalRulesRejectsEmptyText(t *testing.T) {
+	_, router, _ := newRulesTestRouter(t)
 
-	postRule(t, router, http.MethodPost, "/api/rules", map[string]string{"text": "零售增速不超过 15%"}, http.StatusCreated)
-	postRule(t, router, http.MethodPost, "/api/rules/convert", nil, http.StatusOK)
-	if len(converter.contents) != 2 {
-		t.Fatalf("expected manual convert trigger, got %d", len(converter.contents))
+	resp := postJSON(t, router, http.MethodPost, "/api/natural-rules", naturalRuleRequest{Text: ""})
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got %d body=%s", resp.Code, resp.Body.String())
 	}
 }
 
-func newRulesTestHandler(t *testing.T) (*Handler, *rulesFileRepo, *fakeAsyncRuleConverter) {
+func newRulesTestRouter(t *testing.T) (*Handler, http.Handler, *store.Store) {
 	t.Helper()
 
+	gin.SetMode(gin.ReleaseMode)
 	dbPath := filepath.Join(t.TempDir(), "northstar.db")
 	st, err := store.New(dbPath)
 	if err != nil {
@@ -118,20 +180,13 @@ func newRulesTestHandler(t *testing.T) (*Handler, *rulesFileRepo, *fakeAsyncRule
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	repo := &rulesFileRepo{path: filepath.Join(t.TempDir(), "rules.md")}
-	converter := &fakeAsyncRuleConverter{}
-	handler := NewHandlerWithEngine(st, "", dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, ""))
-	handler.rulesRepo = repo
-	handler.ruleConverterFactory = func() (RuleConverter, error) {
-		return converter, nil
-	}
-	if err := st.SetConfig("rules_convert_status", "idle"); err != nil {
-		t.Fatalf("set default status: %v", err)
-	}
-	return handler, repo, converter
+	handler := NewHandlerWithEngine(st, "", dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12))
+	router := gin.New()
+	handler.RegisterRoutes(router.Group("/api"))
+	return handler, router, st
 }
 
-func postRule(t *testing.T, router http.Handler, method string, path string, body any, expected int) {
+func postJSON(t *testing.T, router http.Handler, method string, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 
 	var reqBody []byte
@@ -146,45 +201,5 @@ func postRule(t *testing.T, router http.Handler, method string, path string, bod
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
-	if resp.Code != expected {
-		t.Fatalf("unexpected status %d body=%s", resp.Code, resp.Body.String())
-	}
-}
-
-func fetchRules(t *testing.T, router http.Handler) []RuleItem {
-	t.Helper()
-
-	req := httptest.NewRequest(http.MethodGet, "/api/rules", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("unexpected rules status %d body=%s", resp.Code, resp.Body.String())
-	}
-	var items []RuleItem
-	if err := json.Unmarshal(resp.Body.Bytes(), &items); err != nil {
-		t.Fatalf("decode rules: %v", err)
-	}
-	return items
-}
-
-type testRulesStatusResponse struct {
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updatedAt"`
-	Error     string `json:"error"`
-}
-
-func fetchRulesStatus(t *testing.T, router http.Handler) testRulesStatusResponse {
-	t.Helper()
-
-	req := httptest.NewRequest(http.MethodGet, "/api/rules/status", nil)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("unexpected status response %d body=%s", resp.Code, resp.Body.String())
-	}
-	var status testRulesStatusResponse
-	if err := json.Unmarshal(resp.Body.Bytes(), &status); err != nil {
-		t.Fatalf("decode status: %v", err)
-	}
-	return status
+	return resp
 }

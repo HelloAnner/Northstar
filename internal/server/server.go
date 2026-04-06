@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -18,9 +17,6 @@ import (
 
 //go:embed all:dist
 var staticFiles embed.FS
-
-//go:embed defaults/rules.md defaults/role.json
-var defaultAssets embed.FS
 
 // Server HTTP服务器
 type Server struct {
@@ -48,29 +44,14 @@ func NewServer(cfg *config.AppConfig) *Server {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	configDir := filepath.Join(dataDir, "config")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		log.Fatalf("Failed to initialize config dir: %v", err)
-	}
-	rulesPath := filepath.Join(configDir, "rules.md")
-	rulePath := filepath.Join(configDir, "role.json")
-	if err := ensureRulesMarkdown(rulesPath); err != nil {
-		log.Fatalf("Failed to initialize rules.md: %v", err)
-	}
-	if err := ensureRoleJSON(rulePath); err != nil {
-		log.Fatalf("Failed to initialize role.json: %v", err)
-	}
-	if err := ensureRuleManagementConfig(sqliteStore); err != nil {
-		log.Fatalf("Failed to initialize rule management config: %v", err)
-	}
-	engine := dagcalc.NewEngine(dagcalc.NewGraph(), sqliteStore, 0, 0, rulePath)
+	// 初始化 DAG 引擎，从数据库加载硬约束
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), sqliteStore, 0, 0)
 	if err := engine.ReloadRules(); err != nil {
 		log.Printf("reload rules failed: %v", err)
 	}
 
 	// 创建 V3 API 处理器
 	v3Handler := v3.NewHandlerWithEngine(sqliteStore, cfg.Excel.TemplatePath, engine)
-	v3Handler.ConfigureRuleManagement(rulesPath, rulePath)
 
 	s := &Server{
 		router: gin.Default(),
@@ -81,47 +62,6 @@ func NewServer(cfg *config.AppConfig) *Server {
 	s.setupRoutes(devMode)
 
 	return s
-}
-
-func ensureRulesMarkdown(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	data, err := defaultAssets.ReadFile("defaults/rules.md")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
-
-func ensureRoleJSON(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	data, err := defaultAssets.ReadFile("defaults/role.json")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
-
-func ensureRuleManagementConfig(st *store.Store) error {
-	defaults := map[string]string{
-		"llm_user_prompt":      "",
-		"rules_convert_status": "idle",
-		"rules_convert_at":     "",
-		"rules_convert_error":  "",
-	}
-	for key, value := range defaults {
-		if err := st.EnsureConfig(key, value); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // setupRoutes 设置路由

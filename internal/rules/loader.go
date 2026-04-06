@@ -8,8 +8,9 @@
 package rules
 
 import (
-	"encoding/json"
-	"os"
+	"fmt"
+
+	"northstar/internal/store"
 )
 
 // RuleSet 是运行时规则集合。
@@ -19,84 +20,60 @@ type RuleSet struct {
 	Compensates []*CompensateConstraint
 }
 
-type rawRule struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Type        string   `json:"type"`
-	Indicator   string   `json:"indicator,omitempty"`
-	Min         *float64 `json:"min"`
-	Max         *float64 `json:"max"`
-	Filter      string   `json:"filter,omitempty"`
-	Trigger     string   `json:"trigger,omitempty"`
-	Ensure      string   `json:"ensure,omitempty"`
-	Relation    string   `json:"relation,omitempty"`
-	Tolerance   float64  `json:"tolerance,omitempty"`
+// ConstraintStore 是加载约束所需的最小存储接口。
+type ConstraintStore interface {
+	ListAdjustmentConstraints(enabledOnly bool) ([]store.AdjustmentConstraint, error)
 }
 
-type rawRoleJSON struct {
-	Version    string    `json:"version"`
-	UpdatedAt  string    `json:"updatedAt,omitempty"`
-	SourceFile string    `json:"sourceFile,omitempty"`
-	Rules      []rawRule `json:"rules"`
-}
-
-// Load 读取 role.json 并构建 RuleSet。
-func Load(path string) (*RuleSet, error) {
-	if path == "" {
+// LoadFromStore 从数据库加载启用的约束，构建 RuleSet。
+func LoadFromStore(st ConstraintStore) (*RuleSet, error) {
+	if st == nil {
 		return emptyRuleSet(), nil
 	}
 
-	data, err := os.ReadFile(path)
+	constraints, err := st.ListAdjustmentConstraints(true)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return emptyRuleSet(), nil
-		}
 		return nil, err
 	}
 
-	var raw rawRoleJSON
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
-	}
-	return buildRuleSet(raw.Rules), nil
-}
-
-func buildRuleSet(rawRules []rawRule) *RuleSet {
 	rs := emptyRuleSet()
-	for _, item := range rawRules {
-		appendRule(rs, item)
+	for _, c := range constraints {
+		appendConstraint(rs, c)
 	}
-	return rs
+	return rs, nil
 }
 
-func appendRule(rs *RuleSet, item rawRule) {
-	if item.Type == "clamp_target" {
+func appendConstraint(rs *RuleSet, c store.AdjustmentConstraint) {
+	switch c.Type {
+	case "clamp_target":
 		rs.Clamps = append(rs.Clamps, &ClampTargetConstraint{
-			ID:          item.ID,
-			IndicatorID: item.Indicator,
-			Min:         item.Min,
-			Max:         item.Max,
+			ID:          idFromInt(c.ID),
+			IndicatorID: c.IndicatorID,
+			Min:         c.MinValue,
+			Max:         c.MaxValue,
 		})
-		return
-	}
-	if item.Type == "filter_allocation" {
+	case "filter_allocation":
 		rs.Filters = append(rs.Filters, &FilterAllocationConstraint{
-			ID:          item.ID,
-			IndicatorID: item.Indicator,
-			Filter:      item.Filter,
+			ID:          idFromInt(c.ID),
+			IndicatorID: c.IndicatorID,
+			Filter:      c.FilterMode,
 		})
-		return
-	}
-	if item.Type == "compensate" {
+	case "compensate":
 		rs.Compensates = append(rs.Compensates, &CompensateConstraint{
-			ID:        item.ID,
-			TriggerID: item.Trigger,
-			EnsureID:  item.Ensure,
-			Relation:  item.Relation,
-			Tolerance: item.Tolerance,
+			ID:        idFromInt(c.ID),
+			TriggerID: c.TriggerID,
+			EnsureID:  c.EnsureID,
+			Relation:  c.Relation,
+			Tolerance: c.Tolerance,
 		})
 	}
+}
+
+func idFromInt(id int64) string {
+	if id == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", id)
 }
 
 func emptyRuleSet() *RuleSet {

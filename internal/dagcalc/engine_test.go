@@ -1,7 +1,6 @@
 package dagcalc
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -16,7 +15,7 @@ func TestEngineForwardRecalcReturnsPlan(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	eng := NewEngine(NewGraph(), st, 2025, 12, "")
+	eng := NewEngine(NewGraph(), st, 2025, 12)
 	plan, err := eng.ForwardRecalc("a")
 	if err != nil {
 		t.Fatalf("forward recalc: %v", err)
@@ -47,7 +46,7 @@ func TestEngineReverseAdjustReturnsImpact(t *testing.T) {
 
 	g := NewGraph()
 	g.AddIndicatorID("indicator:limitAbove_month_value", "limitAbove_month_value")
-	eng := NewEngine(g, st, 2025, 12, "")
+	eng := NewEngine(g, st, 2025, 12)
 	plan, err := eng.ReverseAdjust("indicator:limitAbove_month_value", 0)
 	if err != nil {
 		t.Fatalf("reverse adjust: %v", err)
@@ -79,17 +78,17 @@ func TestEngineOptimizeReturnsAppliedRules(t *testing.T) {
 		t.Fatalf("insert wr: %v", err)
 	}
 
-	rolePath := filepath.Join(t.TempDir(), "role.json")
-	if err := os.WriteFile(rolePath, []byte(`{
-  "version": "1.0",
-  "rules": [
-    {"id":"c1","name":"限上","type":"clamp_target","indicator":"wholesale_month_rate","max":10}
-  ]
-}`), 0644); err != nil {
-		t.Fatalf("write role.json: %v", err)
+	max := 10.0
+	if _, err := st.CreateAdjustmentConstraint(store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: "wholesale_month_rate",
+		MaxValue:    &max,
+		Enabled:     true,
+	}); err != nil {
+		t.Fatalf("create constraint: %v", err)
 	}
 
-	eng := NewEngine(NewGraph(), st, 2025, 12, rolePath)
+	eng := NewEngine(NewGraph(), st, 2025, 12)
 	if err := eng.ReloadRules(); err != nil {
 		t.Fatalf("reload rules: %v", err)
 	}

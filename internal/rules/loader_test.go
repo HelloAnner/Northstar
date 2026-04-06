@@ -8,27 +8,42 @@
 package rules
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"northstar/internal/store"
 )
 
-func TestLoadDispatchesRulesByType(t *testing.T) {
-	rolePath := filepath.Join(t.TempDir(), "role.json")
-	content := `{
-  "version": "1.0",
-  "rules": [
-    {"id":"c1","name":"clamp","type":"clamp_target","indicator":"retail_month_rate","min":-5,"max":10},
-    {"id":"f1","name":"filter","type":"filter_allocation","indicator":"retail_month_rate","filter":"positive_current"},
-    {"id":"p1","name":"compensate","type":"compensate","trigger":"retail_month_rate","ensure":"wholesale_month_rate","relation":"gte","tolerance":1},
-    {"id":"x1","name":"skip","type":"unknown_rule"}
-  ]
-}`
-	if err := os.WriteFile(rolePath, []byte(content), 0644); err != nil {
-		t.Fatalf("write role.json: %v", err)
+func TestLoadFromStoreDispatchesConstraintsByType(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "northstar.db")
+	st, err := store.New(dbPath)
+	if err != nil {
+		t.Fatalf("init store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	min := -5.0
+	max := 10.0
+	if _, err := st.CreateAdjustmentConstraint(store.AdjustmentConstraint{
+		Type: "clamp_target", IndicatorID: "retail_month_rate",
+		MinValue: &min, MaxValue: &max, Enabled: true,
+	}); err != nil {
+		t.Fatalf("create clamp: %v", err)
+	}
+	if _, err := st.CreateAdjustmentConstraint(store.AdjustmentConstraint{
+		Type: "filter_allocation", IndicatorID: "retail_month_rate",
+		FilterMode: "positive_current", Enabled: true,
+	}); err != nil {
+		t.Fatalf("create filter: %v", err)
+	}
+	if _, err := st.CreateAdjustmentConstraint(store.AdjustmentConstraint{
+		Type: "compensate", TriggerID: "retail_month_rate",
+		EnsureID: "wholesale_month_rate", Relation: "gte", Tolerance: 1, Enabled: true,
+	}); err != nil {
+		t.Fatalf("create compensate: %v", err)
 	}
 
-	rs, err := Load(rolePath)
+	rs, err := LoadFromStore(st)
 	if err != nil {
 		t.Fatalf("load rules: %v", err)
 	}
@@ -52,10 +67,10 @@ func TestLoadDispatchesRulesByType(t *testing.T) {
 	}
 }
 
-func TestLoadMissingFileReturnsEmptyRuleSet(t *testing.T) {
-	rs, err := Load(filepath.Join(t.TempDir(), "missing.json"))
+func TestLoadFromStoreNilReturnsEmptyRuleSet(t *testing.T) {
+	rs, err := LoadFromStore(nil)
 	if err != nil {
-		t.Fatalf("load missing file: %v", err)
+		t.Fatalf("load nil store: %v", err)
 	}
 	if len(rs.Clamps) != 0 || len(rs.Filters) != 0 || len(rs.Compensates) != 0 {
 		t.Fatalf("expected empty ruleset: %+v", rs)

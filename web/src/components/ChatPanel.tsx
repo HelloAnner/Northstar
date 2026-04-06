@@ -86,33 +86,7 @@ interface ChatPanelProps {
  * 轮询规则转换状态，结束后回调最终状态。
  * 返回 cleanup 函数，调用方可在组件卸载时取消轮询。
  */
-function pollRuleConvertStatus(onDone: (status: 'ok' | 'error') => void): () => void {
-  let stopped = false
-  const interval = setInterval(async () => {
-    if (stopped) return
-    try {
-      const res = await fetch('/api/v1/rules/status')
-      const data = await res.json()
-      if (data.status === 'ok' || data.status === 'error') {
-        stopped = true
-        clearInterval(interval)
-        clearTimeout(timeout)
-        onDone(data.status)
-      }
-    } catch {
-      // 网络错误继续重试
-    }
-  }, 1500)
-  const timeout = setTimeout(() => {
-    stopped = true
-    clearInterval(interval)
-  }, 90_000)
-  return () => {
-    stopped = true
-    clearInterval(interval)
-    clearTimeout(timeout)
-  }
-}
+
 
 // ─── 常量 ───────────────────────────────────────────────
 
@@ -422,11 +396,11 @@ function RuleChangeValue({ rule }: { rule: AppliedRule }) {
 
 function RuleAddedCard({ ruleAdded }: { ruleAdded: RuleAddedPayload }) {
   const statusMap = {
-    converting: { text: '转换中', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200/60 dark:border-amber-800/30' },
     ok: { text: '已生效', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-200/60 dark:border-emerald-800/30' },
-    error: { text: '转换失败', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200/60 dark:border-red-800/30' },
+    error: { text: '添加失败', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200/60 dark:border-red-800/30' },
+    converting: { text: '已生效', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-200/60 dark:border-emerald-800/30' },
   }
-  const s = statusMap[ruleAdded.status as keyof typeof statusMap] ?? statusMap.converting
+  const s = statusMap[ruleAdded.status as keyof typeof statusMap] ?? statusMap.ok
 
   return (
     <div className={`rounded-xl border ${s.border} ${s.bg} px-3.5 py-3`}>
@@ -552,12 +526,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const pollCleanupRef = useRef<(() => void) | null>(null)
   const userScrolledUp = useRef(false)
-
-  useEffect(() => {
-    return () => { pollCleanupRef.current?.() }
-  }, [])
 
   // 只在用户未手动上滑时自动滚到底部
   useEffect(() => {
@@ -851,23 +820,8 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
 
   const applyResult = (result: StreamResultPayload) => {
     if (result.ruleAdded) {
-      if (result.ruleAdded.status === 'converting') {
-        toast.success('规则添加成功，正在转换为 JSON…')
-        pollCleanupRef.current?.()
-        pollCleanupRef.current = pollRuleConvertStatus((finalStatus) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.ruleAdded?.status === 'converting'
-                ? { ...m, ruleAdded: { ...m.ruleAdded, status: finalStatus } }
-                : m
-            )
-          )
-          if (finalStatus === 'ok') {
-            toast.success('规则转换成功，已生效')
-          } else {
-            toast.error('规则转换失败')
-          }
-        })
+      if (result.ruleAdded.status === 'ok') {
+        toast.success('规则已添加')
       } else {
         toast.error('规则添加失败')
       }

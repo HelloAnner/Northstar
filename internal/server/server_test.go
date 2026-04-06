@@ -11,15 +11,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"northstar/internal/config"
-	"northstar/internal/rules"
+	"northstar/internal/store"
 )
 
-func TestNewServerInitializesRuleManagement(t *testing.T) {
+func TestNewServerInitializesCleanState(t *testing.T) {
 	dataDir := t.TempDir()
 	cfg := config.DefaultConfig()
 	cfg.Data.DataDir = dataDir
@@ -30,79 +28,43 @@ func TestNewServerInitializesRuleManagement(t *testing.T) {
 		_ = s.GetStore().Close()
 	})
 
-	rulesPath := filepath.Join(dataDir, "config", "rules.md")
-	raw, err := os.ReadFile(rulesPath)
+	// 验证 store 能正常加载约束（空列表）
+	constraints, err := s.GetStore().ListAdjustmentConstraints(false)
 	if err != nil {
-		t.Fatalf("read rules.md: %v", err)
+		t.Fatalf("list constraints: %v", err)
 	}
-	if len(raw) == 0 {
-		t.Fatal("rules.md should not be empty")
+	if len(constraints) != 0 {
+		t.Fatalf("expected 0 default constraints, got %d", len(constraints))
 	}
 
-	roleJSONPath := filepath.Join(dataDir, "config", "role.json")
-	roleRaw, err := os.ReadFile(roleJSONPath)
-	if err != nil {
-		t.Fatalf("read role.json: %v", err)
-	}
-	if len(roleRaw) == 0 {
-		t.Fatal("role.json should not be empty")
-	}
-	var rolePayload map[string]any
-	if err := json.Unmarshal(roleRaw, &rolePayload); err != nil {
-		t.Fatalf("decode role.json: %v", err)
-	}
-	if rolePayload["updatedAt"] == "" {
-		t.Fatalf("expected role.json updatedAt, got %s", string(roleRaw))
-	}
-	if rolePayload["sourceFile"] != "config/rules.md" {
-		t.Fatalf("unexpected role.json sourceFile: %v", rolePayload["sourceFile"])
-	}
-	loadedRules, err := rules.Load(roleJSONPath)
-	if err != nil {
-		t.Fatalf("load role.json: %v", err)
-	}
-	if loadedRules == nil {
-		t.Fatal("loaded rules should not be nil")
-	}
-	if total := len(loadedRules.Clamps) + len(loadedRules.Filters) + len(loadedRules.Compensates); total != 17 {
-		t.Fatalf("expected 17 default role.json rules, got %d", total)
-	}
-
-	assertConfigValue(t, s, "rules_convert_status", "idle")
-	assertConfigValue(t, s, "rules_convert_at", "")
-	assertConfigValue(t, s, "rules_convert_error", "")
-	assertConfigValue(t, s, "llm_user_prompt", "")
-
+	// 验证约束 API 可用
 	httpServer := httptest.NewServer(s.router)
 	t.Cleanup(httpServer.Close)
 
-	resp, err := http.Get(httpServer.URL + "/api/v1/rules")
+	resp, err := http.Get(httpServer.URL + "/api/v1/constraints")
 	if err != nil {
-		t.Fatalf("get rules: %v", err)
+		t.Fatalf("get constraints: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected rules status: %d", resp.StatusCode)
+		t.Fatalf("unexpected constraints status: %d", resp.StatusCode)
 	}
 
-	var items []map[string]any
+	var items []store.AdjustmentConstraint
 	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		t.Fatalf("decode rules: %v", err)
+		t.Fatalf("decode constraints: %v", err)
 	}
-	// 默认内置 3 条值类非负约束 + 13 条增速范围约束 + 1 条联动约束
-	if len(items) != 17 {
-		t.Fatalf("expected 17 default rules, got %d", len(items))
+	if len(items) != 0 {
+		t.Fatalf("expected empty constraints, got %d", len(items))
 	}
-}
 
-func assertConfigValue(t *testing.T, s *Server, key string, expected string) {
-	t.Helper()
-
-	value, err := s.GetStore().GetConfig(key)
+	// 验证自然语言规则 API 可用
+	rulesResp, err := http.Get(httpServer.URL + "/api/v1/natural-rules")
 	if err != nil {
-		t.Fatalf("get config %s: %v", key, err)
+		t.Fatalf("get natural-rules: %v", err)
 	}
-	if value != expected {
-		t.Fatalf("unexpected config %s=%q expected=%q", key, value, expected)
+	defer rulesResp.Body.Close()
+	if rulesResp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected natural-rules status: %d", rulesResp.StatusCode)
 	}
 }

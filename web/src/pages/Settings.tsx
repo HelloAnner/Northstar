@@ -18,7 +18,7 @@ export default function Settings() {
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Settings</div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">规则与系统偏好</h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            在这里维护自然语言规则，系统会自动生成结构化角色规则并热重载到调整引擎。
+            管理硬约束和自然语言规则，硬约束确定性执行，自然语言规则作为 AI 对话上下文。
           </p>
         </div>
 

@@ -8,13 +8,11 @@ import (
 
 // Handler V3 API 处理器
 type Handler struct {
-	store                *store.Store
-	templatePath         string
-	downloads            *exportDownloadStore
-	engine               *dagcalc.Engine
-	rulesRepo            *rulesFileRepo
-	ruleConverterFactory func() (RuleConverter, error)
-	llmClientFactory     func(prompt string) (LLMChatClient, error)
+	store            *store.Store
+	templatePath     string
+	downloads        *exportDownloadStore
+	engine           *dagcalc.Engine
+	llmClientFactory func(prompt string) (LLMChatClient, error)
 }
 
 // NewHandler 创建 V3 API 处理器
@@ -25,7 +23,7 @@ func NewHandler(store *store.Store, templatePath string) *Handler {
 // NewHandlerWithEngine 创建带规则引擎的 V3 API 处理器。
 func NewHandlerWithEngine(store *store.Store, templatePath string, engine *dagcalc.Engine) *Handler {
 	if engine == nil {
-		engine = dagcalc.NewEngine(dagcalc.NewGraph(), store, 0, 0, "")
+		engine = dagcalc.NewEngine(dagcalc.NewGraph(), store, 0, 0)
 	}
 	return &Handler{
 		store:        store,
@@ -48,12 +46,18 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.PATCH("/config", h.UpdateConfig)
 	router.GET("/settings/user-prompt", h.GetUserPrompt)
 	router.PUT("/settings/user-prompt", h.UpdateUserPrompt)
-	router.GET("/rules", h.GetRules)
-	router.POST("/rules", h.CreateRule)
-	router.PUT("/rules/:index", h.UpdateRule)
-	router.DELETE("/rules/:index", h.DeleteRule)
-	router.POST("/rules/convert", h.ConvertRules)
-	router.GET("/rules/status", h.GetRuleStatus)
+
+	// 硬约束
+	router.GET("/constraints", h.ListConstraints)
+	router.POST("/constraints", h.CreateConstraint)
+	router.PUT("/constraints/:id", h.UpdateConstraint)
+	router.DELETE("/constraints/:id", h.DeleteConstraint)
+
+	// 自然语言规则
+	router.GET("/natural-rules", h.ListNaturalRules)
+	router.POST("/natural-rules", h.CreateNaturalRule)
+	router.PUT("/natural-rules/:id", h.UpdateNaturalRule)
+	router.DELETE("/natural-rules/:id", h.DeleteNaturalRule)
 
 	// 数据导入
 	router.POST("/import", h.Import)

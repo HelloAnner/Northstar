@@ -76,7 +76,7 @@ func newSettingsTestRouter(t *testing.T) (*Handler, http.Handler, *store.Store) 
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	handler := NewHandlerWithEngine(st, "", dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, ""))
+	handler := NewHandlerWithEngine(st, "", dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12))
 	router := gin.New()
 	handler.RegisterRoutes(router.Group("/api"))
 	return handler, router, st

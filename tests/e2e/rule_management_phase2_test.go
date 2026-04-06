@@ -3,6 +3,8 @@
 /**
  * Rule Management Phase 2 端到端测试
  *
+ * 测试硬约束 CRUD 和自然语言规则 CRUD，以及约束生效后的 optimize 验证。
+ *
  * @author Anner
  * Created on 2026/3/14
  */
@@ -11,58 +13,27 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
 	v3 "northstar/internal/api/v3"
 	"northstar/internal/config"
 	"northstar/internal/dagcalc"
-	"northstar/internal/llm"
-	"northstar/internal/rules"
 	"northstar/internal/server"
 	"northstar/internal/store"
 )
 
-type fakeE2ERuleClient struct {
-	responses []llm.ChatResult
-}
-
-func (f *fakeE2ERuleClient) Chat(_ context.Context, _ llm.ChatRequest, _ func(string) error) (llm.ChatResult, error) {
-	if len(f.responses) == 0 {
-		return llm.ChatResult{Content: `{"version":"1.0","rules":[]}`}, nil
-	}
-	resp := f.responses[0]
-	f.responses = f.responses[1:]
-	return resp, nil
-}
-
-type phase2RuleItem struct {
-	Index int    `json:"index"`
-	Text  string `json:"text"`
-}
-
-type phase2RuleStatus struct {
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updatedAt"`
-	Error     string `json:"error"`
-}
-
 type phase2Env struct {
-	baseURL   string
-	store     *store.Store
-	handler   *v3.Handler
-	rolePath  string
-	rulesPath string
-	engine    *dagcalc.Engine
+	baseURL string
+	store   *store.Store
+	handler *v3.Handler
+	engine  *dagcalc.Engine
 }
 
 func TestRuleManagementPhase2E2E_ServerInit(t *testing.T) {
@@ -76,109 +47,79 @@ func TestRuleManagementPhase2E2E_ServerInit(t *testing.T) {
 		_ = s.GetStore().Close()
 	})
 
-	rulesPath := filepath.Join(dataDir, "config", "rules.md")
-	raw, err := os.ReadFile(rulesPath)
-	if err != nil {
-		t.Fatalf("read rules.md: %v", err)
-	}
-	if len(raw) == 0 {
-		t.Fatal("rules.md should not be empty")
-	}
-
-	roleJSONPath := filepath.Join(dataDir, "config", "role.json")
-	roleRaw, err := os.ReadFile(roleJSONPath)
-	if err != nil {
-		t.Fatalf("read role.json: %v", err)
-	}
-	if len(roleRaw) == 0 {
-		t.Fatal("role.json should not be empty")
-	}
-
 	testServer := httptest.NewServer(s.RouterForTest())
 	t.Cleanup(testServer.Close)
 
-	resp, err := http.Get(testServer.URL + "/api/v1/rules/status")
+	// 验证 constraints API 可用
+	resp, err := http.Get(testServer.URL + "/api/v1/constraints")
 	if err != nil {
-		t.Fatalf("get rules status: %v", err)
+		t.Fatalf("get constraints: %v", err)
 	}
 	defer resp.Body.Close()
-
-	status := decodeJSON[phase2RuleStatus](t, resp)
-	if status.Status != "idle" {
-		t.Fatalf("unexpected rules status: %+v", status)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected constraints status: %d", resp.StatusCode)
 	}
 
-	rulesResp, err := http.Get(testServer.URL + "/api/v1/rules")
+	var items []store.AdjustmentConstraint
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatalf("decode constraints: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 default constraints, got %d", len(items))
+	}
+
+	// 验证 natural-rules API 可用
+	rulesResp, err := http.Get(testServer.URL + "/api/v1/natural-rules")
 	if err != nil {
-		t.Fatalf("get rules: %v", err)
+		t.Fatalf("get natural-rules: %v", err)
 	}
 	defer rulesResp.Body.Close()
 	if rulesResp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected rules status code: %d", rulesResp.StatusCode)
-	}
-
-	items := decodeJSON[[]phase2RuleItem](t, rulesResp)
-	if len(items) != 17 {
-		t.Fatalf("expected 17 default rules, got %d", len(items))
+		t.Fatalf("unexpected natural-rules status: %d", rulesResp.StatusCode)
 	}
 }
 
-func TestRuleManagementPhase2E2E_CRUDConvertAndFallback(t *testing.T) {
+func TestRuleManagementPhase2E2E_ConstraintCRUDAndOptimize(t *testing.T) {
 	env := newPhase2Env(t)
 	insertWRRateRow(t, env.store, "W1", "wholesale", 100, 100)
 
-	env.useConverter(&fakeE2ERuleClient{
-		responses: []llm.ChatResult{
-			{Content: `{"version":"1.0","rules":[{"id":"c1","name":"clamp","type":"clamp_target","indicator":"wholesale_month_rate","max":15}]}`},
-		},
+	// 创建约束：批发当月增速不超过 15%
+	max := 15.0
+	created := env.createConstraint(t, store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: "wholesale_month_rate",
+		MaxValue:    &max,
 	})
-
-	env.postRule(t, http.MethodPost, "/api/rules", map[string]string{"text": "批发当月增速不超过 15%"}, http.StatusCreated)
-	waitRuleStatusE2E(t, env, "ok")
-
-	items := env.fetchRules(t)
-	if len(items) != 1 || items[0].Text != "批发当月增速不超过 15%" {
-		t.Fatalf("unexpected rules: %+v", items)
+	if created.ID == 0 {
+		t.Fatalf("expected non-zero constraint ID")
 	}
 
+	// 验证 optimize 生效
 	resp := env.postOptimize(t, map[string]float64{"wholesale_month_rate": 30})
 	rule := requireSingleRule(t, resp.AppliedRules)
 	assertRuleType(t, rule.Type, "clamp_target")
 	assertFloatEqual(t, env.indicatorValue(t, "wholesale_month_rate"), 15)
 
-	roleBefore, err := os.ReadFile(env.rolePath)
-	if err != nil {
-		t.Fatalf("read role.json: %v", err)
-	}
-
-	env.useConverter(&fakeE2ERuleClient{
-		responses: []llm.ChatResult{
-			{Content: `{"version":"1.0","rules":[{"id":"c1","type":"clamp_target","indicator":"bad_indicator","max":15}]}`},
-			{Content: `{"version":"1.0","rules":[{"id":"c1","type":"clamp_target","indicator":"bad_indicator","max":15}]}`},
-			{Content: `{"version":"1.0","rules":[{"id":"c1","type":"clamp_target","indicator":"bad_indicator","max":15}]}`},
-		},
+	// 更新约束：改为不超过 10%
+	newMax := 10.0
+	env.updateConstraint(t, created.ID, store.AdjustmentConstraint{
+		Type:        "clamp_target",
+		IndicatorID: "wholesale_month_rate",
+		MaxValue:    &newMax,
+		Enabled:     true,
 	})
-
-	env.postRule(t, http.MethodPut, "/api/rules/1", map[string]string{"text": "批发当月增速不超过 12%"}, http.StatusOK)
-	waitRuleStatusE2E(t, env, "error")
-
-	status := env.fetchRuleStatus(t)
-	if !strings.Contains(status.Error, "3次重试仍失败") {
-		t.Fatalf("unexpected error status: %+v", status)
-	}
-
-	roleAfter, err := os.ReadFile(env.rolePath)
-	if err != nil {
-		t.Fatalf("read role.json after error: %v", err)
-	}
-	if string(roleAfter) != string(roleBefore) {
-		t.Fatalf("expected role.json to remain unchanged")
-	}
 
 	resp = env.postOptimize(t, map[string]float64{"wholesale_month_rate": 30})
 	rule = requireSingleRule(t, resp.AppliedRules)
-	assertRuleType(t, rule.Type, "clamp_target")
-	assertFloatEqual(t, env.indicatorValue(t, "wholesale_month_rate"), 15)
+	assertFloatEqual(t, env.indicatorValue(t, "wholesale_month_rate"), 10)
+
+	// 删除约束后不再限制
+	env.deleteConstraint(t, created.ID)
+	resp = env.postOptimize(t, map[string]float64{"wholesale_month_rate": 30})
+	if len(resp.AppliedRules) != 0 {
+		t.Fatalf("expected no applied rules after delete, got %+v", resp.AppliedRules)
+	}
+	assertFloatEqual(t, env.indicatorValue(t, "wholesale_month_rate"), 30)
 }
 
 func newPhase2Env(t *testing.T) *phase2Env {
@@ -197,32 +138,13 @@ func newPhase2Env(t *testing.T) *phase2Env {
 	if err := st.SetCurrentYearMonth(2025, 12); err != nil {
 		t.Fatalf("set ym: %v", err)
 	}
-	if err := st.SetConfig("rules_convert_status", "idle"); err != nil {
-		t.Fatalf("set rules status: %v", err)
-	}
-	if err := st.SetConfig("rules_convert_at", ""); err != nil {
-		t.Fatalf("set rules updated at: %v", err)
-	}
-	if err := st.SetConfig("rules_convert_error", ""); err != nil {
-		t.Fatalf("set rules error: %v", err)
-	}
 
-	rulesPath := filepath.Join(tmpDir, "config", "rules.md")
-	rolePath := filepath.Join(tmpDir, "config", "role.json")
-	if err := os.MkdirAll(filepath.Dir(rulesPath), 0755); err != nil {
-		t.Fatalf("mkdir config: %v", err)
-	}
-	if err := os.WriteFile(rulesPath, []byte("# 调整规则\n\n"), 0644); err != nil {
-		t.Fatalf("write rules.md: %v", err)
-	}
-
-	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, rolePath)
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12)
 	if err := engine.ReloadRules(); err != nil {
 		t.Fatalf("reload rules: %v", err)
 	}
 
 	handler := v3.NewHandlerWithEngine(st, "", engine)
-	handler.ConfigureRuleManagement(rulesPath, rolePath)
 
 	router := gin.New()
 	handler.RegisterRoutes(router.Group("/api"))
@@ -230,73 +152,75 @@ func newPhase2Env(t *testing.T) *phase2Env {
 	t.Cleanup(testServer.Close)
 
 	return &phase2Env{
-		baseURL:   testServer.URL,
-		store:     st,
-		handler:   handler,
-		rolePath:  rolePath,
-		rulesPath: rulesPath,
-		engine:    engine,
+		baseURL: testServer.URL,
+		store:   st,
+		handler: handler,
+		engine:  engine,
 	}
 }
 
-func (e *phase2Env) useConverter(client rules.ConverterClient) {
-	e.handler.SetRuleConverterFactory(func() (v3.RuleConverter, error) {
-		return rules.NewConverterWithClient(client, e.store, e.engine, e.rolePath, e.rulesPath), nil
-	})
-}
-
-func (e *phase2Env) postRule(t *testing.T, method string, path string, body any, expected int) {
+func (e *phase2Env) createConstraint(t *testing.T, c store.AdjustmentConstraint) store.AdjustmentConstraint {
 	t.Helper()
 
-	var payload []byte
-	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			t.Fatalf("marshal rule body: %v", err)
-		}
-		payload = data
+	body, err := json.Marshal(c)
+	if err != nil {
+		t.Fatalf("marshal constraint: %v", err)
 	}
-	req, err := http.NewRequest(method, e.baseURL+path, bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, e.baseURL+"/api/constraints", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("call rules api: %v", err)
+		t.Fatalf("create constraint: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != expected {
-		t.Fatalf("unexpected rules status: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected create status: %d", resp.StatusCode)
 	}
+	return decodeJSON[store.AdjustmentConstraint](t, resp)
 }
 
-func (e *phase2Env) fetchRules(t *testing.T) []phase2RuleItem {
+func (e *phase2Env) updateConstraint(t *testing.T, id int64, c store.AdjustmentConstraint) {
 	t.Helper()
 
-	resp, err := http.Get(e.baseURL + "/api/rules")
+	body, err := json.Marshal(c)
 	if err != nil {
-		t.Fatalf("get rules: %v", err)
+		t.Fatalf("marshal constraint: %v", err)
+	}
+	url := fmt.Sprintf("%s/api/constraints/%d", e.baseURL, id)
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("update constraint: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected get rules status: %d", resp.StatusCode)
+		t.Fatalf("unexpected update status: %d", resp.StatusCode)
 	}
-	return decodeJSON[[]phase2RuleItem](t, resp)
 }
 
-func (e *phase2Env) fetchRuleStatus(t *testing.T) phase2RuleStatus {
+func (e *phase2Env) deleteConstraint(t *testing.T, id int64) {
 	t.Helper()
 
-	resp, err := http.Get(e.baseURL + "/api/rules/status")
+	url := fmt.Sprintf("%s/api/constraints/%d", e.baseURL, id)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
-		t.Fatalf("get rule status: %v", err)
+		t.Fatalf("build request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("delete constraint: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected rules status code: %d", resp.StatusCode)
+		t.Fatalf("unexpected delete status: %d", resp.StatusCode)
 	}
-	return decodeJSON[phase2RuleStatus](t, resp)
 }
 
 func (e *phase2Env) postOptimize(t *testing.T, targets map[string]float64) optimizeResult {
@@ -346,17 +270,3 @@ func (e *phase2Env) indicatorValue(t *testing.T, id string) float64 {
 	return 0
 }
 
-func waitRuleStatusE2E(t *testing.T, env *phase2Env, expected string) {
-	t.Helper()
-
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		status := env.fetchRuleStatus(t)
-		if status.Status == expected {
-			return
-		}
-		time.Sleep(30 * time.Millisecond)
-	}
-	status := env.fetchRuleStatus(t)
-	t.Fatalf("unexpected final rules status: %+v", status)
-}

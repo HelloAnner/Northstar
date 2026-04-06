@@ -28,6 +28,28 @@ export interface RuleStatus {
   attempt: string
 }
 
+// 硬约束
+export interface AdjustmentConstraint {
+  id: number
+  type: 'clamp_target' | 'filter_allocation' | 'compensate'
+  indicatorId?: string
+  minValue?: number | null
+  maxValue?: number | null
+  filterMode?: string
+  triggerId?: string
+  ensureId?: string
+  relation?: string
+  tolerance: number
+  enabled: boolean
+}
+
+// 自然语言规则
+export interface NaturalRule {
+  id: number
+  text: string
+  enabled: boolean
+}
+
 export interface UserPromptPayload {
   content: string
 }
@@ -218,32 +240,69 @@ export const configApi = {
     }),
 }
 
-export const rulesApi = {
-  list: () => requestPlain<RuleItem[]>('/rules'),
+// 硬约束 API
+export const constraintsApi = {
+  list: () => requestPlain<AdjustmentConstraint[]>('/constraints'),
+
+  create: (data: Omit<AdjustmentConstraint, 'id'>) =>
+    requestPlain<AdjustmentConstraint>('/constraints', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: number, data: Omit<AdjustmentConstraint, 'id'>) =>
+    requestPlain<AdjustmentConstraint>(`/constraints/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  remove: (id: number) =>
+    requestPlain<{ ok: boolean }>(`/constraints/${id}`, {
+      method: 'DELETE',
+    }),
+}
+
+// 自然语言规则 API
+export const naturalRulesApi = {
+  list: () => requestPlain<NaturalRule[]>('/natural-rules'),
 
   create: (text: string) =>
-    requestPlain<RuleItem[]>('/rules', {
+    requestPlain<NaturalRule>('/natural-rules', {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
 
-  update: (index: number, text: string) =>
-    requestPlain<RuleItem[]>(`/rules/${index}`, {
+  update: (id: number, text: string) =>
+    requestPlain<NaturalRule>(`/natural-rules/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ text }),
     }),
 
-  remove: (index: number) =>
-    requestPlain<RuleItem[]>(`/rules/${index}`, {
+  remove: (id: number) =>
+    requestPlain<{ ok: boolean }>(`/natural-rules/${id}`, {
       method: 'DELETE',
     }),
+}
 
-  convert: () =>
-    requestPlain<{ status: string }>('/rules/convert', {
+/** @deprecated Use constraintsApi + naturalRulesApi instead */
+export const rulesApi = {
+  list: () => requestPlain<RuleItem[]>('/natural-rules'),
+  create: (text: string) =>
+    requestPlain<RuleItem[]>('/natural-rules', {
       method: 'POST',
+      body: JSON.stringify({ text }),
     }),
-
-  status: () => requestPlain<RuleStatus>('/rules/status'),
+  update: (index: number, text: string) =>
+    requestPlain<RuleItem[]>(`/natural-rules/${index}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text }),
+    }),
+  remove: (index: number) =>
+    requestPlain<RuleItem[]>(`/natural-rules/${index}`, {
+      method: 'DELETE',
+    }),
+  convert: () => Promise.resolve({ status: 'ok' }),
+  status: () => Promise.resolve({ status: 'ok', updatedAt: '', error: '', step: '', attempt: '' } as RuleStatus),
 }
 
 export const settingsApi = {

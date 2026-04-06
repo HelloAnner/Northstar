@@ -1,12 +1,12 @@
 /**
- * 规则列表
+ * 规则列表 — 硬约束 + 自然语言规则
  *
  * @author Anner
  * Created on 2026/3/14
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, RefreshCw, Pencil, Trash2, AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,111 +18,395 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useRulesStore } from '@/store/rulesStore'
-import type { RuleItem } from '@/services/api'
+import type { AdjustmentConstraint, NaturalRule } from '@/services/api'
 
-const PAGE_SIZE = 8
+// --- 指标选项 ---
 
-/** 转换步骤 → 进度百分比与中文标签 */
-const STEP_META: Record<string, { progress: number; label: string }> = {
-  initializing: { progress: 10, label: '初始化' },
-  calling_llm: { progress: 30, label: '调用大模型' },
-  validating: { progress: 70, label: '校验规则' },
-  writing_json: { progress: 85, label: '写入规则' },
-  reloading: { progress: 95, label: '热重载引擎' },
+const INDICATOR_OPTIONS = [
+  { value: 'limitAbove_month_value', label: '限上社零额月值' },
+  { value: 'limitAbove_month_rate', label: '限上社零额月增速' },
+  { value: 'limitAbove_cumulative_value', label: '限上社零额累计值' },
+  { value: 'limitAbove_cumulative_rate', label: '限上社零额累计增速' },
+  { value: 'eatWearUse_month_rate', label: '吃穿用月增速' },
+  { value: 'microSmall_month_rate', label: '小微企业月增速' },
+  { value: 'wholesale_month_rate', label: '批发业月增速' },
+  { value: 'wholesale_cumulative_rate', label: '批发业累计增速' },
+  { value: 'retail_month_rate', label: '零售业月增速' },
+  { value: 'retail_cumulative_rate', label: '零售业累计增速' },
+  { value: 'accommodation_month_rate', label: '住宿业月增速' },
+  { value: 'accommodation_cumulative_rate', label: '住宿业累计增速' },
+  { value: 'catering_month_rate', label: '餐饮业月增速' },
+  { value: 'catering_cumulative_rate', label: '餐饮业累计增速' },
+  { value: 'totalSocial_cumulative_value', label: '社零总额累计值' },
+  { value: 'totalSocial_cumulative_rate', label: '社零总额累计增速' },
+]
+
+const FILTER_OPTIONS = [
+  { value: 'positive_current', label: '仅正增长企业' },
+  { value: 'negative_current', label: '仅负增长企业' },
+  { value: 'large_scale_only', label: '仅大型企业' },
+  { value: 'exclude_small_micro', label: '排除小微企业' },
+]
+
+const CONSTRAINT_TYPE_LABELS: Record<string, string> = {
+  clamp_target: '值域约束',
+  filter_allocation: '过滤分配',
+  compensate: '联动补偿',
 }
 
-interface RuleListViewProps {
-  rules: RuleItem[]
-  status: 'idle' | 'pending' | 'running' | 'ok' | 'error'
-  statusError: string
-  statusUpdatedAt: string
-  statusStep: string
-  statusAttempt: string
-  loading: boolean
-  submitting: boolean
-  onAdd: (text: string) => Promise<void>
-  onEdit: (index: number, text: string) => Promise<void>
-  onDelete: (index: number) => Promise<void>
-  onRefresh: () => Promise<void>
-  onConvert: () => Promise<void>
-}
+// --- 硬约束区 ---
 
-export function RuleListView({
-  rules,
-  status,
-  statusError,
-  statusUpdatedAt,
-  statusStep,
-  statusAttempt,
-  loading,
+function ConstraintSection({
+  constraints,
   submitting,
   onAdd,
-  onEdit,
+  onUpdate,
   onDelete,
-  onRefresh,
-  onConvert,
-}: RuleListViewProps) {
+}: {
+  constraints: AdjustmentConstraint[]
+  submitting: boolean
+  onAdd: (data: Omit<AdjustmentConstraint, 'id'>) => Promise<void>
+  onUpdate: (id: number, data: Omit<AdjustmentConstraint, 'id'>) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [editing, setEditing] = useState<RuleItem | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [editing, setEditing] = useState<AdjustmentConstraint | null>(null)
 
-  const statusMeta = useMemo(() => buildStatusMeta(status), [status])
-  const formattedUpdatedAt = formatUpdatedAt(statusUpdatedAt)
+  const openCreate = () => {
+    setEditing(null)
+    setDialogOpen(true)
+  }
 
-  const totalPages = Math.max(1, Math.ceil(rules.length / PAGE_SIZE))
-  const pagedRules = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE
-    return rules.slice(start, start + PAGE_SIZE)
-  }, [rules, currentPage])
+  const openEdit = (item: AdjustmentConstraint) => {
+    setEditing(item)
+    setDialogOpen(true)
+  }
+
+  return (
+    <>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">硬约束</h3>
+            <p className="text-xs text-muted-foreground">
+              确定性执行，每次调整自动生效。共 {constraints.length} 条。
+            </p>
+          </div>
+          <Button size="sm" onClick={openCreate} disabled={submitting}>
+            <Plus className="h-3.5 w-3.5" />
+            新增约束
+          </Button>
+        </div>
+
+        {constraints.length === 0 && (
+          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            暂无硬约束
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {constraints.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3"
+            >
+              <div className="min-w-0 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    {CONSTRAINT_TYPE_LABELS[item.type] ?? item.type}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {formatConstraintSummary(item)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(item)} disabled={submitting}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void onDelete(item.id)}
+                  disabled={submitting}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <ConstraintDialog
+        open={dialogOpen}
+        editing={editing}
+        submitting={submitting}
+        onClose={() => {
+          setDialogOpen(false)
+          setEditing(null)
+        }}
+        onSave={async (data) => {
+          if (editing) {
+            await onUpdate(editing.id, data)
+          } else {
+            await onAdd(data)
+          }
+          setDialogOpen(false)
+          setEditing(null)
+        }}
+      />
+    </>
+  )
+}
+
+function formatConstraintSummary(c: AdjustmentConstraint): string {
+  const indicator = INDICATOR_OPTIONS.find((o) => o.value === c.indicatorId)?.label ?? c.indicatorId
+  if (c.type === 'clamp_target') {
+    const parts: string[] = [indicator]
+    if (c.minValue != null) parts.push(`≥ ${c.minValue}`)
+    if (c.maxValue != null) parts.push(`≤ ${c.maxValue}`)
+    return parts.join(' ')
+  }
+  if (c.type === 'filter_allocation') {
+    const filter = FILTER_OPTIONS.find((o) => o.value === c.filterMode)?.label ?? c.filterMode
+    return `${indicator} → ${filter}`
+  }
+  if (c.type === 'compensate') {
+    const trigger = INDICATOR_OPTIONS.find((o) => o.value === c.triggerId)?.label ?? c.triggerId
+    const ensure = INDICATOR_OPTIONS.find((o) => o.value === c.ensureId)?.label ?? c.ensureId
+    return `${trigger} → ${ensure} (${c.relation}, ±${c.tolerance})`
+  }
+  return ''
+}
+
+// --- 约束编辑弹窗 ---
+
+function ConstraintDialog({
+  open,
+  editing,
+  submitting,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  editing: AdjustmentConstraint | null
+  submitting: boolean
+  onClose: () => void
+  onSave: (data: Omit<AdjustmentConstraint, 'id'>) => Promise<void>
+}) {
+  const [type, setType] = useState<AdjustmentConstraint['type']>('clamp_target')
+  const [indicatorId, setIndicatorId] = useState('')
+  const [minValue, setMinValue] = useState('')
+  const [maxValue, setMaxValue] = useState('')
+  const [filterMode, setFilterMode] = useState('')
+  const [triggerId, setTriggerId] = useState('')
+  const [ensureId, setEnsureId] = useState('')
+  const [relation, setRelation] = useState('gte')
+  const [tolerance, setTolerance] = useState('0')
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
+    if (editing) {
+      setType(editing.type)
+      setIndicatorId(editing.indicatorId ?? '')
+      setMinValue(editing.minValue != null ? String(editing.minValue) : '')
+      setMaxValue(editing.maxValue != null ? String(editing.maxValue) : '')
+      setFilterMode(editing.filterMode ?? '')
+      setTriggerId(editing.triggerId ?? '')
+      setEnsureId(editing.ensureId ?? '')
+      setRelation(editing.relation ?? 'gte')
+      setTolerance(String(editing.tolerance ?? 0))
+    } else {
+      setType('clamp_target')
+      setIndicatorId('')
+      setMinValue('')
+      setMaxValue('')
+      setFilterMode('')
+      setTriggerId('')
+      setEnsureId('')
+      setRelation('gte')
+      setTolerance('0')
     }
-  }, [totalPages, currentPage])
+  }, [editing, open])
 
-  const handleSubmit = async () => {
-    const text = draft.trim()
-    if (!text) {
-      toast.error('规则内容不能为空')
-      return
+  const handleSave = async () => {
+    const data: Omit<AdjustmentConstraint, 'id'> = {
+      type,
+      indicatorId: type !== 'compensate' ? indicatorId : undefined,
+      minValue: type === 'clamp_target' && minValue !== '' ? Number(minValue) : null,
+      maxValue: type === 'clamp_target' && maxValue !== '' ? Number(maxValue) : null,
+      filterMode: type === 'filter_allocation' ? filterMode : undefined,
+      triggerId: type === 'compensate' ? triggerId : undefined,
+      ensureId: type === 'compensate' ? ensureId : undefined,
+      relation: type === 'compensate' ? relation : undefined,
+      tolerance: type === 'compensate' ? Number(tolerance) : 0,
+      enabled: true,
     }
     try {
-      if (editing) {
-        await onEdit(editing.index, text)
-        toast.success('规则已更新')
-      } else {
-        await onAdd(text)
-        toast.success('规则已新增')
-      }
-      setDialogOpen(false)
-      setDraft('')
-      setEditing(null)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存规则失败')
+      await onSave(data)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败')
     }
   }
 
-  const handleDelete = async (index: number) => {
-    try {
-      await onDelete(index)
-      toast.success('规则已删除')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '删除规则失败')
-    }
-  }
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{editing ? '编辑约束' : '新增约束'}</DialogTitle>
+          <DialogDescription>硬约束在每次数据调整时自动执行。</DialogDescription>
+        </DialogHeader>
 
-  const handleConvert = async () => {
-    try {
-      await onConvert()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '触发规则转换失败')
-    }
-  }
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>约束类型</Label>
+            <Select value={type} onValueChange={(v) => setType(v as AdjustmentConstraint['type'])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="clamp_target">值域约束（Clamp）</SelectItem>
+                <SelectItem value="filter_allocation">过滤分配（Filter）</SelectItem>
+                <SelectItem value="compensate">联动补偿（Compensate）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {type === 'clamp_target' && (
+            <>
+              <div className="space-y-2">
+                <Label>指标</Label>
+                <Select value={indicatorId} onValueChange={setIndicatorId}>
+                  <SelectTrigger><SelectValue placeholder="选择指标" /></SelectTrigger>
+                  <SelectContent>
+                    {INDICATOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>最小值</Label>
+                  <Input type="number" value={minValue} onChange={(e) => setMinValue(e.target.value)} placeholder="不限" />
+                </div>
+                <div className="space-y-2">
+                  <Label>最大值</Label>
+                  <Input type="number" value={maxValue} onChange={(e) => setMaxValue(e.target.value)} placeholder="不限" />
+                </div>
+              </div>
+            </>
+          )}
+
+          {type === 'filter_allocation' && (
+            <>
+              <div className="space-y-2">
+                <Label>指标</Label>
+                <Select value={indicatorId} onValueChange={setIndicatorId}>
+                  <SelectTrigger><SelectValue placeholder="选择指标" /></SelectTrigger>
+                  <SelectContent>
+                    {INDICATOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>过滤模式</Label>
+                <Select value={filterMode} onValueChange={setFilterMode}>
+                  <SelectTrigger><SelectValue placeholder="选择过滤模式" /></SelectTrigger>
+                  <SelectContent>
+                    {FILTER_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+
+          {type === 'compensate' && (
+            <>
+              <div className="space-y-2">
+                <Label>触发指标</Label>
+                <Select value={triggerId} onValueChange={setTriggerId}>
+                  <SelectTrigger><SelectValue placeholder="选择触发指标" /></SelectTrigger>
+                  <SelectContent>
+                    {INDICATOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>保障指标</Label>
+                <Select value={ensureId} onValueChange={setEnsureId}>
+                  <SelectTrigger><SelectValue placeholder="选择保障指标" /></SelectTrigger>
+                  <SelectContent>
+                    {INDICATOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>关系</Label>
+                  <Select value={relation} onValueChange={setRelation}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gte">≥（不低于）</SelectItem>
+                      <SelectItem value="lte">≤（不高于）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>容差</Label>
+                  <Input type="number" value={tolerance} onChange={(e) => setTolerance(e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose} disabled={submitting}>取消</Button>
+          <Button onClick={() => void handleSave()} disabled={submitting}>
+            {submitting ? '保存中…' : '保存'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// --- 自然语言规则区 ---
+
+function NaturalRuleSection({
+  rules,
+  submitting,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  rules: NaturalRule[]
+  submitting: boolean
+  onAdd: (text: string) => Promise<void>
+  onUpdate: (id: number, text: string) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<NaturalRule | null>(null)
+  const [draft, setDraft] = useState('')
 
   const openCreate = () => {
     setEditing(null)
@@ -130,142 +414,86 @@ export function RuleListView({
     setDialogOpen(true)
   }
 
-  const openEdit = (item: RuleItem) => {
+  const openEdit = (item: NaturalRule) => {
     setEditing(item)
     setDraft(item.text)
     setDialogOpen(true)
   }
 
-  // 进度条计算
-  const stepInfo = STEP_META[statusStep] ?? null
-  const progressValue = status === 'running' ? (stepInfo?.progress ?? 15) : 0
+  const handleSave = async () => {
+    const text = draft.trim()
+    if (!text) {
+      toast.error('规则内容不能为空')
+      return
+    }
+    try {
+      if (editing) {
+        await onUpdate(editing.id, text)
+      } else {
+        await onAdd(text)
+      }
+      setDialogOpen(false)
+      setEditing(null)
+      setDraft('')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败')
+    }
+  }
 
   return (
     <>
-      <div data-testid="rule-list" className="flex h-full flex-col">
-        {/* 头部 */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1.5">
-            <p className="text-sm text-muted-foreground">
-              编辑完成后点击「转换规则」按钮统一生效。
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">自然语言规则</h3>
+            <p className="text-xs text-muted-foreground">
+              作为 AI 对话上下文生效，由大模型理解和遵守。共 {rules.length} 条。
             </p>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-              <span>最后转换：{formattedUpdatedAt}</span>
-              <span className="text-xs">共 {rules.length} 条</span>
-            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="outline" onClick={() => void onRefresh()} disabled={loading || submitting}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              刷新
-            </Button>
-            <Button
-              size="sm"
-              variant={status === 'pending' ? 'default' : 'outline'}
-              onClick={() => void handleConvert()}
-              disabled={submitting || status === 'running'}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {status === 'pending' ? '转换规则' : '重新转换'}
-            </Button>
-            <Button size="sm" onClick={openCreate} disabled={submitting}>
-              <Plus className="h-3.5 w-3.5" />
-              新增规则
-            </Button>
-          </div>
+          <Button size="sm" onClick={openCreate} disabled={submitting}>
+            <Plus className="h-3.5 w-3.5" />
+            新增规则
+          </Button>
         </div>
 
-        {/* 转换进度条 */}
-        {status === 'running' && (
-          <div className="mt-3 space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>
-                {stepInfo?.label ?? '准备中'}
-                {statusAttempt ? ` (第 ${statusAttempt} 次)` : ''}
-                …
-              </span>
+        {rules.length === 0 && (
+          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            暂无自然语言规则
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {rules.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3"
+            >
+              <div className="min-w-0">
+                <div className="text-sm leading-6 text-foreground">{item.text}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(item)} disabled={submitting}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void onDelete(item.id)}
+                  disabled={submitting}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
-            <Progress value={progressValue} className="h-1.5" />
-          </div>
-        )}
-
-        {/* 错误详情 */}
-        {status === 'error' && statusError && (
-          <details className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
-              <AlertCircle className="h-4 w-4" />
-              转换失败，查看错误详情
-            </summary>
-            <div className="mt-2 whitespace-pre-wrap break-words">{statusError}</div>
-          </details>
-        )}
-
-        {/* 规则列表（固定高度区域） */}
-        <div className="mt-3 min-h-0 flex-1 overflow-auto">
-          <div className="space-y-2">
-            {rules.length === 0 && (
-              <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-                还没有任何调整规则，可以先新增一条自然语言规则。
-              </div>
-            )}
-            {pagedRules.map((item) => (
-              <div
-                key={item.index}
-                className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3"
-              >
-                <div className="min-w-0 space-y-0.5">
-                  <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    Rule {item.index}
-                  </div>
-                  <div className="text-sm leading-6 text-foreground">{item.text}</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(item)} disabled={submitting}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => void handleDelete(item.index)} disabled={submitting}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
-
-        {/* 分页 */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-3 pt-2 border-t text-sm text-muted-foreground">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <span>
-              {currentPage} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* 新增/编辑弹窗 */}
       <Dialog
         open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open)
-          if (!open) {
+        onOpenChange={(v) => {
+          if (!v) {
+            setDialogOpen(false)
             setEditing(null)
             setDraft('')
           }
@@ -273,21 +501,23 @@ export function RuleListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? `编辑规则 ${editing.index}` : '新增规则'}</DialogTitle>
-            <DialogDescription>使用一条清晰、可执行的自然语言规则，系统会自动转换为结构化规则。</DialogDescription>
+            <DialogTitle>{editing ? '编辑规则' : '新增规则'}</DialogTitle>
+            <DialogDescription>
+              用自然语言描述规则，AI 在对话调整时会参考这些规则。
+            </DialogDescription>
           </DialogHeader>
           <Textarea
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="例如：调整零售业当月增速时，仅允许使用正增长企业参与分配。"
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="例如：调整零售业时，尽量避免过大的波动。"
             disabled={submitting}
           />
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
               取消
             </Button>
-            <Button onClick={() => void handleSubmit()} disabled={submitting}>
-              {submitting ? '提交中…' : '保存'}
+            <Button onClick={() => void handleSave()} disabled={submitting}>
+              {submitting ? '保存中…' : '保存'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -296,75 +526,45 @@ export function RuleListView({
   )
 }
 
+// --- 主组件 ---
+
 export default function RuleList() {
-  const rules = useRulesStore((state) => state.rules)
-  const status = useRulesStore((state) => state.status)
-  const statusError = useRulesStore((state) => state.statusError)
-  const statusUpdatedAt = useRulesStore((state) => state.statusUpdatedAt)
-  const statusStep = useRulesStore((state) => state.statusStep)
-  const statusAttempt = useRulesStore((state) => state.statusAttempt)
-  const loading = useRulesStore((state) => state.loading)
-  const submitting = useRulesStore((state) => state.submitting)
-  const loadRules = useRulesStore((state) => state.loadRules)
-  const loadStatus = useRulesStore((state) => state.loadStatus)
-  const addRule = useRulesStore((state) => state.addRule)
-  const updateRule = useRulesStore((state) => state.updateRule)
-  const deleteRule = useRulesStore((state) => state.deleteRule)
-  const convertRules = useRulesStore((state) => state.convertRules)
-  const stopPolling = useRulesStore((state) => state.stopPolling)
+  const constraints = useRulesStore((s) => s.constraints)
+  const naturalRules = useRulesStore((s) => s.naturalRules)
+  const submitting = useRulesStore((s) => s.submitting)
+  const loadConstraints = useRulesStore((s) => s.loadConstraints)
+  const loadNaturalRules = useRulesStore((s) => s.loadNaturalRules)
+  const addConstraint = useRulesStore((s) => s.addConstraint)
+  const updateConstraint = useRulesStore((s) => s.updateConstraint)
+  const deleteConstraint = useRulesStore((s) => s.deleteConstraint)
+  const addNaturalRule = useRulesStore((s) => s.addNaturalRule)
+  const updateNaturalRule = useRulesStore((s) => s.updateNaturalRule)
+  const deleteNaturalRule = useRulesStore((s) => s.deleteNaturalRule)
 
   useEffect(() => {
-    void loadRules()
-    void loadStatus()
-    return () => {
-      stopPolling()
-    }
-  }, [loadRules, loadStatus, stopPolling])
+    void loadConstraints()
+    void loadNaturalRules()
+  }, [loadConstraints, loadNaturalRules])
 
   return (
-    <RuleListView
-      rules={rules}
-      status={status}
-      statusError={statusError}
-      statusUpdatedAt={statusUpdatedAt}
-      statusStep={statusStep}
-      statusAttempt={statusAttempt}
-      loading={loading}
-      submitting={submitting}
-      onAdd={addRule}
-      onEdit={updateRule}
-      onDelete={deleteRule}
-      onRefresh={loadStatus}
-      onConvert={convertRules}
-    />
+    <div data-testid="rule-list" className="space-y-8">
+      <ConstraintSection
+        constraints={constraints}
+        submitting={submitting}
+        onAdd={addConstraint}
+        onUpdate={updateConstraint}
+        onDelete={deleteConstraint}
+      />
+
+      <div className="border-t" />
+
+      <NaturalRuleSection
+        rules={naturalRules}
+        submitting={submitting}
+        onAdd={addNaturalRule}
+        onUpdate={updateNaturalRule}
+        onDelete={deleteNaturalRule}
+      />
+    </div>
   )
-}
-
-function buildStatusMeta(status: RuleListViewProps['status']) {
-  if (status === 'idle') {
-    return { label: '待转换', variant: 'outline' as const }
-  }
-  if (status === 'pending') {
-    return { label: '规则已修改', variant: 'secondary' as const }
-  }
-  if (status === 'running') {
-    return { label: '转换中', variant: 'secondary' as const }
-  }
-  if (status === 'error') {
-    return { label: '转换失败', variant: 'destructive' as const }
-  }
-  return { label: '已生效', variant: 'default' as const }
-}
-
-function formatUpdatedAt(value: string) {
-  if (!value) {
-    return '未完成'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  return `${date.getMonth() + 1}-${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(
-    date.getMinutes()
-  ).padStart(2, '0')}`
 }

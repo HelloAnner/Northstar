@@ -96,7 +96,7 @@ type phase3Env struct {
 }
 
 func TestAIChatPhase3E2E_SettingsAndChatMode(t *testing.T) {
-	env := newPhase3Env(t, "")
+	env := newPhase3Env(t)
 	env.factory.clients = []v3.LLMChatClient{
 		&fakePhase3LLMClient{
 			chunks: []string{"当前批发增速偏高"},
@@ -119,12 +119,7 @@ func TestAIChatPhase3E2E_SettingsAndChatMode(t *testing.T) {
 }
 
 func TestAIChatPhase3E2E_AdjustAndFallback(t *testing.T) {
-	env := newPhase3Env(t, `{
-  "version": "1.0",
-  "rules": [
-    {"id":"c1","name":"limit","type":"clamp_target","indicator":"wholesale_month_rate","max":10}
-  ]
-}`)
+	env := newPhase3Env(t, clampConstraint("wholesale_month_rate", nil, float64Ptr(10)))
 	insertWRRateRow(t, env.store, "W1", "wholesale", 100, 100)
 
 	env.factory.clients = []v3.LLMChatClient{
@@ -162,7 +157,7 @@ func TestAIChatPhase3E2E_AdjustAndFallback(t *testing.T) {
 	}
 }
 
-func newPhase3Env(t *testing.T, roleJSON string) *phase3Env {
+func newPhase3Env(t *testing.T, constraints ...store.AdjustmentConstraint) *phase3Env {
 	t.Helper()
 
 	gin.SetMode(gin.ReleaseMode)
@@ -182,12 +177,13 @@ func newPhase3Env(t *testing.T, roleJSON string) *phase3Env {
 		t.Fatalf("set llm_user_prompt: %v", err)
 	}
 
-	rolePath := filepath.Join(tmpDir, "config", "role.json")
-	if strings.TrimSpace(roleJSON) != "" {
-		writeRoleJSON(t, rolePath, roleJSON)
+	for _, c := range constraints {
+		if _, err := st.CreateAdjustmentConstraint(c); err != nil {
+			t.Fatalf("create constraint: %v", err)
+		}
 	}
 
-	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, rolePath)
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12)
 	if err := engine.ReloadRules(); err != nil {
 		t.Fatalf("reload rules: %v", err)
 	}

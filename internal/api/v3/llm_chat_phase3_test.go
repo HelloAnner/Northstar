@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,7 +58,7 @@ func (f *scriptedClientFactory) newClient(prompt string) (LLMChatClient, error) 
 }
 
 func TestLLMChatPhase3ChatModeIncludesUserPrompt(t *testing.T) {
-	handler, router, _ := newLLMChatPhase3Router(t, "")
+	handler, router, _ := newLLMChatPhase3Router(t, false)
 	client := &scriptedLLMClient{
 		chunks: []string{"当前", "批发增速偏高"},
 		result: llm.ChatResult{Content: "当前批发增速偏高"},
@@ -95,17 +94,7 @@ func TestLLMChatPhase3ChatModeIncludesUserPrompt(t *testing.T) {
 }
 
 func TestLLMChatPhase3AdjustModeRunsOptimize(t *testing.T) {
-	rolePath := filepath.Join(t.TempDir(), "role.json")
-	if err := os.WriteFile(rolePath, []byte(`{
-  "version": "1.0",
-  "rules": [
-    {"id":"c1","name":"limit","type":"clamp_target","indicator":"wholesale_month_rate","max":10}
-  ]
-}`), 0644); err != nil {
-		t.Fatalf("write role.json: %v", err)
-	}
-
-	handler, router, st := newLLMChatPhase3Router(t, rolePath)
+	handler, router, st := newLLMChatPhase3Router(t, true)
 	insertChatPhase3WRRow(t, st)
 
 	intentClient := &scriptedLLMClient{
@@ -144,7 +133,7 @@ func TestLLMChatPhase3AdjustModeRunsOptimize(t *testing.T) {
 }
 
 func TestLLMChatPhase3AdjustModeFallsBackToChat(t *testing.T) {
-	handler, router, st := newLLMChatPhase3Router(t, "")
+	handler, router, st := newLLMChatPhase3Router(t, false)
 	intentClient := &scriptedLLMClient{
 		result: llm.ChatResult{Content: `{"actions":[]}`},
 	}
@@ -179,7 +168,7 @@ func TestLLMChatPhase3AdjustModeFallsBackToChat(t *testing.T) {
 	}
 }
 
-func newLLMChatPhase3Router(t *testing.T, rolePath string) (*Handler, http.Handler, *store.Store) {
+func newLLMChatPhase3Router(t *testing.T, withClamp bool) (*Handler, http.Handler, *store.Store) {
 	t.Helper()
 
 	gin.SetMode(gin.ReleaseMode)
@@ -196,11 +185,21 @@ func newLLMChatPhase3Router(t *testing.T, rolePath string) (*Handler, http.Handl
 		t.Fatalf("set user prompt: %v", err)
 	}
 
-	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12, rolePath)
-	if rolePath != "" {
-		if err := engine.ReloadRules(); err != nil {
-			t.Fatalf("reload rules: %v", err)
+	if withClamp {
+		max := 10.0
+		if _, err := st.CreateAdjustmentConstraint(store.AdjustmentConstraint{
+			Type:        "clamp_target",
+			IndicatorID: "wholesale_month_rate",
+			MaxValue:    &max,
+			Enabled:     true,
+		}); err != nil {
+			t.Fatalf("create constraint: %v", err)
 		}
+	}
+
+	engine := dagcalc.NewEngine(dagcalc.NewGraph(), st, 2025, 12)
+	if err := engine.ReloadRules(); err != nil {
+		t.Fatalf("reload rules: %v", err)
 	}
 	handler := NewHandlerWithEngine(st, "", engine)
 	router := gin.New()

@@ -9,337 +9,202 @@ package v3
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	rulepkg "northstar/internal/rules"
+	"northstar/internal/store"
 )
 
-var numberedRulePattern = regexp.MustCompile(`^\d+\.\s+(.+)$`)
+// --- 硬约束 API ---
 
-// RuleItem 表示 rules.md 中的一条规则。
-type RuleItem struct {
-	Index int    `json:"index"`
-	Text  string `json:"text"`
+// ListConstraints 列出所有硬约束。
+func (h *Handler) ListConstraints(c *gin.Context) {
+	constraints, err := h.store.ListAdjustmentConstraints(false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取约束失败"})
+		return
+	}
+	c.JSON(http.StatusOK, constraints)
 }
 
-type RuleConverter interface {
-	ConvertAsync(mdContent string)
+// CreateConstraint 新增硬约束。
+func (h *Handler) CreateConstraint(c *gin.Context) {
+	var req store.AdjustmentConstraint
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
+		return
+	}
+	if err := validateConstraint(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.Enabled = true
+	id, err := h.store.CreateAdjustmentConstraint(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建约束失败"})
+		return
+	}
+	req.ID = id
+	_ = h.engine.ReloadRules()
+	c.JSON(http.StatusCreated, req)
 }
 
-type rulesStatusResponse struct {
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updatedAt"`
-	Error     string `json:"error"`
-	Step      string `json:"step,omitempty"`
-	Attempt   string `json:"attempt,omitempty"`
+// UpdateConstraint 更新硬约束。
+func (h *Handler) UpdateConstraint(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+	var req store.AdjustmentConstraint
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
+		return
+	}
+	if err := validateConstraint(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.ID = id
+	if err := h.store.UpdateAdjustmentConstraint(req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新约束失败"})
+		return
+	}
+	_ = h.engine.ReloadRules()
+	c.JSON(http.StatusOK, req)
 }
 
-type ruleTextRequest struct {
+// DeleteConstraint 删除硬约束。
+func (h *Handler) DeleteConstraint(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+	if err := h.store.DeleteAdjustmentConstraint(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除约束失败"})
+		return
+	}
+	_ = h.engine.ReloadRules()
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// --- 自然语言规则 API ---
+
+// ListNaturalRules 列出所有自然语言规则。
+func (h *Handler) ListNaturalRules(c *gin.Context) {
+	rules, err := h.store.ListNaturalRules(false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取规则失败"})
+		return
+	}
+	c.JSON(http.StatusOK, rules)
+}
+
+type naturalRuleRequest struct {
 	Text string `json:"text"`
 }
 
-type rulesFileRepo struct {
-	path string
-}
-
-func (r *rulesFileRepo) ReadRules() ([]RuleItem, error) {
-	if strings.TrimSpace(r.path) == "" {
-		return []RuleItem{}, nil
-	}
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []RuleItem{}, nil
-		}
-		return nil, err
-	}
-	lines := strings.Split(string(data), "\n")
-	items := make([]RuleItem, 0)
-	for _, line := range lines {
-		text := parseRuleLine(line)
-		if text == "" {
-			continue
-		}
-		items = append(items, RuleItem{Index: len(items) + 1, Text: text})
-	}
-	return items, nil
-}
-
-func parseRuleLine(line string) string {
-	trimmed := strings.TrimSpace(line)
-	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-		return ""
-	}
-	match := numberedRulePattern.FindStringSubmatch(trimmed)
-	if len(match) != 2 {
-		return ""
-	}
-	return strings.TrimSpace(match[1])
-}
-
-func (r *rulesFileRepo) WriteRules(items []RuleItem) error {
-	if strings.TrimSpace(r.path) == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(r.path), 0755); err != nil {
-		return err
-	}
-	builder := strings.Builder{}
-	builder.WriteString("# 调整规则\n\n")
-	for idx, item := range items {
-		builder.WriteString(strconv.Itoa(idx + 1))
-		builder.WriteString(". ")
-		builder.WriteString(strings.TrimSpace(item.Text))
-		builder.WriteString("\n")
-	}
-	return os.WriteFile(r.path, []byte(builder.String()), 0644)
-}
-
-func (r *rulesFileRepo) ReadContent() (string, error) {
-	if strings.TrimSpace(r.path) == "" {
-		return "", nil
-	}
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-// ConfigureRuleManagement 配置 rules.md 与 role.json 路径。
-func (h *Handler) ConfigureRuleManagement(mdPath string, rolePath string) {
-	h.rulesRepo = &rulesFileRepo{path: mdPath}
-	h.ruleConverterFactory = func() (RuleConverter, error) {
-		return rulepkg.NewConverter(h.store, h.engine, rolePath, mdPath)
-	}
-}
-
-// SetRuleConverterFactory 设置规则转换器工厂，主要用于测试。
-func (h *Handler) SetRuleConverterFactory(factory func() (RuleConverter, error)) {
-	h.ruleConverterFactory = factory
-}
-
-// GetRules 获取规则列表。
-func (h *Handler) GetRules(c *gin.Context) {
-	repo, ok := h.ensureRulesRepo(c)
-	if !ok {
-		return
-	}
-	items, err := repo.ReadRules()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取规则失败"})
-		return
-	}
-	c.JSON(http.StatusOK, items)
-}
-
-// CreateRule 新增规则，仅保存不自动转换。
-func (h *Handler) CreateRule(c *gin.Context) {
-	req, ok := bindRuleTextRequest(c)
-	if !ok {
-		return
-	}
-	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
-		return append(items, RuleItem{Index: len(items) + 1, Text: req.Text}), true
-	})
-	if !ok {
-		return
-	}
-	h.markRulesPending()
-	c.JSON(http.StatusCreated, items)
-}
-
-// UpdateRule 更新指定规则，仅保存不自动转换。
-func (h *Handler) UpdateRule(c *gin.Context) {
-	req, ok := bindRuleTextRequest(c)
-	if !ok {
-		return
-	}
-	index, ok := parseRuleIndex(c)
-	if !ok {
-		return
-	}
-	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
-		if index < 1 || index > len(items) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
-			return nil, false
-		}
-		items[index-1].Text = req.Text
-		return items, true
-	})
-	if !ok {
-		return
-	}
-	h.markRulesPending()
-	c.JSON(http.StatusOK, items)
-}
-
-// DeleteRule 删除指定规则，仅保存不自动转换。
-func (h *Handler) DeleteRule(c *gin.Context) {
-	index, ok := parseRuleIndex(c)
-	if !ok {
-		return
-	}
-	items, _, ok := h.mutateRules(c, func(items []RuleItem) ([]RuleItem, bool) {
-		if index < 1 || index > len(items) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
-			return nil, false
-		}
-		next := append([]RuleItem{}, items[:index-1]...)
-		next = append(next, items[index:]...)
-		return next, true
-	})
-	if !ok {
-		return
-	}
-	h.markRulesPending()
-	c.JSON(http.StatusOK, items)
-}
-
-// ConvertRules 手动触发规则转换。
-func (h *Handler) ConvertRules(c *gin.Context) {
-	repo, ok := h.ensureRulesRepo(c)
-	if !ok {
-		return
-	}
-	content, err := repo.ReadContent()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取规则失败"})
-		return
-	}
-	h.triggerRuleConvert(content)
-	c.JSON(http.StatusOK, gin.H{"status": "running"})
-}
-
-// GetRuleStatus 获取转换状态，单次查询返回全部状态字段。
-func (h *Handler) GetRuleStatus(c *gin.Context) {
-	keys := []string{
-		"rules_convert_status", "rules_convert_at",
-		"rules_convert_error", "rules_convert_step", "rules_convert_attempt",
-	}
-	values, err := h.store.GetConfigBatch(keys)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取状态失败"})
-		return
-	}
-	fallback := func(key string) string {
-		if v, ok := values[key]; ok {
-			return v
-		}
-		return ""
-	}
-	status := fallback("rules_convert_status")
-	if status == "" {
-		status = "idle"
-	}
-	c.JSON(http.StatusOK, rulesStatusResponse{
-		Status:    status,
-		UpdatedAt: fallback("rules_convert_at"),
-		Error:     fallback("rules_convert_error"),
-		Step:      fallback("rules_convert_step"),
-		Attempt:   fallback("rules_convert_attempt"),
-	})
-}
-
-func bindRuleTextRequest(c *gin.Context) (ruleTextRequest, bool) {
-	var req ruleTextRequest
+// CreateNaturalRule 新增自然语言规则。
+func (h *Handler) CreateNaturalRule(c *gin.Context) {
+	var req naturalRuleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
-		return ruleTextRequest{}, false
-	}
-	req.Text = strings.TrimSpace(req.Text)
-	if req.Text == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "text 不能为空"})
-		return ruleTextRequest{}, false
-	}
-	return req, true
-}
-
-func parseRuleIndex(c *gin.Context) (int, bool) {
-	index, err := strconv.Atoi(c.Param("index"))
-	if err != nil || index <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "非法规则序号"})
-		return 0, false
-	}
-	return index, true
-}
-
-func (h *Handler) mutateRules(c *gin.Context, mutate func([]RuleItem) ([]RuleItem, bool)) ([]RuleItem, string, bool) {
-	repo, ok := h.ensureRulesRepo(c)
-	if !ok {
-		return nil, "", false
-	}
-	items, err := repo.ReadRules()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取规则失败"})
-		return nil, "", false
-	}
-	next, ok := mutate(items)
-	if !ok {
-		return nil, "", false
-	}
-	reindexRules(next)
-	if err := repo.WriteRules(next); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入规则失败"})
-		return nil, "", false
-	}
-	content, err := repo.ReadContent()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取规则失败"})
-		return nil, "", false
-	}
-	return next, content, true
-}
-
-func reindexRules(items []RuleItem) {
-	for idx := range items {
-		items[idx].Index = idx + 1
-	}
-}
-
-func (h *Handler) ensureRulesRepo(c *gin.Context) (*rulesFileRepo, bool) {
-	if h.rulesRepo == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "规则管理未初始化"})
-		return nil, false
-	}
-	return h.rulesRepo, true
-}
-
-func (h *Handler) triggerRuleConvert(content string) {
-	converter, err := h.newRuleConverter()
-	if err != nil || converter == nil {
-		if err == nil {
-			err = os.ErrInvalid
-		}
-		_ = h.store.SetConfig("rules_convert_status", "error")
-		_ = h.store.SetConfig("rules_convert_error", err.Error())
 		return
 	}
-	converter.ConvertAsync(content)
-}
-
-func (h *Handler) newRuleConverter() (RuleConverter, error) {
-	if h.ruleConverterFactory == nil {
-		return nil, nil
+	text := strings.TrimSpace(req.Text)
+	if text == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "规则内容不能为空"})
+		return
 	}
-	return h.ruleConverterFactory()
-}
-
-// markRulesPending 标记规则已修改、待转换。
-func (h *Handler) markRulesPending() {
-	_ = h.store.SetConfig("rules_convert_status", "pending")
-}
-
-func (h *Handler) getRuleConfig(key string, fallback string) string {
-	value, err := h.store.GetConfig(key)
+	id, err := h.store.CreateNaturalRule(text)
 	if err != nil {
-		return fallback
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建规则失败"})
+		return
 	}
-	return value
+	c.JSON(http.StatusCreated, store.NaturalRule{ID: id, Text: text, Enabled: true})
 }
+
+// UpdateNaturalRule 更新自然语言规则。
+func (h *Handler) UpdateNaturalRule(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+	var req naturalRuleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
+		return
+	}
+	text := strings.TrimSpace(req.Text)
+	if text == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "规则内容不能为空"})
+		return
+	}
+	if err := h.store.UpdateNaturalRule(id, text, true); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新规则失败"})
+		return
+	}
+	c.JSON(http.StatusOK, store.NaturalRule{ID: id, Text: text, Enabled: true})
+}
+
+// DeleteNaturalRule 删除自然语言规则。
+func (h *Handler) DeleteNaturalRule(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+	if err := h.store.DeleteNaturalRule(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除规则失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// --- helpers ---
+
+func parseIDParam(c *gin.Context) (int64, bool) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法 ID"})
+		return 0, false
+	}
+	return id, true
+}
+
+func validateConstraint(c store.AdjustmentConstraint) error {
+	switch c.Type {
+	case "clamp_target":
+		if c.IndicatorID == "" {
+			return errMsg("indicatorId 不能为空")
+		}
+		if c.MinValue == nil && c.MaxValue == nil {
+			return errMsg("min 和 max 不能同时为空")
+		}
+	case "filter_allocation":
+		if c.IndicatorID == "" {
+			return errMsg("indicatorId 不能为空")
+		}
+		if c.FilterMode == "" {
+			return errMsg("filterMode 不能为空")
+		}
+	case "compensate":
+		if c.TriggerID == "" {
+			return errMsg("triggerId 不能为空")
+		}
+		if c.EnsureID == "" {
+			return errMsg("ensureId 不能为空")
+		}
+		if c.Relation != "gte" && c.Relation != "lte" {
+			return errMsg("relation 必须为 gte 或 lte")
+		}
+	default:
+		return errMsg("未知约束类型: " + c.Type)
+	}
+	return nil
+}
+
+type constraintError string
+
+func (e constraintError) Error() string { return string(e) }
+func errMsg(msg string) error           { return constraintError(msg) }

@@ -8,151 +8,132 @@
 import { createStore } from 'zustand/vanilla'
 import { useStore } from 'zustand'
 import { toast } from 'sonner'
-import { rulesApi, type RuleItem, type RuleStatus } from '@/services/api'
-
-export type RulesConvertStatus = 'idle' | 'pending' | 'running' | 'ok' | 'error'
+import {
+  constraintsApi,
+  naturalRulesApi,
+  type AdjustmentConstraint,
+  type NaturalRule,
+} from '@/services/api'
 
 export interface RulesStoreState {
-  rules: RuleItem[]
-  status: RulesConvertStatus
-  statusError: string
-  statusUpdatedAt: string
-  statusStep: string
-  statusAttempt: string
-  loading: boolean
-  submitting: boolean
-  pollingTimer: number | null
-  loadRules: () => Promise<void>
-  addRule: (text: string) => Promise<void>
-  updateRule: (index: number, text: string) => Promise<void>
-  deleteRule: (index: number) => Promise<void>
-  convertRules: () => Promise<void>
-  loadStatus: () => Promise<void>
-  startPolling: () => void
-  stopPolling: () => void
-}
+  // 硬约束
+  constraints: AdjustmentConstraint[]
+  constraintsLoading: boolean
 
-const pollingIntervalMs = 3000
+  // 自然语言规则
+  naturalRules: NaturalRule[]
+  naturalRulesLoading: boolean
+
+  // 通用
+  submitting: boolean
+
+  // 硬约束操作
+  loadConstraints: () => Promise<void>
+  addConstraint: (data: Omit<AdjustmentConstraint, 'id'>) => Promise<void>
+  updateConstraint: (id: number, data: Omit<AdjustmentConstraint, 'id'>) => Promise<void>
+  deleteConstraint: (id: number) => Promise<void>
+
+  // 自然语言规则操作
+  loadNaturalRules: () => Promise<void>
+  addNaturalRule: (text: string) => Promise<void>
+  updateNaturalRule: (id: number, text: string) => Promise<void>
+  deleteNaturalRule: (id: number) => Promise<void>
+}
 
 export function createRulesStore() {
   return createStore<RulesStoreState>((set, get) => ({
-    rules: [],
-    status: 'idle',
-    statusError: '',
-    statusUpdatedAt: '',
-    statusStep: '',
-    statusAttempt: '',
-    loading: false,
+    constraints: [],
+    constraintsLoading: false,
+    naturalRules: [],
+    naturalRulesLoading: false,
     submitting: false,
-    pollingTimer: null,
 
-    loadRules: async () => {
-      set({ loading: true })
+    loadConstraints: async () => {
+      set({ constraintsLoading: true })
       try {
-        const rules = await rulesApi.list()
-        set({ rules })
+        const constraints = await constraintsApi.list()
+        set({ constraints })
       } finally {
-        set({ loading: false })
+        set({ constraintsLoading: false })
       }
     },
 
-    addRule: async (text) => {
-      await mutateRules(set, get, () => rulesApi.create(text))
-    },
-
-    updateRule: async (index, text) => {
-      await mutateRules(set, get, () => rulesApi.update(index, text))
-    },
-
-    deleteRule: async (index) => {
-      await mutateRules(set, get, () => rulesApi.remove(index))
-    },
-
-    convertRules: async () => {
+    addConstraint: async (data) => {
       set({ submitting: true })
       try {
-        await rulesApi.convert()
-        set({ status: 'running', statusError: '', statusStep: '', statusAttempt: '' })
-        get().startPolling()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '触发规则转换失败'
-        set({ status: 'error', statusError: msg })
-        toast.error(msg)
+        await constraintsApi.create(data)
+        await get().loadConstraints()
+        toast.success('���束已添加')
       } finally {
         set({ submitting: false })
       }
     },
 
-    loadStatus: async () => {
-      const status = await rulesApi.status()
-      applyRuleStatus(set, get, status)
+    updateConstraint: async (id, data) => {
+      set({ submitting: true })
+      try {
+        await constraintsApi.update(id, data)
+        await get().loadConstraints()
+        toast.success('约束已更新')
+      } finally {
+        set({ submitting: false })
+      }
     },
 
-    startPolling: () => {
-      if (get().pollingTimer != null) {
-        return
+    deleteConstraint: async (id) => {
+      set({ submitting: true })
+      try {
+        await constraintsApi.remove(id)
+        await get().loadConstraints()
+        toast.success('约束已删除')
+      } finally {
+        set({ submitting: false })
       }
-      const timer = window.setInterval(async () => {
-        await get().loadStatus()
-      }, pollingIntervalMs)
-      set({ pollingTimer: timer })
     },
 
-    stopPolling: () => {
-      const timer = get().pollingTimer
-      if (timer != null) {
-        window.clearInterval(timer)
+    loadNaturalRules: async () => {
+      set({ naturalRulesLoading: true })
+      try {
+        const naturalRules = await naturalRulesApi.list()
+        set({ naturalRules })
+      } finally {
+        set({ naturalRulesLoading: false })
       }
-      set({ pollingTimer: null })
+    },
+
+    addNaturalRule: async (text) => {
+      set({ submitting: true })
+      try {
+        await naturalRulesApi.create(text)
+        await get().loadNaturalRules()
+        toast.success('规则已添加')
+      } finally {
+        set({ submitting: false })
+      }
+    },
+
+    updateNaturalRule: async (id, text) => {
+      set({ submitting: true })
+      try {
+        await naturalRulesApi.update(id, text)
+        await get().loadNaturalRules()
+        toast.success('规则已更新')
+      } finally {
+        set({ submitting: false })
+      }
+    },
+
+    deleteNaturalRule: async (id) => {
+      set({ submitting: true })
+      try {
+        await naturalRulesApi.remove(id)
+        await get().loadNaturalRules()
+        toast.success('规则已删除')
+      } finally {
+        set({ submitting: false })
+      }
     },
   }))
-}
-
-async function mutateRules(
-  set: (partial: Partial<RulesStoreState>) => void,
-  get: () => RulesStoreState,
-  action: () => Promise<unknown>
-) {
-  set({ submitting: true })
-  try {
-    await action()
-    await get().loadRules()
-    set({ status: 'pending' })
-  } finally {
-    set({ submitting: false })
-  }
-}
-
-function applyRuleStatus(
-  set: (partial: Partial<RulesStoreState>) => void,
-  get: () => RulesStoreState,
-  status: RuleStatus
-) {
-  const prevStatus = get().status
-  // pending 是客户端状态（规则已修改未转换），只有 running 到来时才覆盖
-  const nextStatus = prevStatus === 'pending' && status.status !== 'running'
-    ? 'pending'
-    : status.status
-  set({
-    status: nextStatus,
-    statusError: status.error,
-    statusUpdatedAt: status.updatedAt,
-    statusStep: status.step ?? '',
-    statusAttempt: status.attempt ?? '',
-  })
-
-  // 状态变化时发送 Toast 通知
-  if (prevStatus === 'running' && status.status === 'ok') {
-    toast.success('规则转换成功，已生效')
-  } else if (prevStatus === 'running' && status.status === 'error') {
-    toast.error('规则转换失败：' + (status.error || '未知错误'))
-  }
-
-  if (status.status === 'running') {
-    get().startPolling()
-    return
-  }
-  get().stopPolling()
 }
 
 const rulesStore = createRulesStore()

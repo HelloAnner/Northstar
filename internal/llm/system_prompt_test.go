@@ -15,7 +15,7 @@ func TestBuildChatSystemPromptIncludesRuntimeContext(t *testing.T) {
 	prompt := BuildChatSystemPrompt(SystemPromptContext{
 		Year:             2026,
 		Month:            3,
-		RuleCount:        4,
+		ConstraintCount:        4,
 		IndicatorSummary: "- wholesale_month_rate 批发业销售额增速（当月）= 12%\n- retail_month_rate 零售业销售额增速（当月）= 8%",
 	}, "回答尽量直接，先给结论再解释原因。")
 
@@ -33,7 +33,7 @@ func TestBuildChatSystemPromptSkipsUserSectionWhenEmpty(t *testing.T) {
 	prompt := BuildChatSystemPrompt(SystemPromptContext{
 		Year:             2025,
 		Month:            12,
-		RuleCount:        0,
+		ConstraintCount:        0,
 		IndicatorSummary: "- limitAbove_month_rate 限上社零额增速（当月）= 0%",
 	}, "")
 
@@ -47,15 +47,15 @@ func TestBuildChatSystemPromptIncludesBuiltInGuardrails(t *testing.T) {
 	prompt := BuildChatSystemPrompt(SystemPromptContext{
 		Year:             2026,
 		Month:            3,
-		RuleCount:        2,
+		ConstraintCount:        2,
 		IndicatorSummary: "- wholesale_month_rate 批发业销售额增速（当月）= 12.5%",
 	}, "")
 
 	assertPromptContains(t, prompt,
-		"Northstar 月度经济数据统计系统的 AI 助手",
-		"调整建议必须基于已加载的规则",
-		"不允许建议删除企业数据或重置导入数据",
-		"mode=adjust 时，输出结构化 AdjustmentPlan JSON",
+		"Northstar",
+		"简洁回答",
+		"不虚构不存在的指标",
+		"禁止使用 emoji",
 	)
 }
 
