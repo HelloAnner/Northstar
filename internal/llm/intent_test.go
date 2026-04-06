@@ -33,7 +33,7 @@ func TestParseIntentReturnsAdjustmentPlan(t *testing.T) {
 	plan, err := ParseIntent(client, "把批发当月增速调整到 15%", map[string]float64{
 		"wholesale_month_rate": 12,
 		"retail_month_rate":    8,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("parse intent: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestParseIntentAllowsEmptyActions(t *testing.T) {
 
 	plan, err := ParseIntent(client, "当前零售增速为什么偏低？", map[string]float64{
 		"retail_month_rate": 8,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("parse intent: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestParseIntentRejectsInvalidIndicator(t *testing.T) {
 
 	_, err := ParseIntent(client, "调整指标", map[string]float64{
 		"wholesale_month_rate": 12,
-	})
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "bad_indicator") {
 		t.Fatalf("expected invalid indicator error, got %v", err)
 	}
@@ -96,7 +96,7 @@ func TestParseIntentAcceptsSetIndicatorAlias(t *testing.T) {
 
 	plan, err := ParseIntent(client, "把批发当月增速调到 18%", map[string]float64{
 		"wholesale_month_rate": 12,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("parse intent: %v", err)
 	}

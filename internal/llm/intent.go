@@ -58,13 +58,14 @@ type IntentClient interface {
 
 // BuildIntentSystemPrompt 返回结构化意图解析提示词。
 func BuildIntentSystemPrompt() string {
-	return strings.TrimSpace(`你是意图解析器，从用户输入提取调整动作。只输出纯 JSON，不要输出其他任何文字。
+	return strings.TrimSpace(`你是意图解析器，从用户输入和对话上下文提取调整动作。只输出纯 JSON，不要输出其他任何文字。
 
 分类规则：
 - “调到 X”、”设为 X” → set_target
 - “调整 X%”、”增加/减少 X%” → adjust_percent
 - “不能超过”、”限制”、”加一条规则” → add_rule
-- 打招呼、咨询、提问 → {“actions”:[]}（空数组，不要猜测动作）
+- 用户确认上一轮AI提出的调整方案（”可以”、”好的”、”执行”、”确认”）→ 从上下文中提取AI提出的具体调整动作
+- 打招呼、纯咨询、提问 → {“actions”:[]}（空数组，不要猜测动作）
 
 合法指标 ID（只能用这些）：
 limitAbove_month_value, limitAbove_month_rate, limitAbove_cumulative_value, limitAbove_cumulative_rate,
@@ -84,16 +85,30 @@ totalSocial_cumulative_value, totalSocial_cumulative_rate
 }
 
 // ParseIntent 将用户输入解析为结构化调整计划。
-func ParseIntent(client IntentClient, userMsg string, indicators map[string]float64) (*AdjustmentPlan, error) {
+// history 提供对话上下文，帮助理解指代和确认类消息（如"可以"、"好的"）。
+func ParseIntent(client IntentClient, userMsg string, indicators map[string]float64, history []ChatMessage) (*AdjustmentPlan, error) {
 	if client == nil {
 		return nil, fmt.Errorf("intent client is nil")
 	}
 
+	messages := make([]ChatMessage, 0, len(history)+1)
+	// 传入最近几轮对话上下文（最多 6 条），帮助理解指代
+	if len(history) > 0 {
+		start := 0
+		if len(history) > 6 {
+			start = len(history) - 6
+		}
+		for _, m := range history[start:] {
+			messages = append(messages, ChatMessage{Role: m.Role, Content: m.Content})
+		}
+	}
+	messages = append(messages, ChatMessage{
+		Role:    "user",
+		Content: buildIntentUserMessage(userMsg, indicators),
+	})
+
 	result, err := client.Chat(context.Background(), ChatRequest{
-		Messages: []ChatMessage{{
-			Role:    "user",
-			Content: buildIntentUserMessage(userMsg, indicators),
-		}},
+		Messages: messages,
 	}, nil)
 	if err != nil {
 		return nil, err

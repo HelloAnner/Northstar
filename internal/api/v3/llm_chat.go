@@ -235,11 +235,17 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
+	// 构建对话历史用于意图解析上下文
+	history := make([]llm.ChatMessage, 0, len(chatCtx.request.Messages))
+	for _, m := range chatCtx.request.Messages {
+		history = append(history, llm.ChatMessage{Role: m.Role, Content: m.Content})
+	}
+
 	intentClient, err := h.newLLMClient(llm.BuildIntentSystemPrompt())
 	if err != nil {
 		return nil, err
 	}
-	plan, err := llm.ParseIntent(intentClient, userMsg, buildIndicatorValueMap(chatCtx.groups))
+	plan, err := llm.ParseIntent(intentClient, userMsg, buildIndicatorValueMap(chatCtx.groups), history)
 	if err != nil {
 		return nil, err
 	}
