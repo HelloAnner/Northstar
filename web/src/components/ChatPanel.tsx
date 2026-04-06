@@ -450,22 +450,36 @@ function RuleAddedCard({ ruleAdded }: { ruleAdded: RuleAddedPayload }) {
 // ─── 消息气泡 ────────────────────────────────────────────
 
 const proseClasses = [
-  'prose prose-sm max-w-none',
-  'text-stone-700 dark:text-stone-300',
-  // 段落间距
+  'prose prose-sm dark:prose-invert max-w-none',
+  // 段落
   'prose-p:my-2 prose-p:leading-[1.75]',
   // 列表
   'prose-ul:my-2.5 prose-ol:my-2.5 prose-li:my-0.5',
   // 标题
-  'prose-headings:my-3 prose-headings:text-stone-800 prose-headings:font-semibold dark:prose-headings:text-stone-200',
+  'prose-headings:my-3 prose-headings:font-semibold',
+  'prose-h3:text-sm prose-h3:mt-4',
   // 加粗
-  'prose-strong:text-stone-800 dark:prose-strong:text-stone-200',
+  'prose-strong:font-semibold',
   // 分割线
-  'prose-hr:my-4 prose-hr:border-stone-200 dark:prose-hr:border-stone-700',
+  'prose-hr:my-4',
+  // 代码
+  'prose-code:before:content-none prose-code:after:content-none prose-code:rounded prose-code:bg-stone-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:font-normal dark:prose-code:bg-stone-800',
   // 表格
-  'prose-table:my-3 prose-th:px-3 prose-th:py-1.5 prose-th:text-left prose-th:font-medium prose-th:text-stone-600 dark:prose-th:text-stone-400',
-  'prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-stone-100 dark:prose-td:border-stone-800',
+  'prose-table:my-3 prose-table:text-xs prose-table:border prose-table:border-stone-200 dark:prose-table:border-stone-700',
+  'prose-thead:bg-stone-50 dark:prose-thead:bg-stone-800/50',
+  'prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:border prose-th:border-stone-200 dark:prose-th:border-stone-700',
+  'prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-stone-200 dark:prose-td:border-stone-700',
 ].join(' ')
+
+/** 修复 Markdown 格式：确保表格和标题前后有空行，防止被解析为内联文本 */
+function normalizeMarkdown(text: string): string {
+  let result = text
+  // 确保 ### 标题前有空行
+  result = result.replace(/([^\n])\n(#{1,6}\s)/g, '$1\n\n$2')
+  // 确保表格起始行（含 |）前有空行
+  result = result.replace(/([^\n|])\n(\|[^\n]+\|)/g, '$1\n\n$2')
+  return fixMarkdownBold(result)
+}
 
 function MessageBubble({ message }: { message: ChatPanelMessage }) {
   const isUser = message.role === 'user'
@@ -527,7 +541,7 @@ function MessageBubble({ message }: { message: ChatPanelMessage }) {
         {/* 正文 */}
         {message.content.trim() && (
           <div className={proseClasses}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdownBold(message.content)}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(message.content)}</ReactMarkdown>
           </div>
         )}
         {message.streaming && <span className="inline-block h-4 w-0.5 animate-pulse bg-stone-400" />}
