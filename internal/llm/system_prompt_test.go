@@ -38,9 +38,30 @@ func TestBuildChatSystemPromptSkipsUserSectionWhenEmpty(t *testing.T) {
 	}, "")
 
 	assertPromptContains(t, prompt, "2025年12月", "limitAbove_month_rate")
-	if strings.Contains(prompt, "---") {
-		t.Fatalf("empty user prompt should not render separator: %s", prompt)
+	if strings.Contains(prompt, "用户偏好提示词") {
+		t.Fatalf("empty user prompt should not render user prompt section: %s", prompt)
 	}
+}
+
+func TestBuildChatSystemPromptIncludesBackgroundKnowledge(t *testing.T) {
+	prompt := BuildChatSystemPrompt(SystemPromptContext{
+		Year:             2026,
+		Month:            3,
+		ConstraintCount:  0,
+		IndicatorSummary: "- test = 0",
+	}, "")
+
+	assertPromptContains(t, prompt,
+		"社会消费品零售总额",
+		"限额以上",
+		"批发业",
+		"零售业",
+		"住宿业",
+		"餐饮业",
+		"吃穿用",
+		"小微企业",
+		"调整机制",
+	)
 }
 
 func TestBuildChatSystemPromptIncludesBuiltInGuardrails(t *testing.T) {
