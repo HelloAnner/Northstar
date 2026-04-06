@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Check, Loader2, X, Zap, BrainCircuit, Radio, Wrench } from 'lucide-react'
 import RuleList from '@/components/RuleList'
+import SystemPromptEditor from '@/components/SystemPromptEditor'
 
 interface GlobalConfigDialogProps {
   open: boolean
@@ -47,6 +48,7 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
           <TabsList className="w-fit shrink-0">
             <TabsTrigger value="llm">模型配置</TabsTrigger>
             <TabsTrigger value="rules">规则列表</TabsTrigger>
+            <TabsTrigger value="system-prompt">系统提示词</TabsTrigger>
           </TabsList>
 
           <TabsContent value="llm" className="flex-1 min-h-0 mt-4 data-[state=active]:flex flex-col">
@@ -55,6 +57,10 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
 
           <TabsContent value="rules" className="flex-1 min-h-0 overflow-auto mt-4 data-[state=active]:flex flex-col">
             <RuleList />
+          </TabsContent>
+
+          <TabsContent value="system-prompt" className="flex-1 min-h-0 overflow-auto mt-4 data-[state=active]:flex flex-col">
+            <SystemPromptEditor embedded />
           </TabsContent>
         </Tabs>
       </DialogContent>

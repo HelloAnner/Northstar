@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 const MAX_LENGTH = 5000
 
-export default function SystemPromptEditor() {
+export default function SystemPromptEditor({ embedded = false }: { embedded?: boolean }) {
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -52,6 +52,33 @@ export default function SystemPromptEditor() {
   const count = Array.from(value).length
   const exceeded = count > MAX_LENGTH
 
+  const content = (
+    <div className="flex flex-col flex-1 min-h-0 space-y-3">
+      {!embedded && (
+        <p className="text-sm text-muted-foreground">
+          定义 AI 助手的业务背景知识和回答规则。修改后对所有新对话生效。
+        </p>
+      )}
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={loaded ? '' : '加载中…'}
+        className="flex-1 min-h-[300px] font-mono text-sm leading-relaxed"
+        disabled={!loaded}
+      />
+      <div className="flex items-center justify-between text-sm shrink-0">
+        <span className={exceeded ? 'text-destructive' : 'text-muted-foreground'}>
+          {count}/{MAX_LENGTH}
+        </span>
+        <Button onClick={() => void handleSave()} disabled={saving || exceeded || !loaded}>
+          {saving ? '保存中…' : '保存'}
+        </Button>
+      </div>
+    </div>
+  )
+
+  if (embedded) return content
+
   return (
     <Card>
       <CardHeader>
@@ -60,23 +87,7 @@ export default function SystemPromptEditor() {
           定义 AI 助手的业务背景知识和回答规则。修改后对所有新对话生效。
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Textarea
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={loaded ? '' : '加载中…'}
-          className="min-h-[400px] font-mono text-sm leading-relaxed"
-          disabled={!loaded}
-        />
-        <div className="flex items-center justify-between text-sm">
-          <span className={exceeded ? 'text-destructive' : 'text-muted-foreground'}>
-            {count}/{MAX_LENGTH}
-          </span>
-          <Button onClick={() => void handleSave()} disabled={saving || exceeded || !loaded}>
-            {saving ? '保存中…' : '保存'}
-          </Button>
-        </div>
-      </CardContent>
+      <CardContent>{content}</CardContent>
     </Card>
   )
 }

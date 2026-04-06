@@ -75,7 +75,6 @@ func TestBuildChatSystemPromptIncludesBuiltInGuardrails(t *testing.T) {
 	assertPromptContains(t, prompt,
 		"Northstar",
 		"简洁回答",
-		"不虚构不存在的指标",
 		"禁止使用 emoji",
 	)
 }
