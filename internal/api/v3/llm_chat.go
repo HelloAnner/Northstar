@@ -42,10 +42,11 @@ type llmChatRequest struct {
 
 type adjustedTarget struct {
 	IndicatorID string  `json:"indicatorId"`
-	Target      float64 `json:"target"`      // 请求的目标值
-	Actual      float64 `json:"actual"`      // 引擎执行后的实际值
-	Delta       float64 `json:"delta"`       // 偏差 = actual - target
-	Converged   bool    `json:"converged"`   // |delta| < 阈值
+	Target      float64 `json:"target"`             // 请求的目标值
+	Actual      float64 `json:"actual"`             // 引擎执行后的实际值
+	Delta       float64 `json:"delta"`              // 偏差 = actual - target
+	Converged   bool    `json:"converged"`          // |delta| < 阈值
+	Reason      string  `json:"reason,omitempty"`   // 不收敛时的原因说明
 }
 
 type llmResultPayload struct {
@@ -281,6 +282,10 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
+	// 验证：对比请求的目标值 vs 引擎执行后的实际值
+	actualValues := buildIndicatorValueMap(resp.Groups)
+	adjustedList := buildVerifiedTargets(targets, actualValues, resp.AppliedRules)
+
 	summaryPrompt := h.buildChatPrompt(chatCtx.year, chatCtx.month, resp.Groups, chatCtx.userPrompt)
 	if chatCtx.reasoning {
 		summaryPrompt += reasoningSuffix
@@ -297,6 +302,7 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 				plan.Actions,
 				resp.Groups,
 				resp.AppliedRules,
+				adjustedList,
 			),
 		}},
 		Year:  chatCtx.year,
@@ -305,10 +311,6 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 	if err != nil {
 		return nil, err
 	}
-
-	// 验证：对比请求的目标值 vs 引擎执行后的实际值
-	actualValues := buildIndicatorValueMap(resp.Groups)
-	adjustedList := buildVerifiedTargets(targets, actualValues)
 
 	return &llmResultPayload{
 		Mode:            "adjust",
@@ -349,10 +351,9 @@ func adjustByPercent(indicatorID string, current float64, percent float64) float
 }
 
 // buildVerifiedTargets 对比请求目标和实际结果，生成验证后的调整列表。
-// 阈值：增速指标允许 2 个百分点偏差，数值指标允许 2% 偏差。
-func buildVerifiedTargets(targets map[string]float64, actual map[string]float64) []adjustedTarget {
-	const rateThreshold = 2.0    // 百分点
-	const valueThreshold = 0.02  // 2%
+func buildVerifiedTargets(targets map[string]float64, actual map[string]float64, appliedRules []dagcalc.AppliedRule) []adjustedTarget {
+	const rateThreshold = 2.0
+	const valueThreshold = 0.02
 
 	list := make([]adjustedTarget, 0, len(targets))
 	for id, target := range targets {
@@ -370,15 +371,50 @@ func buildVerifiedTargets(targets map[string]float64, actual map[string]float64)
 			}
 		}
 
+		reason := ""
+		if !converged {
+			reason = diagnoseDeviation(id, target, actualVal, appliedRules)
+		}
+
 		list = append(list, adjustedTarget{
 			IndicatorID: id,
 			Target:      math.Round(target*100) / 100,
 			Actual:      math.Round(actualVal*100) / 100,
 			Delta:       math.Round(delta*100) / 100,
 			Converged:   converged,
+			Reason:      reason,
 		})
 	}
 	return list
+}
+
+// diagnoseDeviation 诊断指标未收敛的原因。
+func diagnoseDeviation(indicatorID string, target, actual float64, appliedRules []dagcalc.AppliedRule) string {
+	// 检查是否被 clamp 裁剪
+	for _, rule := range appliedRules {
+		if rule.Type == "clamp_target" && rule.IndicatorID == indicatorID && rule.BeforeValue != rule.AfterValue {
+			return fmt.Sprintf("被约束裁剪：目标 %.0f 超出允许范围，裁剪为 %.0f", rule.BeforeValue, rule.AfterValue)
+		}
+	}
+	// 检查是否被 filter 导致企业不足
+	for _, rule := range appliedRules {
+		if rule.Type == "filter_allocation" && rule.IndicatorID == indicatorID && rule.AfterCount < rule.BeforeCount {
+			return fmt.Sprintf("过滤规则生效：仅 %d/%d 家企业参与分配，调整能力受限", rule.AfterCount, rule.BeforeCount)
+		}
+	}
+	// 增速指标特殊诊断
+	if strings.HasSuffix(indicatorID, "_rate") {
+		if actual == -100 || math.IsInf(actual, 0) || math.IsNaN(actual) {
+			return "上年同期基数为 0，增速无法计算。建议先导入或构造上年同期数据"
+		}
+		if math.Abs(actual) > 500 {
+			return "上年同期基数过小，导致增速计算结果异常。建议调整基数数据"
+		}
+	}
+	if actual == 0 && target != 0 {
+		return "当前无有效企业数据，调整无法生效。建议先导入企业数据"
+	}
+	return fmt.Sprintf("偏差 %.1f，可能由企业数据分布或舍入导致", math.Abs(actual-target))
 }
 
 // addRuleFromChat 通过聊天添加自然语言规则，直接写入数据库
@@ -604,6 +640,7 @@ func buildAdjustSummaryMessage(
 	actions []llm.AdjustmentAction,
 	groups []dagcalc.IndicatorGroup,
 	appliedRules []dagcalc.AppliedRule,
+	verified []adjustedTarget,
 ) string {
 	lines := []string{
 		"请根据以下真实执行结果，生成一段给用户看的简洁中文总结。",
@@ -618,6 +655,22 @@ func buildAdjustSummaryMessage(
 			fmt.Sprintf("- %s -> %.0f", action.IndicatorID, action.Value),
 		)
 	}
+
+	// 验证结果（关键信息）
+	lines = append(lines, "", "验证结果（目标 vs 实际）：")
+	allOk := true
+	for _, v := range verified {
+		status := "✓ 达标"
+		if !v.Converged {
+			status = "✗ 未达标"
+			allOk = false
+		}
+		lines = append(lines, fmt.Sprintf("- %s：目标 %.1f，实际 %.1f，偏差 %.1f → %s", v.IndicatorID, v.Target, v.Actual, v.Delta, status))
+		if v.Reason != "" {
+			lines = append(lines, fmt.Sprintf("  原因：%s", v.Reason))
+		}
+	}
+
 	lines = append(lines, "", "规则生效情况：")
 	ruleLines := formatAppliedRules(appliedRules)
 	lines = append(lines, ruleLines...)
@@ -626,10 +679,15 @@ func buildAdjustSummaryMessage(
 	lines = append(lines,
 		"",
 		"要求：",
-		"1. 明确说明系统已经实际执行了哪些调整",
-		"2. 如有规则裁剪或过滤，要直接告诉用户",
-		"3. 不要编造未执行的企业修改",
+		"1. 明确说明系统已经实际执行了哪些调整及其验证结果",
+		"2. 如有指标未达标，必须说明具体原因和给用户的解决建议",
+		"3. 如有规则裁剪或过滤，要直接告诉用户",
 	)
+	if !allOk {
+		lines = append(lines,
+			"4. 由于存在未达标指标，必须给用户解释为什么调整不到预期值，并给出具体的修复建议（如：需要先导入上年同期数据、需要调整基数等）",
+		)
+	}
 	return strings.Join(lines, "\n")
 }
 

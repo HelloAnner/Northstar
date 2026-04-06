@@ -50,6 +50,7 @@ interface AdjustedTarget {
   actual: number
   delta: number
   converged: boolean
+  reason?: string
 }
 
 interface StreamResultPayload {
@@ -366,7 +367,12 @@ function AdjustmentCard({ targets, rules }: { targets: AdjustedTarget[]; rules: 
                   const label = INDICATOR_LABEL_MAP[t.indicatorId] ?? t.indicatorId
                   return (
                     <tr key={t.indicatorId} className="border-t border-stone-100/60 dark:border-stone-800/20">
-                      <td className="px-3.5 py-2 text-stone-600 dark:text-stone-400">{label}</td>
+                      <td className="px-3.5 py-2 text-stone-600 dark:text-stone-400">
+                        {label}
+                        {!t.converged && t.reason && (
+                          <div className="mt-1 text-[10px] leading-tight text-amber-600 dark:text-amber-400">{t.reason}</div>
+                        )}
+                      </td>
                       <td className="px-3.5 py-2 text-right text-stone-500">{Math.round(t.target)}</td>
                       <td className="px-3.5 py-2 text-right font-semibold text-stone-700 dark:text-stone-300">{Math.round(t.actual)}</td>
                       <td className={`px-3.5 py-2 text-right ${Math.abs(t.delta) < 0.5 ? 'text-stone-400' : 'text-amber-600 dark:text-amber-400'}`}>
