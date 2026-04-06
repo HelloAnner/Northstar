@@ -22,6 +22,12 @@ type sqlExecer interface {
 }
 
 func (s *Store) normalizeIndicatorRuleIdentifiers() error {
+	// Skip migration if indicator_definitions table doesn't exist (fresh database)
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='indicator_definitions'`).Scan(&n); err != nil || n == 0 {
+		return nil
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin normalize identifier tx failed: %w", err)
