@@ -39,7 +39,7 @@ export default function GlobalConfigDialog({ open, onOpenChange }: GlobalConfigD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[70vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>全局配置</DialogTitle>
         </DialogHeader>

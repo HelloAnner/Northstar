@@ -1,12 +1,12 @@
 /**
- * 规则列表 — 硬约束 + 自然语言规则
+ * 规则列表 — 硬约束 + 自然语言规则（支持搜索和分页）
  *
  * @author Anner
  * Created on 2026/3/14
  */
 
-import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,8 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { useRulesStore } from '@/store/rulesStore'
 import type { AdjustmentConstraint, NaturalRule } from '@/services/api'
+
+const PAGE_SIZE = 6
 
 // --- 指标选项 ---
 
@@ -65,6 +67,41 @@ const CONSTRAINT_TYPE_LABELS: Record<string, string> = {
   compensate: '联动补偿',
 }
 
+// --- 通用分页组件 ---
+
+function Pagination({ current, total, onChange }: { current: number; total: number; onChange: (p: number) => void }) {
+  if (total <= 1) return null
+  return (
+    <div className="flex items-center justify-center gap-2 pt-2 text-sm text-muted-foreground">
+      <Button variant="outline" size="sm" disabled={current <= 1} onClick={() => onChange(current - 1)}>
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </Button>
+      <span>{current} / {total}</span>
+      <Button variant="outline" size="sm" disabled={current >= total} onClick={() => onChange(current + 1)}>
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
+}
+
+// --- 搜索匹配 ---
+
+function matchConstraint(c: AdjustmentConstraint, query: string): boolean {
+  const q = query.toLowerCase()
+  const indicator = INDICATOR_OPTIONS.find((o) => o.value === c.indicatorId)?.label ?? c.indicatorId ?? ''
+  const trigger = INDICATOR_OPTIONS.find((o) => o.value === c.triggerId)?.label ?? c.triggerId ?? ''
+  const ensure = INDICATOR_OPTIONS.find((o) => o.value === c.ensureId)?.label ?? c.ensureId ?? ''
+  const filter = FILTER_OPTIONS.find((o) => o.value === c.filterMode)?.label ?? c.filterMode ?? ''
+  const typeLabel = CONSTRAINT_TYPE_LABELS[c.type] ?? c.type
+  return [indicator, trigger, ensure, filter, typeLabel, c.indicatorId, c.triggerId, c.ensureId, c.filterMode, c.type]
+    .filter(Boolean)
+    .some((s) => s!.toLowerCase().includes(q))
+}
+
+function matchNaturalRule(r: NaturalRule, query: string): boolean {
+  return r.text.toLowerCase().includes(query.toLowerCase())
+}
+
 // --- 硬约束区 ---
 
 function ConstraintSection({
@@ -82,16 +119,17 @@ function ConstraintSection({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<AdjustmentConstraint | null>(null)
+  const [page, setPage] = useState(1)
 
-  const openCreate = () => {
-    setEditing(null)
-    setDialogOpen(true)
-  }
+  const totalPages = Math.max(1, Math.ceil(constraints.length / PAGE_SIZE))
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return constraints.slice(start, start + PAGE_SIZE)
+  }, [constraints, page])
 
-  const openEdit = (item: AdjustmentConstraint) => {
-    setEditing(item)
-    setDialogOpen(true)
-  }
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [totalPages, page])
 
   return (
     <>
@@ -103,66 +141,55 @@ function ConstraintSection({
               确定性执行，每次调整自动生效。共 {constraints.length} 条。
             </p>
           </div>
-          <Button size="sm" onClick={openCreate} disabled={submitting}>
+          <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true) }} disabled={submitting}>
             <Plus className="h-3.5 w-3.5" />
             新增约束
           </Button>
         </div>
 
         {constraints.length === 0 && (
-          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
             暂无硬约束
           </div>
         )}
 
         <div className="space-y-2">
-          {constraints.map((item) => (
+          {paged.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3"
+              className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-2.5"
             >
-              <div className="min-w-0 space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px]">
-                    {CONSTRAINT_TYPE_LABELS[item.type] ?? item.type}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {formatConstraintSummary(item)}
-                  </span>
-                </div>
+              <div className="min-w-0 flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] shrink-0">
+                  {CONSTRAINT_TYPE_LABELS[item.type] ?? item.type}
+                </Badge>
+                <span className="text-xs text-muted-foreground truncate">
+                  {formatConstraintSummary(item)}
+                </span>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => openEdit(item)} disabled={submitting}>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => { setEditing(item); setDialogOpen(true) }} disabled={submitting}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void onDelete(item.id)}
-                  disabled={submitting}
-                >
+                <Button variant="ghost" size="sm" onClick={() => void onDelete(item.id)} disabled={submitting}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
           ))}
         </div>
+
+        <Pagination current={page} total={totalPages} onChange={setPage} />
       </div>
 
       <ConstraintDialog
         open={dialogOpen}
         editing={editing}
         submitting={submitting}
-        onClose={() => {
-          setDialogOpen(false)
-          setEditing(null)
-        }}
+        onClose={() => { setDialogOpen(false); setEditing(null) }}
         onSave={async (data) => {
-          if (editing) {
-            await onUpdate(editing.id, data)
-          } else {
-            await onAdd(data)
-          }
+          if (editing) await onUpdate(editing.id, data)
+          else await onAdd(data)
           setDialogOpen(false)
           setEditing(null)
         }}
@@ -407,31 +434,24 @@ function NaturalRuleSection({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<NaturalRule | null>(null)
   const [draft, setDraft] = useState('')
+  const [page, setPage] = useState(1)
 
-  const openCreate = () => {
-    setEditing(null)
-    setDraft('')
-    setDialogOpen(true)
-  }
+  const totalPages = Math.max(1, Math.ceil(rules.length / PAGE_SIZE))
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return rules.slice(start, start + PAGE_SIZE)
+  }, [rules, page])
 
-  const openEdit = (item: NaturalRule) => {
-    setEditing(item)
-    setDraft(item.text)
-    setDialogOpen(true)
-  }
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [totalPages, page])
 
   const handleSave = async () => {
     const text = draft.trim()
-    if (!text) {
-      toast.error('规则内容不能为空')
-      return
-    }
+    if (!text) { toast.error('规则内容不能为空'); return }
     try {
-      if (editing) {
-        await onUpdate(editing.id, text)
-      } else {
-        await onAdd(text)
-      }
+      if (editing) await onUpdate(editing.id, text)
+      else await onAdd(text)
       setDialogOpen(false)
       setEditing(null)
       setDraft('')
@@ -450,61 +470,44 @@ function NaturalRuleSection({
               作为 AI 对话上下文生效，由大模型理解和遵守。共 {rules.length} 条。
             </p>
           </div>
-          <Button size="sm" onClick={openCreate} disabled={submitting}>
+          <Button size="sm" onClick={() => { setEditing(null); setDraft(''); setDialogOpen(true) }} disabled={submitting}>
             <Plus className="h-3.5 w-3.5" />
             新增规则
           </Button>
         </div>
 
         {rules.length === 0 && (
-          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
             暂无自然语言规则
           </div>
         )}
 
         <div className="space-y-2">
-          {rules.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3"
-            >
+          {paged.map((item) => (
+            <div key={item.id} className="flex items-start justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-2.5">
               <div className="min-w-0">
                 <div className="text-sm leading-6 text-foreground">{item.text}</div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => openEdit(item)} disabled={submitting}>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => { setEditing(item); setDraft(item.text); setDialogOpen(true) }} disabled={submitting}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void onDelete(item.id)}
-                  disabled={submitting}
-                >
+                <Button variant="ghost" size="sm" onClick={() => void onDelete(item.id)} disabled={submitting}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
           ))}
         </div>
+
+        <Pagination current={page} total={totalPages} onChange={setPage} />
       </div>
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(v) => {
-          if (!v) {
-            setDialogOpen(false)
-            setEditing(null)
-            setDraft('')
-          }
-        }}
-      >
+      <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) { setDialogOpen(false); setEditing(null); setDraft('') } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editing ? '编辑规则' : '新增规则'}</DialogTitle>
-            <DialogDescription>
-              用自然语言描述规则，AI 在对话调整时会参考这些规则。
-            </DialogDescription>
+            <DialogDescription>用自然语言描述规则，AI 在对话调整时会参考这些规则。</DialogDescription>
           </DialogHeader>
           <Textarea
             value={draft}
@@ -513,9 +516,7 @@ function NaturalRuleSection({
             disabled={submitting}
           />
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
-              取消
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>取消</Button>
             <Button onClick={() => void handleSave()} disabled={submitting}>
               {submitting ? '保存中…' : '保存'}
             </Button>
@@ -541,15 +542,38 @@ export default function RuleList() {
   const updateNaturalRule = useRulesStore((s) => s.updateNaturalRule)
   const deleteNaturalRule = useRulesStore((s) => s.deleteNaturalRule)
 
+  const [search, setSearch] = useState('')
+
   useEffect(() => {
     void loadConstraints()
     void loadNaturalRules()
   }, [loadConstraints, loadNaturalRules])
 
+  const query = search.trim()
+  const filteredConstraints = useMemo(
+    () => query ? constraints.filter((c) => matchConstraint(c, query)) : constraints,
+    [constraints, query],
+  )
+  const filteredNaturalRules = useMemo(
+    () => query ? naturalRules.filter((r) => matchNaturalRule(r, query)) : naturalRules,
+    [naturalRules, query],
+  )
+
   return (
-    <div data-testid="rule-list" className="space-y-8">
+    <div data-testid="rule-list" className="space-y-6">
+      {/* 搜索栏 */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜索约束或规则…"
+          className="pl-9"
+        />
+      </div>
+
       <ConstraintSection
-        constraints={constraints}
+        constraints={filteredConstraints}
         submitting={submitting}
         onAdd={addConstraint}
         onUpdate={updateConstraint}
@@ -559,7 +583,7 @@ export default function RuleList() {
       <div className="border-t" />
 
       <NaturalRuleSection
-        rules={naturalRules}
+        rules={filteredNaturalRules}
         submitting={submitting}
         onAdd={addNaturalRule}
         onUpdate={updateNaturalRule}

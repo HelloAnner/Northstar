@@ -53,6 +53,9 @@ func NewServer(cfg *config.AppConfig) *Server {
 		log.Printf("ensure llm_system_prompt config: %v", err)
 	}
 
+	// 初始化默认硬约束（首次启动时写入）
+	seedDefaultConstraints(sqliteStore)
+
 	// 初始化 DAG 引擎，从数据库加载硬约束
 	engine := dagcalc.NewEngine(dagcalc.NewGraph(), sqliteStore, 0, 0)
 	if err := engine.ReloadRules(); err != nil {
@@ -153,4 +156,41 @@ func (s *Server) GetStore() *store.Store {
 // RouterForTest 暴露路由，仅用于测试。
 func (s *Server) RouterForTest() http.Handler {
 	return s.router
+}
+
+// seedDefaultConstraints 首次启动时写入默认硬约束。
+func seedDefaultConstraints(st *store.Store) {
+	existing, err := st.ListAdjustmentConstraints(false)
+	if err != nil || len(existing) > 0 {
+		return // 已有约束，不重复写入
+	}
+
+	f := func(v float64) *float64 { return &v }
+
+	defaults := []store.AdjustmentConstraint{
+		{Type: "clamp_target", IndicatorID: "limitAbove_month_value", MinValue: f(0), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "limitAbove_cumulative_value", MinValue: f(0), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "totalSocial_cumulative_value", MinValue: f(0), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "limitAbove_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "limitAbove_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "eatWearUse_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "microSmall_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "wholesale_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "wholesale_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "retail_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "retail_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "accommodation_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "accommodation_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "catering_month_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "catering_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "clamp_target", IndicatorID: "totalSocial_cumulative_rate", MinValue: f(-30), MaxValue: f(50), Enabled: true},
+		{Type: "compensate", TriggerID: "limitAbove_cumulative_rate", EnsureID: "totalSocial_cumulative_rate", Relation: "gte", Tolerance: 2, Enabled: true},
+	}
+
+	for _, c := range defaults {
+		if _, err := st.CreateAdjustmentConstraint(c); err != nil {
+			log.Printf("seed constraint failed: %v", err)
+		}
+	}
+	log.Printf("seeded %d default constraints", len(defaults))
 }
