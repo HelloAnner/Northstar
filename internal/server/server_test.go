@@ -28,13 +28,13 @@ func TestNewServerInitializesCleanState(t *testing.T) {
 		_ = s.GetStore().Close()
 	})
 
-	// 验证 store 能正常加载约束（空列表）
+	// 验证默认约束已种入
 	constraints, err := s.GetStore().ListAdjustmentConstraints(false)
 	if err != nil {
 		t.Fatalf("list constraints: %v", err)
 	}
-	if len(constraints) != 0 {
-		t.Fatalf("expected 0 default constraints, got %d", len(constraints))
+	if len(constraints) != 17 {
+		t.Fatalf("expected 17 default constraints, got %d", len(constraints))
 	}
 
 	// 验证约束 API 可用
@@ -54,8 +54,8 @@ func TestNewServerInitializesCleanState(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
 		t.Fatalf("decode constraints: %v", err)
 	}
-	if len(items) != 0 {
-		t.Fatalf("expected empty constraints, got %d", len(items))
+	if len(items) != 17 {
+		t.Fatalf("expected 17 default constraints via API, got %d", len(items))
 	}
 
 	// 验证自然语言规则 API 可用

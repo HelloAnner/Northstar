@@ -39,14 +39,19 @@ type llmChatRequest struct {
 	Messages  []llmChatMessage `json:"messages"`
 }
 
+type adjustedTarget struct {
+	IndicatorID string  `json:"indicatorId"`
+	Value       float64 `json:"value"`
+}
+
 type llmResultPayload struct {
 	Mode             string                   `json:"mode"`
 	Reply            string                   `json:"reply"`
 	Groups           []dagcalc.IndicatorGroup `json:"groups,omitempty"`
 	AppliedRules     []dagcalc.AppliedRule    `json:"appliedRules,omitempty"`
 	RuleAdded        *ruleAddedPayload        `json:"ruleAdded,omitempty"`
-	// AdjustedTargets 直接调整的指标 ID 列表（不含规则触发的联动变更）
-	AdjustedTargets  []string                 `json:"adjustedTargets,omitempty"`
+	// AdjustedTargets 直接调整的指标及其目标值
+	AdjustedTargets  []adjustedTarget         `json:"adjustedTargets,omitempty"`
 }
 
 type ruleAddedPayload struct {
@@ -291,10 +296,10 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
-	// 收集直接调整的指标 ID，用于前端绿色高亮
-	targetIDs := make([]string, 0, len(targets))
-	for id := range targets {
-		targetIDs = append(targetIDs, id)
+	// 收集直接调整的指标及其目标值
+	adjustedList := make([]adjustedTarget, 0, len(targets))
+	for id, val := range targets {
+		adjustedList = append(adjustedList, adjustedTarget{IndicatorID: id, Value: val})
 	}
 
 	return &llmResultPayload{
@@ -303,7 +308,7 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		Groups:          resp.Groups,
 		AppliedRules:    resp.AppliedRules,
 		RuleAdded:       ruleAdded,
-		AdjustedTargets: targetIDs,
+		AdjustedTargets: adjustedList,
 	}, nil
 }
 

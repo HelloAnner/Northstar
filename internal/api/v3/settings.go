@@ -76,6 +76,7 @@ func (h *Handler) UpdateSystemPrompt(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存系统提示词失败"})
 		return
 	}
+	_ = h.store.SetConfig("llm_system_prompt_modified", "true")
 
 	c.JSON(http.StatusOK, userPromptResponse{Content: content})
 }

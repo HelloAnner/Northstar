@@ -33,6 +33,7 @@ export interface ChatPanelMessage {
   reasoning?: string
   reasoningDone?: boolean
   appliedRules?: AppliedRule[]
+  adjustedTargets?: AdjustedTarget[]
   ruleAdded?: RuleAddedPayload
   /** 本次调整涉及的指标 ID 列表 */
   changedIndicatorIds?: string[]
@@ -43,13 +44,18 @@ interface RuleAddedPayload {
   status: string
 }
 
+interface AdjustedTarget {
+  indicatorId: string
+  value: number
+}
+
 interface StreamResultPayload {
   mode: string
   reply: string
   appliedRules?: AppliedRule[]
   ruleAdded?: RuleAddedPayload
-  /** 直接调整的指标 ID 列表（后端返回，用于绿色高亮） */
-  adjustedTargets?: string[]
+  /** 直接调整的指标及其目标值 */
+  adjustedTargets?: AdjustedTarget[]
 }
 
 interface StreamEvent {
@@ -312,55 +318,83 @@ function HistoryListView({
 
 // ─── 调整结果卡片 ──────────────────────────────────────────
 
-function AdjustmentCard({ rules }: { rules: AppliedRule[] }) {
-  const [open, setOpen] = useState(false)
-  if (!rules || rules.length === 0) return null
+function AdjustmentCard({ targets, rules }: { targets: AdjustedTarget[]; rules: AppliedRule[] }) {
+  const [open, setOpen] = useState(true)
+  const totalActions = targets.length + rules.length
+  if (totalActions === 0) return null
 
   return (
-    <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-b from-emerald-50/60 to-emerald-50/30 dark:border-emerald-800/40 dark:from-emerald-950/30 dark:to-emerald-950/10">
+    <div className="rounded-xl border border-sky-200/70 bg-gradient-to-b from-sky-50/60 to-sky-50/30 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-sky-950/10">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2.5 px-3.5 py-2.5"
       >
-        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-          已执行 {rules.length} 项调整
+        <Target className="h-4 w-4 text-sky-500" />
+        <span className="text-xs font-semibold text-sky-700 dark:text-sky-400">
+          数据调整 · {targets.length} 项指标{rules.length > 0 ? ` · ${rules.length} 条约束生效` : ''}
         </span>
-        {open ? <ChevronDown className="ml-auto h-3.5 w-3.5 text-emerald-500" /> : <ChevronRight className="ml-auto h-3.5 w-3.5 text-emerald-500" />}
+        {open ? <ChevronDown className="ml-auto h-3.5 w-3.5 text-sky-500" /> : <ChevronRight className="ml-auto h-3.5 w-3.5 text-sky-500" />}
       </button>
       {open && (
-        <div className="border-t border-emerald-200/50 dark:border-emerald-800/30">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-emerald-600/70 dark:text-emerald-400/60">
-                <th className="px-3.5 py-2 text-left font-medium">类型</th>
-                <th className="px-3.5 py-2 text-left font-medium">指标</th>
-                <th className="px-3.5 py-2 text-right font-medium">变更</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="border-t border-sky-200/50 dark:border-sky-800/30 px-3.5 py-2.5 space-y-3">
+          {/* 直接调整的目标 */}
+          {targets.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-500/70">调整目标</div>
+              {targets.map((t) => {
+                const label = INDICATOR_LABEL_MAP[t.indicatorId] ?? t.indicatorId
+                return (
+                  <div key={t.indicatorId} className="flex items-center justify-between text-xs">
+                    <span className="text-stone-600 dark:text-stone-400">{label}</span>
+                    <span className="font-semibold text-sky-700 dark:text-sky-400">→ {Math.round(t.value)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* 约束生效情况 */}
+          {rules.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500/70">约束生效</div>
               {rules.map((rule, i) => (
-                <tr key={`${rule.ruleId}-${i}`} className="border-t border-emerald-100/60 dark:border-emerald-800/20">
-                  <td className="px-3.5 py-2 text-emerald-600 dark:text-emerald-400">
-                    {rule.type === 'clamp_target' && '裁剪'}
-                    {rule.type === 'filter_allocation' && '过滤'}
-                    {rule.type === 'compensate' && '联动'}
-                    {!['clamp_target', 'filter_allocation', 'compensate'].includes(rule.type) && rule.type}
-                  </td>
-                  <td className="px-3.5 py-2 text-stone-600 dark:text-stone-400">
-                    {rule.indicatorId || rule.ensureId || rule.ruleId}
-                  </td>
-                  <td className="px-3.5 py-2 text-right">
-                    <RuleChangeValue rule={rule} />
-                  </td>
-                </tr>
+                <div key={`${rule.ruleId}-${i}`} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                      {rule.type === 'clamp_target' ? '裁剪' : rule.type === 'filter_allocation' ? '过滤' : rule.type === 'compensate' ? '联动' : rule.type}
+                    </span>
+                    <span className="text-stone-600 dark:text-stone-400">
+                      {rule.indicatorId || rule.ensureId || rule.ruleId}
+                    </span>
+                  </div>
+                  <RuleChangeValue rule={rule} />
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+const INDICATOR_LABEL_MAP: Record<string, string> = {
+  limitAbove_month_value: '限上社零额月值',
+  limitAbove_month_rate: '限上社零额月增速',
+  limitAbove_cumulative_value: '限上社零额累计值',
+  limitAbove_cumulative_rate: '限上社零额累计增速',
+  eatWearUse_month_rate: '吃穿用月增速',
+  microSmall_month_rate: '小微企业月增速',
+  wholesale_month_rate: '批发业月增速',
+  wholesale_cumulative_rate: '批发业累计增速',
+  retail_month_rate: '零售业月增速',
+  retail_cumulative_rate: '零售业累计增速',
+  accommodation_month_rate: '住宿业月增速',
+  accommodation_cumulative_rate: '住宿业累计增速',
+  catering_month_rate: '餐饮业月增速',
+  catering_cumulative_rate: '餐饮业累计增速',
+  totalSocial_cumulative_value: '社零总额累计值',
+  totalSocial_cumulative_rate: '社零总额累计增速',
 }
 
 function RuleChangeValue({ rule }: { rule: AppliedRule }) {
@@ -499,9 +533,9 @@ function MessageBubble({ message }: { message: ChatPanelMessage }) {
         {message.streaming && <span className="inline-block h-4 w-0.5 animate-pulse bg-stone-400" />}
 
         {/* 调整结果卡片 */}
-        {message.appliedRules && message.appliedRules.length > 0 && (
-          <AdjustmentCard rules={message.appliedRules} />
-        )}
+        {(message.adjustedTargets?.length || message.appliedRules?.length) ? (
+          <AdjustmentCard targets={message.adjustedTargets ?? []} rules={message.appliedRules ?? []} />
+        ) : null}
 
         {/* 规则添加卡片 */}
         {message.ruleAdded && <RuleAddedCard ruleAdded={message.ruleAdded} />}
@@ -584,6 +618,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
             role: msg.role,
             content: msg.content,
             appliedRules: msg.appliedRules,
+            adjustedTargets: msg.adjustedTargets,
             ruleAdded: msg.ruleAdded,
           })),
         }),
@@ -603,6 +638,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
         role: m.role,
         content: m.content,
         appliedRules: m.appliedRules,
+        adjustedTargets: m.adjustedTargets,
         ruleAdded: m.ruleAdded,
       }))
       setSessionId(id)
@@ -771,7 +807,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
       setThinking(false)
       applyResult(event.result)
       if (event.result.mode === 'adjust') {
-        const fromTargets = event.result.adjustedTargets ?? []
+        const fromTargets = (event.result.adjustedTargets ?? []).map((t) => t.indicatorId)
         const fromRules = extractChangedIndicatorIds(event.result.appliedRules)
         const changedIds = [...new Set([...fromTargets, ...fromRules])]
         onAdjustApplied?.(changedIds)
@@ -839,6 +875,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
             role: 'assistant',
             content: result.reply,
             appliedRules: result.appliedRules ?? [],
+            adjustedTargets: result.adjustedTargets ?? [],
             ruleAdded: result.ruleAdded,
             changedIndicatorIds: changedIds,
           },
@@ -851,6 +888,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
           content: last.content || result.reply,
           streaming: false,
           appliedRules: result.appliedRules ?? last.appliedRules,
+          adjustedTargets: result.adjustedTargets ?? last.adjustedTargets,
           ruleAdded: result.ruleAdded ?? last.ruleAdded,
           changedIndicatorIds: changedIds.length > 0 ? changedIds : last.changedIndicatorIds,
         },

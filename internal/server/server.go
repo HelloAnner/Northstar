@@ -49,8 +49,16 @@ func NewServer(cfg *config.AppConfig) *Server {
 	if err := sqliteStore.EnsureConfig("llm_user_prompt", ""); err != nil {
 		log.Printf("ensure llm_user_prompt config: %v", err)
 	}
-	if err := sqliteStore.EnsureConfig("llm_system_prompt", llm.DefaultSystemPromptBody); err != nil {
-		log.Printf("ensure llm_system_prompt config: %v", err)
+	if err := sqliteStore.EnsureConfig("llm_system_prompt_modified", "false"); err != nil {
+		log.Printf("ensure llm_system_prompt_modified config: %v", err)
+	}
+	// 如果用户未自行修改过系统提示词，每次启动用代码中的默认值覆盖数据库
+	modified, _ := sqliteStore.GetConfig("llm_system_prompt_modified")
+	if modified != "true" {
+		_ = sqliteStore.SetConfig("llm_system_prompt", llm.DefaultSystemPromptBody)
+	} else {
+		// 确保 key 存在（用户修改过，保留 DB 值）
+		_ = sqliteStore.EnsureConfig("llm_system_prompt", llm.DefaultSystemPromptBody)
 	}
 
 	// 初始化默认硬约束（首次启动时写入）
