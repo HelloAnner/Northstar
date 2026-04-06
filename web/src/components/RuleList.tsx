@@ -172,7 +172,7 @@ function ConstraintSection({
 }
 
 function formatConstraintSummary(c: AdjustmentConstraint): string {
-  const indicator = INDICATOR_OPTIONS.find((o) => o.value === c.indicatorId)?.label ?? c.indicatorId
+  const indicator = INDICATOR_OPTIONS.find((o) => o.value === c.indicatorId)?.label ?? c.indicatorId ?? ''
   if (c.type === 'clamp_target') {
     const parts: string[] = [indicator]
     if (c.minValue != null) parts.push(`≥ ${c.minValue}`)
