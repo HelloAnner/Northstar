@@ -46,7 +46,10 @@ interface RuleAddedPayload {
 
 interface AdjustedTarget {
   indicatorId: string
-  value: number
+  target: number
+  actual: number
+  delta: number
+  converged: boolean
 }
 
 interface StreamResultPayload {
@@ -323,48 +326,77 @@ function AdjustmentCard({ targets, rules }: { targets: AdjustedTarget[]; rules: 
   const totalActions = targets.length + rules.length
   if (totalActions === 0) return null
 
+  const allConverged = targets.every((t) => t.converged)
+
   return (
-    <div className="rounded-xl border border-sky-200/70 bg-gradient-to-b from-sky-50/60 to-sky-50/30 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-sky-950/10">
+    <div className={`rounded-xl border bg-gradient-to-b ${allConverged ? 'border-emerald-200/70 from-emerald-50/60 to-emerald-50/30 dark:border-emerald-800/40 dark:from-emerald-950/30 dark:to-emerald-950/10' : 'border-amber-200/70 from-amber-50/60 to-amber-50/30 dark:border-amber-800/40 dark:from-amber-950/30 dark:to-amber-950/10'}`}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2.5 px-3.5 py-2.5"
       >
-        <Target className="h-4 w-4 text-sky-500" />
-        <span className="text-xs font-semibold text-sky-700 dark:text-sky-400">
-          数据调整 · {targets.length} 项指标{rules.length > 0 ? ` · ${rules.length} 条约束生效` : ''}
+        {allConverged
+          ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          : <Target className="h-4 w-4 text-amber-500" />
+        }
+        <span className={`text-xs font-semibold ${allConverged ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+          {allConverged ? '调整完成' : '调整有偏差'} · {targets.length} 项指标
+          {rules.length > 0 ? ` · ${rules.length} 条约束` : ''}
         </span>
-        {open ? <ChevronDown className="ml-auto h-3.5 w-3.5 text-sky-500" /> : <ChevronRight className="ml-auto h-3.5 w-3.5 text-sky-500" />}
+        {open
+          ? <ChevronDown className={`ml-auto h-3.5 w-3.5 ${allConverged ? 'text-emerald-500' : 'text-amber-500'}`} />
+          : <ChevronRight className={`ml-auto h-3.5 w-3.5 ${allConverged ? 'text-emerald-500' : 'text-amber-500'}`} />
+        }
       </button>
       {open && (
-        <div className="border-t border-sky-200/50 dark:border-sky-800/30 px-3.5 py-2.5 space-y-3">
-          {/* 直接调整的目标 */}
+        <div className="border-t border-stone-200/50 dark:border-stone-800/30">
+          {/* 调整验证表 */}
           {targets.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-500/70">调整目标</div>
-              {targets.map((t) => {
-                const label = INDICATOR_LABEL_MAP[t.indicatorId] ?? t.indicatorId
-                return (
-                  <div key={t.indicatorId} className="flex items-center justify-between text-xs">
-                    <span className="text-stone-600 dark:text-stone-400">{label}</span>
-                    <span className="font-semibold text-sky-700 dark:text-sky-400">→ {Math.round(t.value)}</span>
-                  </div>
-                )
-              })}
-            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-stone-500 dark:text-stone-400">
+                  <th className="px-3.5 py-2 text-left font-medium">指标</th>
+                  <th className="px-3.5 py-2 text-right font-medium">目标</th>
+                  <th className="px-3.5 py-2 text-right font-medium">实际</th>
+                  <th className="px-3.5 py-2 text-right font-medium">偏差</th>
+                  <th className="px-3.5 py-2 text-center font-medium">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {targets.map((t) => {
+                  const label = INDICATOR_LABEL_MAP[t.indicatorId] ?? t.indicatorId
+                  return (
+                    <tr key={t.indicatorId} className="border-t border-stone-100/60 dark:border-stone-800/20">
+                      <td className="px-3.5 py-2 text-stone-600 dark:text-stone-400">{label}</td>
+                      <td className="px-3.5 py-2 text-right text-stone-500">{Math.round(t.target)}</td>
+                      <td className="px-3.5 py-2 text-right font-semibold text-stone-700 dark:text-stone-300">{Math.round(t.actual)}</td>
+                      <td className={`px-3.5 py-2 text-right ${Math.abs(t.delta) < 0.5 ? 'text-stone-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                        {t.delta > 0 ? '+' : ''}{Math.round(t.delta * 10) / 10}
+                      </td>
+                      <td className="px-3.5 py-2 text-center">
+                        {t.converged
+                          ? <CheckCircle2 className="inline h-3.5 w-3.5 text-emerald-500" />
+                          : <Target className="inline h-3.5 w-3.5 text-amber-500" />
+                        }
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
 
           {/* 约束生效情况 */}
           {rules.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500/70">约束生效</div>
+            <div className="border-t border-stone-200/50 dark:border-stone-800/30 px-3.5 py-2.5 space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">约束生效</div>
               {rules.map((rule, i) => (
                 <div key={`${rule.ruleId}-${i}`} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
-                    <span className="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                    <span className="inline-flex items-center rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-600 dark:bg-stone-800 dark:text-stone-400">
                       {rule.type === 'clamp_target' ? '裁剪' : rule.type === 'filter_allocation' ? '过滤' : rule.type === 'compensate' ? '联动' : rule.type}
                     </span>
                     <span className="text-stone-600 dark:text-stone-400">
-                      {rule.indicatorId || rule.ensureId || rule.ruleId}
+                      {INDICATOR_LABEL_MAP[rule.indicatorId ?? ''] ?? INDICATOR_LABEL_MAP[rule.ensureId ?? ''] ?? rule.indicatorId ?? rule.ensureId ?? rule.ruleId}
                     </span>
                   </div>
                   <RuleChangeValue rule={rule} />
@@ -821,7 +853,7 @@ export default function ChatPanel({ open, onOpenChange, onAdjustApplied, suggest
       setThinking(false)
       applyResult(event.result)
       if (event.result.mode === 'adjust') {
-        const fromTargets = (event.result.adjustedTargets ?? []).map((t) => t.indicatorId)
+        const fromTargets = (event.result.adjustedTargets ?? []).map((t: AdjustedTarget) => t.indicatorId)
         const fromRules = extractChangedIndicatorIds(event.result.appliedRules)
         const changedIds = [...new Set([...fromTargets, ...fromRules])]
         onAdjustApplied?.(changedIds)

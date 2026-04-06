@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -41,7 +42,10 @@ type llmChatRequest struct {
 
 type adjustedTarget struct {
 	IndicatorID string  `json:"indicatorId"`
-	Value       float64 `json:"value"`
+	Target      float64 `json:"target"`      // 请求的目标值
+	Actual      float64 `json:"actual"`      // 引擎执行后的实际值
+	Delta       float64 `json:"delta"`       // 偏差 = actual - target
+	Converged   bool    `json:"converged"`   // |delta| < 阈值
 }
 
 type llmResultPayload struct {
@@ -302,13 +306,9 @@ func (h *Handler) runAdjustMode(stream *llmStreamWriter, chatCtx llmChatContext)
 		return nil, err
 	}
 
-	// 收集直接调整的指标，使用引擎执行后的实际值（而非意图目标值）
+	// 验证：对比请求的目标值 vs 引擎执行后的实际值
 	actualValues := buildIndicatorValueMap(resp.Groups)
-	adjustedList := make([]adjustedTarget, 0, len(targets))
-	for id := range targets {
-		actual := actualValues[id]
-		adjustedList = append(adjustedList, adjustedTarget{IndicatorID: id, Value: actual})
-	}
+	adjustedList := buildVerifiedTargets(targets, actualValues)
 
 	return &llmResultPayload{
 		Mode:            "adjust",
@@ -346,6 +346,39 @@ func adjustByPercent(indicatorID string, current float64, percent float64) float
 		return current + percent
 	}
 	return current * (1 + percent/100)
+}
+
+// buildVerifiedTargets 对比请求目标和实际结果，生成验证后的调整列表。
+// 阈值：增速指标允许 2 个百分点偏差，数值指标允许 2% 偏差。
+func buildVerifiedTargets(targets map[string]float64, actual map[string]float64) []adjustedTarget {
+	const rateThreshold = 2.0    // 百分点
+	const valueThreshold = 0.02  // 2%
+
+	list := make([]adjustedTarget, 0, len(targets))
+	for id, target := range targets {
+		actualVal := actual[id]
+		delta := actualVal - target
+
+		var converged bool
+		if strings.HasSuffix(id, "_rate") {
+			converged = math.Abs(delta) <= rateThreshold
+		} else {
+			if target == 0 {
+				converged = math.Abs(delta) < 1
+			} else {
+				converged = math.Abs(delta/target) <= valueThreshold
+			}
+		}
+
+		list = append(list, adjustedTarget{
+			IndicatorID: id,
+			Target:      math.Round(target*100) / 100,
+			Actual:      math.Round(actualVal*100) / 100,
+			Delta:       math.Round(delta*100) / 100,
+			Converged:   converged,
+		})
+	}
+	return list
 }
 
 // addRuleFromChat 通过聊天添加自然语言规则，直接写入数据库
