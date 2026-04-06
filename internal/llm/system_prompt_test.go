@@ -80,6 +80,39 @@ func TestBuildChatSystemPromptIncludesBuiltInGuardrails(t *testing.T) {
 	)
 }
 
+func TestBuildChatSystemPromptUsesCustomBody(t *testing.T) {
+	customBody := "这是自定义的业务背景。\n\n# 自定义回答规则\n- 用英文回答"
+	prompt := BuildChatSystemPrompt(SystemPromptContext{
+		Year:             2026,
+		Month:            3,
+		ConstraintCount:  0,
+		IndicatorSummary: "- test = 0",
+		SystemPromptBody: customBody,
+	}, "")
+
+	assertPromptContains(t, prompt,
+		"Northstar",         // 角色定义始终存在
+		"自定义的业务背景",  // 自定义正文生效
+		"用英文回答",
+		"2026年3月",         // 运行时数据仍注入
+	)
+	if strings.Contains(prompt, "社会消费品零售总额") {
+		t.Fatalf("custom body should replace default, but default content still present")
+	}
+}
+
+func TestBuildChatSystemPromptFallsBackToDefault(t *testing.T) {
+	prompt := BuildChatSystemPrompt(SystemPromptContext{
+		Year:             2026,
+		Month:            3,
+		ConstraintCount:  0,
+		IndicatorSummary: "- test = 0",
+		SystemPromptBody: "", // 空 → 回退默认
+	}, "")
+
+	assertPromptContains(t, prompt, "社会消费品零售总额", "调整机制")
+}
+
 func assertPromptContains(t *testing.T, prompt string, parts ...string) {
 	t.Helper()
 

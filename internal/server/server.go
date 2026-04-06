@@ -12,6 +12,7 @@ import (
 	"northstar/internal/api/v3"
 	"northstar/internal/config"
 	"northstar/internal/dagcalc"
+	"northstar/internal/llm"
 	"northstar/internal/store"
 )
 
@@ -42,6 +43,14 @@ func NewServer(cfg *config.AppConfig) *Server {
 	sqliteStore, err := store.New(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// 初始化 LLM 相关 config 默认值
+	if err := sqliteStore.EnsureConfig("llm_user_prompt", ""); err != nil {
+		log.Printf("ensure llm_user_prompt config: %v", err)
+	}
+	if err := sqliteStore.EnsureConfig("llm_system_prompt", llm.DefaultSystemPromptBody); err != nil {
+		log.Printf("ensure llm_system_prompt config: %v", err)
 	}
 
 	// 初始化 DAG 引擎，从数据库加载硬约束

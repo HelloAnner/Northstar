@@ -46,6 +46,8 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.PATCH("/config", h.UpdateConfig)
 	router.GET("/settings/user-prompt", h.GetUserPrompt)
 	router.PUT("/settings/user-prompt", h.UpdateUserPrompt)
+	router.GET("/settings/system-prompt", h.GetSystemPrompt)
+	router.PUT("/settings/system-prompt", h.UpdateSystemPrompt)
 
 	// 硬约束
 	router.GET("/constraints", h.ListConstraints)

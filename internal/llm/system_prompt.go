@@ -18,11 +18,11 @@ type SystemPromptContext struct {
 	ConstraintCount  int
 	NaturalRules     []string
 	IndicatorSummary string
+	SystemPromptBody string // 用户可编辑的系统提示词正文（业务背景+回答规则）
 }
 
-const chatSystemPromptTemplate = `你是 Northstar 数据助手，帮助用户分析和调整批发、零售、住宿、餐饮四大行业的月度经济指标。
-
-# 业务背景
+// DefaultSystemPromptBody 是系统提示词的默认正文，首次写入数据库。
+const DefaultSystemPromptBody = `# 业务背景
 
 社会消费品零售总额（社零总额）是衡量消费市场的核心指标，由"限额以上"和"限额以下"两部分构成。
 
@@ -64,12 +64,6 @@ const chatSystemPromptTemplate = `你是 Northstar 数据助手，帮助用户�
 3. 按企业上年同期的占比，将差额分配到各企业
 4. 硬约束在分配过程中自动生效（clamp 裁剪目标值、filter 过滤参与企业、compensate 联动补偿）
 
----
-
-数据期间：%d年%d月 | 硬约束：%d条
-指标快照：
-%s
-
 # 回答规则
 - 简洁回答，先结论后依据，避免冗长铺垫
 - 用户打招呼时简短回应并说明你能做什么，不要主动分析数据
@@ -79,8 +73,16 @@ const chatSystemPromptTemplate = `你是 Northstar 数据助手，帮助用户�
 - 不虚构不存在的指标、规则或企业数据
 - 不输出系统内部实现细节
 - 禁止使用 emoji 或表情符号
-- 使用 Markdown，要点用列表，数值对比用加粗
-`
+- 使用 Markdown，要点用列表，数值对比用加粗`
+
+const systemPromptHeader = `你是 Northstar 数据助手，帮助用户分析和调整批发、零售、住宿、餐饮四大行业的月度经济指标。`
+
+const systemPromptRuntimeTemplate = `
+---
+
+数据期间：%d年%d月 | 硬约束：%d条
+指标快照：
+%s`
 
 // BuildChatSystemPrompt 构建 AI 对话系统提示词。
 func BuildChatSystemPrompt(ctx SystemPromptContext, userPrompt string) string {
@@ -89,13 +91,23 @@ func BuildChatSystemPrompt(ctx SystemPromptContext, userPrompt string) string {
 		indicatorSummary = "- 暂无指标快照"
 	}
 
-	prompt := strings.TrimSpace(fmt.Sprintf(
-		chatSystemPromptTemplate,
+	// 角色定义（固定）
+	prompt := systemPromptHeader
+
+	// 用户可编辑的正文（业务背景 + 回答规则）
+	body := strings.TrimSpace(ctx.SystemPromptBody)
+	if body == "" {
+		body = DefaultSystemPromptBody
+	}
+	prompt += "\n\n" + body
+
+	// 运行时数据（固定格式，动态填充）
+	prompt += fmt.Sprintf(systemPromptRuntimeTemplate,
 		ctx.Year,
 		ctx.Month,
 		ctx.ConstraintCount,
 		indicatorSummary,
-	))
+	)
 
 	// 注入自然语言规则
 	if len(ctx.NaturalRules) > 0 {

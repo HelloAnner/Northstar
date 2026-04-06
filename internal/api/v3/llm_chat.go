@@ -394,12 +394,14 @@ func (h *Handler) newLLMClient(prompt string) (LLMChatClient, error) {
 
 func (h *Handler) buildChatPrompt(year, month int, groups []dagcalc.IndicatorGroup, userPrompt string) string {
 	naturalRules := h.loadNaturalRuleTexts()
+	systemPromptBody := h.getConfigValue("llm_system_prompt", "")
 	return llm.BuildChatSystemPrompt(llm.SystemPromptContext{
 		Year:             year,
 		Month:            month,
 		ConstraintCount:  h.engine.ConstraintCount(),
 		NaturalRules:     naturalRules,
 		IndicatorSummary: buildIndicatorSummary(groups),
+		SystemPromptBody: systemPromptBody,
 	}, userPrompt)
 }
 

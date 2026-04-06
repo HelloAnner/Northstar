@@ -7,6 +7,7 @@
 
 import AIPreferenceForm from '@/components/AIPreferenceForm'
 import RuleList from '@/components/RuleList'
+import SystemPromptEditor from '@/components/SystemPromptEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -18,13 +19,14 @@ export default function Settings() {
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Settings</div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">规则与系统偏好</h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            管理硬约束和自然语言规则，硬约束确定性执行，自然语言规则作为 AI 对话上下文。
+            管理硬约束、自然语言规则和 AI 系统配置。
           </p>
         </div>
 
         <Tabs defaultValue="rules" className="space-y-4">
           <TabsList>
             <TabsTrigger value="rules">调整规则</TabsTrigger>
+            <TabsTrigger value="system-prompt">系统提示词</TabsTrigger>
             <TabsTrigger value="ai">AI 偏好</TabsTrigger>
           </TabsList>
           <TabsContent value="rules">
@@ -36,6 +38,9 @@ export default function Settings() {
                 <RuleList />
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="system-prompt">
+            <SystemPromptEditor />
           </TabsContent>
           <TabsContent value="ai">
             <AIPreferenceForm />

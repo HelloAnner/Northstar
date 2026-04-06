@@ -313,6 +313,14 @@ export const settingsApi = {
       method: 'PUT',
       body: JSON.stringify({ content }),
     }),
+
+  getSystemPrompt: () => requestPlain<UserPromptPayload>('/settings/system-prompt'),
+
+  updateSystemPrompt: (content: string) =>
+    requestPlain<UserPromptPayload>('/settings/system-prompt', {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    }),
 }
 
 // 导出
