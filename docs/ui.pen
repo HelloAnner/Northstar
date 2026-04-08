@@ -1,0 +1,495 @@
+# Northstar UI 设计文档
+
+## 整体架构
+
+### 技术栈
+- React + TypeScript
+- Tailwind CSS
+- shadcn/ui 组件库
+- Lucide React 图标
+
+### 布局结构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Header (顶部栏)                                                  │
+│  ├─ Logo + 标题                                                   │
+│  ├─ 状态指示器 (已保存/自动保存)                                    │
+│  ├─ 月份选择器                                                    │
+│  ├─ 智能调整按钮 (橙色)                                           │
+│  ├─ 撤销、导入、导出、全局配置按钮                                  │
+│  └─ 主题切换                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Indicator Cards (指标卡片区)  4列网格                             │
+│  ├─ 限上社零额                                                    │
+│  ├─ 专项增速                                                      │
+│  ├─ 四大行业增速                                                  │
+│  └─ 社零总额                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Companies Table (企业数据微调)                                   │
+│  ├─ 标题 + 自动保存标识                                           │
+│  ├─ Tabs: 全部/批发/零售/住宿/餐饮                                 │
+│  ├─ 搜索框                                                        │
+│  └─ 可编辑数据表格                                                │
+├─────────────────────────────────────────────────────────────────┤
+│  [浮动按钮] 打开 AI 助手                                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 1. 主页面 DashboardV3
+
+### 1.1 顶部栏 (Header)
+
+**左侧**
+- Logo: NorthstarIcon (蓝色星形图标) + "Northstar" 标题
+- 副标题: "{year}年{month}月 · 共 {total} 家（批零 {wrCount} + 住餐 {acCount}）"
+
+**右侧操作区**
+- 状态 Badge:
+  - 已保存: 灰色圆点 + "已保存"
+  - 自动保存中: 绿色脉冲圆点 + "自动保存中…" / "智能调整中…"
+- 月份选择器: Select 组件，显示 "2025年12月 · 225 家"
+- 智能调整按钮: 橙色背景 (bg-orange-500)，禁用状态当没有草稿值
+- 撤销按钮: variant="outline"
+- 导入按钮: Upload 图标
+- 导出按钮: Download 图标
+- 全局配置按钮: Settings2 图标
+- 主题切换按钮
+
+### 1.2 指标卡片区域 (IndicatorCards)
+
+**布局**
+- 默认 4 列网格 (lg:grid-cols-4)
+- AI 助手打开时 2 列网格 (lg:grid-cols-2)
+- 每个卡片: border-border/60 bg-card/60 backdrop-blur
+
+**卡片内容结构**
+```
+Card
+├─ 标题: text-[13px] font-medium text-muted-foreground
+└─ 指标列表 (space-y-2)
+   └─ 每行指标
+      ├─ 左侧: 指标名称 (truncate text-[12px] text-muted-foreground)
+      │   └─ 违规标识 (可选): 红色 Badge "违规"
+      └─ 右侧: 输入框 + 单位
+          ├─ Input: rounded-full, text-right, font-mono
+          │   ├─ 数值类型: w-[150px]
+          │   ├─ 百分比类型: w-[110px]
+          │   ├─ 正数: text-emerald-600
+          │   ├─ 负数: text-rose-600
+          │   └─ 边框状态:
+          │       ├─ 已修改: border-emerald-400 ring-2
+          │       ├─ 联动高亮: border-amber-400 ring-1
+          │       ├─ 草稿值: border-orange-400/70
+          │       ├─ 违规: border-rose-400/70
+          │       └─ 默认: border-border/60
+          └─ 单位: w-9 text-right text-[11px] text-muted-foreground
+```
+
+**四个指标组**
+1. **限上社零额** (4项)
+   - 限上社零额（当月值）- 万元
+   - 限上社零额增速（当月）- %
+   - 限上社零额（累计值）- 万元
+   - 限上社零额增速（累计）- %
+
+2. **专项增速** (2项)
+   - 吃穿用增速（当月）- %
+   - 小微企业增速（当月）- %
+
+3. **四大行业增速** (8项)
+   - 批发业销售额增速（当月/累计）- %
+   - 零售业销售额增速（当月/累计）- %
+   - 住宿业营业额增速（当月/累计）- %
+   - 餐饮业营业额增速（当月/累计）- %
+
+4. **社零总额** (2项)
+   - 社零总额（累计值）- 万元
+   - 社零总额增速（累计）- %
+
+### 1.3 企业数据表格 (CompaniesTable)
+
+**卡片头部**
+```
+CardHeader
+├─ 左侧
+│   ├─ 标题: "企业数据微调" (text-base)
+│   └─ 描述: "支持搜索 / 筛选 / 排序；修改后自动保存并联动更新 16 项指标"
+└─ 右侧
+    └─ 自动保存 Badge: Save 图标 + "自动保存" / "自动保存中 · {count}"
+```
+
+**筛选栏**
+```
+Tabs (value: all/wholesale/retail/accommodation/catering)
+├─ 全部
+├─ 批发
+├─ 零售
+├─ 住宿
+└─ 餐饮
+```
+
+**搜索区**
+- 月份选择器 (与顶部栏相同)
+- 搜索输入框: Search 图标 + "按企业名称/信用代码搜索…"
+
+**表格结构**
+```
+ScrollArea (h-[520px])
+└─ Table
+    ├─ TableHeader (sticky top-0, bg-card/90, backdrop-blur)
+    │   └─ 表头行
+    │       ├─ 企业名称 (w-[260px], text-center)
+    │       ├─ 规模 (w-[72px])
+    │       ├─ 标记 (w-[120px])
+    │       ├─ 本年-上月 (w-[150px], right)
+    │       ├─ 本年-本月 (w-[160px], right, editable)
+    │       ├─ 上年-本月 (w-[160px], right, editable)
+    │       ├─ 同比增量(当月) (w-[160px], right)
+    │       ├─ 环比增量(当月) (w-[160px], right)
+    │       ├─ 环比增速(当月) (w-[160px], right)
+    │       ├─ 同比增速(当月) (w-[160px], right, editable)
+    │       ├─ 本年-1—本月 (w-[170px], right, editable)
+    │       ├─ 上年-1—本月 (w-[170px], right, editable)
+    │       ├─ 累计同比增量 (w-[160px], right)
+    │       ├─ 累计同比增速 (w-[160px], right, editable)
+    │       └─ ... (更多列)
+    └─ TableBody
+        └─ TableRow (hover:bg-muted/30)
+            └─ TableCell
+                ├─ 企业名称列
+                │   ├─ 企业名 (font-medium)
+                │   ├─ 行业 Badge (批发/零售/住宿/餐饮)
+                │   └─ 信用代码 (font-mono text-xs text-muted-foreground)
+                └─ 数据列
+                    ├─ 普通值: font-mono text-sm tabular-nums
+                    ├─ 增速值: 正数 emerald, 负数 rose
+                    └─ 可编辑: Input (h-8 w-[120px], bg-muted/20, text-center)
+```
+
+**标记列显示**
+- 小微: Badge variant="secondary"
+- 吃穿用: Badge variant="secondary"
+- 无: "-"
+
+### 1.4 AI 助手浮动按钮
+
+```
+Button (fixed bottom-6 right-6, size="icon", rounded-full, shadow-lg)
+└─ MessageCircle (h-5 w-5)
+```
+
+---
+
+## 2. AI 助手侧边栏 (ChatPanel)
+
+**整体布局**
+- 位置: 右侧固定面板 (w-[420px] 或类似)
+- 高度: 100vh
+- 边框: border-l
+
+**标题栏**
+```
+flex items-center justify-between border-b px-5 py-3.5
+├─ 左侧: "数据助手" (text-sm font-medium)
+└─ 右侧按钮组
+    ├─ 新建对话 (Plus)
+    ├─ 历史对话 (Clock)
+    └─ 关闭 (X)
+```
+
+**快捷指令区**
+```
+ rounded-xl border bg-gradient-to-b p-4 space-y-2
+├─ 说明文字: "我是数据助手，可以帮你查看、分析经济指标，也能直接调整目标值或添加约束规则。"
+└─ 快捷按钮列表 (space-y-2)
+    ├─ 解释批发增速 (Sparkles 图标)
+    ├─ 分析零售走势 (TrendingUp 图标)
+    ├─ 调整批发增速 (Target 图标)
+    ├─ 随机调整零售 (Wand2 图标)
+    └─ 添加规则 (BookPlus 图标)
+```
+
+**消息区域**
+- 滚动区域 (ScrollArea)
+- 消息类型:
+
+1. **用户消息** (justify-end)
+   ```
+   max-w-[85%] rounded-2xl rounded-br-md bg-primary/90 px-4 py-2.5
+   text-sm leading-relaxed text-primary-foreground shadow-sm
+   ```
+
+2. **AI 消息** (items-start gap-3)
+   ```
+   ├─ 头像: rounded-full bg-stone-100 dark:bg-stone-800
+   │   └─ Sparkles 图标
+   └─ 内容区
+       ├─ 思考中指示器 (3个跳动圆点)
+       ├─ 思考过程折叠面板 (amber 色调)
+       │   └─ "深度思考" + 展开/收起箭头
+       └─ 正文 (prose 样式)
+   ```
+
+3. **调整结果卡片** (VerificationCard)
+   ```
+   rounded-xl border bg-gradient-to-b
+   ├─ 收敛状态: border-emerald-200/70 from-emerald-50/60
+   │   └─ CheckCircle2 + "指标已收敛" / Target + "指标未完全收敛"
+   ├─ 表格 (text-xs)
+   │   ├─ 表头: 指标 | 目标 | 实际 | 偏差 | 状态
+   │   └─ 行数据
+   │       ├─ 指标名
+   │       ├─ 原因 (text-[10px] text-amber-600)
+   │       ├─ 目标值
+   │       ├─ 实际值
+   │       ├─ 偏差
+   │       └─ 状态图标 (CheckCircle2/Target)
+   └─ 规则生效列表
+       └─ 每项: Badge + 描述
+   ```
+
+4. **规则添加卡片**
+   ```
+   rounded-xl border bg-gradient-to-b border-emerald-200/70
+   ├─ BookPlus 图标 + "新增规则 · 值域约束"
+   └─ 规则文本
+   ```
+
+**输入区域**
+```
+border-t px-4 py-3
+├─ 输入框容器 (relative)
+│   ├─ Textarea
+│   │   └─ placeholder: "输入问题或调整指令…"
+│   └─ 发送按钮 (absolute right-2 bottom-2)
+│       └─ Send 图标
+└─ 底部工具栏
+    ├─ 深度思考 Switch
+    └─ 快捷键提示: "Enter 发送 · Shift+Enter 换行"
+```
+
+---
+
+## 3. 全局配置弹窗 (GlobalConfigDialog)
+
+**整体结构**
+```
+Dialog (max-w-6xl h-[85vh])
+├─ DialogHeader: "全局配置"
+└─ Tabs
+    ├─ 模型配置
+    ├─ 规则列表
+    └─ 系统提示词
+```
+
+### 3.1 模型配置 Tab
+
+**能力标签区** (如果有)
+```
+rounded-lg bg-stone-50 px-4 py-2.5
+├─ "模型能力"
+└─ 标签列表
+    ├─ 流式输出 (Radio 图标, emerald 色调)
+    ├─ 工具调用 (Wrench 图标)
+    └─ 深度思考 (BrainCircuit 图标)
+```
+
+**配置表单**
+```
+space-y-4
+├─ 接口地址 (Label + Input)
+│   └─ placeholder: "例如：https://api.openai.com/v1"
+├─ 模型名称 (Label + Input)
+│   └─ placeholder: "例如：gpt-4o-mini"
+├─ API 密钥 (Label + Input + 显示/隐藏按钮)
+│   └─ type: password/text 切换
+└─ 错误提示 (text-destructive)
+```
+
+**底部按钮**
+```
+flex justify-end gap-2 pt-4
+├─ 取消 (variant="outline")
+└─ 保存并测试
+```
+
+### 3.2 规则列表 Tab (RuleList)
+
+**搜索栏**
+```
+relative
+├─ Search 图标 (absolute left-3)
+└─ Input (pl-9, placeholder="搜索约束或规则…")
+```
+
+**硬约束区**
+```
+space-y-3
+├─ 头部
+│   ├─ 标题: "硬约束"
+│   ├─ 描述: "确定性执行，每次调整自动生效。共 {count} 条。"
+│   └─ 新增约束按钮 (Plus 图标)
+├─ 空状态: border-dashed + "暂无硬约束"
+└─ 约束列表 (space-y-2)
+    └─ 每项
+        ├─ 左侧
+        │   ├─ 类型 Badge (variant="outline", text-[10px])
+        │   │   └─ "值域约束" / "过滤分配" / "联动补偿"
+        │   └─ 描述文本 (truncate text-xs)
+        └─ 右侧操作
+            ├─ 编辑 (Pencil)
+            └─ 删除 (Trash2)
+```
+
+**分页组件**
+```
+flex items-center justify-center gap-2 pt-2
+├─ 上一页 (ChevronLeft)
+├─ 页码: "{current} / {total}"
+└─ 下一页 (ChevronRight)
+```
+
+**自然语言规则区**
+```
+space-y-3 (border-t 分隔)
+├─ 头部
+│   ├─ 标题: "自然语言规则"
+│   ├─ 描述: "作为 AI 对话上下文生效，由大模型理解和遵守。共 {count} 条。"
+│   └─ 新增规则按钮
+├─ 空状态: border-dashed + "暂无自然语言规则"
+└─ 规则列表
+    └─ 每项
+        ├─ 规则文本 (text-sm leading-6)
+        └─ 编辑/删除按钮
+```
+
+### 3.3 系统提示词 Tab
+
+- SystemPromptEditor 组件 (embedded 模式)
+- Textarea 编辑区域
+
+---
+
+## 4. 导入/导出弹窗
+
+### 4.1 导入弹窗 (ImportDialog)
+
+**结构**
+```
+Dialog
+├─ DialogHeader: "导入 Excel"
+├─ 上传区域
+│   └─ 拖拽/点击上传 (border-dashed rounded-lg)
+├─ 已上传文件列表
+│   └─ 文件名 + Sheet 选择 + 删除按钮
+├─ 导入预览/进度
+└─ 底部按钮: 取消 / 开始导入
+```
+
+### 4.2 导出弹窗 (ExportDialog)
+
+**结构**
+```
+Dialog
+├─ DialogHeader: "导出数据"
+├─ 月份信息展示
+├─ 导出选项 (Checkbox 列表)
+│   ├─ 包含企业明细
+│   ├─ 包含指标汇总
+│   └─ ...
+└─ 底部按钮: 取消 / 导出 Excel
+```
+
+---
+
+## 5. 设计系统
+
+### 5.1 颜色系统
+
+**主要颜色**
+- Primary: 系统默认主色
+- Background: 页面背景
+- Card: 卡片背景 (bg-card/60 backdrop-blur)
+- Border: border-border/60
+
+**状态颜色**
+- 成功/正数: emerald-600 (dark: emerald-400)
+- 警告/草稿: orange-400, amber-400
+- 错误/负数: rose-600 (dark: rose-400)
+- 违规标识: rose-100 text-rose-700
+
+**特殊颜色**
+- 智能调整按钮: bg-orange-500 hover:bg-orange-600
+- AI 助手: stone 色调
+- 思考过程: amber 色调
+- 收敛状态: emerald 色调
+
+### 5.2 字体系统
+
+**字号**
+- 页面标题: text-3xl font-semibold tracking-tight
+- 卡片标题: text-[13px] font-medium
+- 指标名称: text-[12px]
+- 表格头部: text-base
+- 表格内容: text-sm
+- 数值: font-mono text-sm tabular-nums
+
+### 5.3 圆角系统
+
+- 卡片: 默认 (rounded-lg)
+- 按钮: 默认
+- 输入框: 默认 或 rounded-full (指标输入)
+- 徽章: rounded-full
+
+### 5.4 间距系统
+
+- 页面内边距: p-6
+- 卡片内边距: p-4
+- 卡片间距: gap-4
+- 表单间距: space-y-4 / space-y-2
+
+### 5.5 阴影与效果
+
+- 卡片: backdrop-blur supports-[backdrop-filter]:bg-card/50
+- 浮动按钮: shadow-lg
+- 输入框聚焦: ring-2 / ring-1
+
+---
+
+## 6. 组件清单
+
+### shadcn/ui 组件
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Input
+- Badge
+- Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+- Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+- Tabs, TabsList, TabsTrigger, TabsContent
+- Dialog, DialogContent, DialogHeader, DialogTitle
+- ScrollArea
+- Skeleton
+- Textarea
+- Label
+- Switch
+- Separator
+
+### 自定义组件
+- IndicatorCards
+- CompaniesTable
+- ChatPanel
+- GlobalConfigDialog
+- RuleList
+- ImportDialog
+- ExportDialog
+- NorthstarIcon
+- ThemeToggle
+
+### Lucide 图标
+- Upload, Download, Settings2, MessageCircle
+- Search, Save, Loader2, Plus, Pencil, Trash2
+- ChevronLeft, ChevronRight, ChevronDown, ChevronRight
+- Sparkles, TrendingUp, Target, Wand2, BookPlus
+- Check, X, Zap, BrainCircuit, Radio, Wrench
+- CheckCircle2, ArrowRight
